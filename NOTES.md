@@ -536,3 +536,42 @@ Următorii pași: login Steam (QR, date mobile/WiFi) ca jocul să fie online; pe
   mari (Dota 2) vor fi foarte lente. Pasul următor pentru Mali ar fi un wrapper spre driverul vendor
   (ideea vulkan-wrapper-android).
 - Cost: ~150 MB în plus în rootfs-ul arm64 (LLVM).
+
+## N-028 · Clientul Steam pornește pe telefon: login, bibliotecă, magazin  ✅ (Realme GT, 2026-09-26)
+Verificat pe telefon: ecranul de login Steam, login cu parolă (tastat prin `adb shell input`, trece prin
+XTEST), apoi biblioteca și magazinul. Steam a găsit Dota 2 în `files/steamlib` și a pornit validarea.
+Blocajele, în ordinea în care au apărut:
+- **Semafoare x86:** `semtest` x86-64 și i386 trec prin FEX („all ok”). Sunt compilate dinamic, pentru că
+  binarele statice x86 crapă sub FEX pe kernelul 5.4.
+- **`DiskCache=1` (FEX-2609)** face ca `steam-runtime/setup.sh` să crape cu segfault. E oprit implicit, cu o
+  cheie nouă de preferință (`fex_disk_cache_v2`). În Setări e marcat experimental.
+- **GLX:** vgui (`glXChooseVisual`) cere GLX. `build-rootfs.sh` păstrează doar `swrast_dri.so` (libgallium).
+  `XSession` dă `LIBGL_DRIVERS_PATH` numai procesului Xvfb, pentru că `ld.so` deschide căile `/usr` direct,
+  fără fxpath. Layerele Vulkan implicite Mesa (device_select, overlay) sunt scoase.
+- **DNS:** Android nu are `/etc/resolv.conf`. `LinuxEnv.writeIdentityFiles` scrie `resolv.conf` și `hosts` și
+  în rootfs-urile x86 (DNS din `ConnectivityManager`, fără IPv6 cu scope, maxim 3).
+- **`/proc` gol în rootfs:** FEX deschide `<rootfs>/proc` când există, iar exporturile Docker/OCI îl au ca
+  director gol. `openat(fd_proc, "self/task")` dădea ENOENT și zygote-ul Chromium murea (`thread_helpers.cc`).
+  Aplicația șterge `proc`/`sys` goale; scripturile de build nu le mai pun.
+- **libpci:** `/proc/bus/pci` există, dar SELinux interzice citirea, iar handler-ul implicit libpci face
+  `exit(1)`, deci procesul GPU al CEF murea la fiecare pornire. Patch FEX: `/proc/bus/pci` apare ca ENOENT, iar
+  `/sys/bus/pci` e redirecționat spre un arbore gol (`usr/share/fex-emu/fexdroid-empty-pci`), adică o mașină
+  fără PCI.
+- **Socket AF_UNIX în `/tmp`:** `bind("/tmp/steam_chrome_shmem_…")` dădea ENOENT, pentru că FEX trimite căile
+  socket-urilor neschimbate. Patch FEX: pentru `bind`/`connect` (x86-64 și socketcall i386), o cale al cărei
+  părinte există doar în RootFS e rescrisă spre RootFS (`FileManager::RootFSSocketAddr`).
+- **Client Steam incomplet:** copierea de dimineață se oprise la jumătatea unui fișier (`steamui/library.js`
+  lipsea, iar `-noverifyfiles` ascundea asta). `adb-copy-steam-client.sh` e acum incremental și verifică
+  dimensiunile. Listarea pe telefon folosește `find -print0 | xargs`, pentru că `find -exec {} +` din toybox
+  depășea ARG_MAX.
+- **403 pe websocket-ul UI** (`logs/transport_client.txt`): clientul verifică cine e la celălalt capăt cu
+  `lsof -P -F upnR -i TCP@127.0.0.1:<port>`. Aplicațiile Android nu pot citi `/proc/net/tcp` și nici folosi
+  `NETLINK_SOCK_DIAG` (testat: EACCES). Soluția păstrează verificarea reală, nu o ocolește. FEX notează
+  socket-urile TCP ale oaspeților la `connect`/`bind`/`accept` (`patches/fex/src/AndroidTcpRegistry.h`), iar
+  `tools/lsof/fxlsof.c` răspunde din acest registru. Raportează o intrare doar cât timp `/proc/<pid>/fd` al acelui
+  proces încă ține socket-ul. Formatul de ieșire e identic cu lsof -F (verificat pe PC).
+- Unelte de depanare: `files/strace-steam.txt` (opțiuni strace pentru tot arborele Steam),
+  `files/steam-launch-options.txt` (de ex. `-cef-enable-debugging` → DevTools pe portul 8080, cu
+  `adb forward`) și `scripts/lib/cdp.py` (client DevTools fără dependențe).
+- **Baterie:** sub sarcină, portul USB al PC-ului nu ține pasul; telefonul s-a oprit la 0% în timpul validării
+  Dota. Pentru sesiuni lungi e nevoie de încărcător de priză (adb prin Wi-Fi).
