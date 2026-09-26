@@ -15,7 +15,10 @@ allowlist. FEX forwards many guest syscalls to the host verbatim; this patch:
   * x86-64 set/get_robust_list kept in FEX (like FEX already does for 32-bit
     guests) instead of registering with the kernel;
   * replaces raw openat2 calls in FileManagement with a userspace RESOLVE_IN_ROOT
-    implementation (patches/fex/src/AndroidOpenat2.h).
+    implementation (patches/fex/src/AndroidOpenat2.h);
+  * bind/connect: AF_UNIX paths under guest-only dirs (/tmp) map into the RootFS;
+  * hides host paths apps cannot read (/proc/bus/pci) from guests: ENOENT, and shows
+    /sys/bus/pci as an empty tree (libpci exit()s without a working access method).
 Raw ::syscall() sites are covered by our glibc's syscall() wrapper (glibc 0003).
 
 usage: make-fex-android-patch.py <fex src (pristine for these files)> <aosp-dir> <unistd.h> <patch out>
@@ -37,6 +40,43 @@ GUARD = """  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
   }
 """
 
+SOCKADDR_IMPL = """  // fexdroid: AF_UNIX paths under guest-only directories map into the RootFS (FileManager::RootFSSocketAddr).
+  REGISTER_SYSCALL_IMPL({name}, [](FEXCore::Core::CpuStateFrame* Frame, int sockfd, const struct sockaddr* addr, socklen_t addrlen) -> uint64_t {{
+    struct sockaddr_un Un;
+    uint32_t UnLen;
+    if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(addr, addrlen, Un, UnLen)) {{
+      addr = reinterpret_cast<const struct sockaddr*>(&Un);
+      addrlen = UnLen;
+    }}
+    uint64_t Result = ::{name}(sockfd, addr, addrlen);
+    SYSCALL_ERRNO();
+  }});
+"""
+
+def x32socket(text):
+    for name, op in (("bind", "OP_BIND"), ("connect", "OP_CONNECT")):
+        a = f"""    case {op}: {{
+      Result = ::{name}(Arguments[0], reinterpret_cast<const struct sockaddr*>(Arguments[1]), Arguments[2]);
+      break;
+    }}"""
+        b = f"""    case {op}: {{
+      // fexdroid: AF_UNIX paths under guest-only directories (FileManager::RootFSSocketAddr).
+      auto Addr = reinterpret_cast<const struct sockaddr*>(Arguments[1]);
+      socklen_t AddrLen = Arguments[2];
+      struct sockaddr_un Un;
+      uint32_t UnLen;
+      if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(Addr, AddrLen, Un, UnLen)) {{
+        Addr = reinterpret_cast<const struct sockaddr*>(&Un);
+        AddrLen = UnLen;
+      }}
+      Result = ::{name}(Arguments[0], Addr, AddrLen);
+      break;
+    }}"""
+        if text.count(a) != 1:
+            sys.exit(f"x32/Socket.cpp: {op} anchor not found")
+        text = text.replace(a, b)
+    return text
+
 def passthrough(text):
     # Only the ARCHITECTURE_arm64 section (before the first #else) uses inline svc.
     arm64, sep, rest = text.partition("\n#else\n")
@@ -47,6 +87,8 @@ def passthrough(text):
         arm64 = arm64[:j] + GUARD + arm64[j:]
     text = arm64 + sep + rest
     reps = [
+        ("  REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);\n", SOCKADDR_IMPL.format(name="connect")),
+        ("  REGISTER_SYSCALL_IMPL(bind, SyscallPassthrough3<SYSCALL_DEF(bind)>);\n", SOCKADDR_IMPL.format(name="bind")),
         ('#include "LinuxSyscalls/x32/Syscalls.h"\n',
          '#include "LinuxSyscalls/x32/Syscalls.h"\n#include "LinuxSyscalls/AndroidSeccomp.h"\n'),
         ('#include <sys/epoll.h>\n', '#include <sys/epoll.h>\n#include <sys/shm.h>\n#include <sys/sem.h>\n#include <sys/socket.h>\n#include <errno.h>\n'),
@@ -132,6 +174,18 @@ def passthrough(text):
     return text
 
 FM_HELPERS = r"""
+// fexdroid: host paths that exist on Android but that no app can read. Guests see
+// them as missing, like on a machine without them. /proc/bus/pci: Android lists it but
+// SELinux denies reading it; libpci's default error handler then calls exit(1), which
+// kills Chromium's GPU process (steamwebhelper) at every start.
+static bool FEXDroidIsHiddenHostPath(const char* pathname) {
+  if (!pathname) {
+    return false;
+  }
+  constexpr char Pci[] = "/proc/bus/pci";
+  return strncmp(pathname, Pci, sizeof(Pci) - 1) == 0 && (pathname[sizeof(Pci) - 1] == '\0' || pathname[sizeof(Pci) - 1] == '/');
+}
+
 // fexdroid: Android has no /tmp, /var/tmp, ... on the host. Files and directories
 // that guests create under such paths would fail with ENOENT although the RootFS
 // has them. For an absolute path whose parent is missing on the host but present
@@ -160,6 +214,46 @@ FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* p
   }
   Rel = fextl::string(P.Path) + "/" + Full.substr(Slash + 1);
   return EmulatedFDPathResult {P.FD, Rel.c_str()};
+}
+
+// fexdroid: bind()/connect() pass AF_UNIX paths to the host verbatim, so a socket under
+// a guest-only directory (/tmp on Android) fails with ENOENT. A path whose parent is missing
+// on the host but present in the RootFS is rewritten to that RootFS directory, the same
+// rule Open/Mkdirat use for files. Both ends of a socket go through here, so they agree.
+bool FileManager::RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const {
+  constexpr auto PathOff = offsetof(struct sockaddr_un, sun_path);
+  if (!Addr || Len <= PathOff || Len > sizeof(Out)) {
+    return false;
+  }
+  const auto In = static_cast<const struct sockaddr_un*>(Addr);
+  if (In->sun_family != AF_UNIX || In->sun_path[0] != '/') {
+    return false; // Abstract or relative: nothing to map.
+  }
+  char Path[sizeof(Out.sun_path) + 1] {};
+  memcpy(Path, In->sun_path, Len - PathOff);
+  FDPathTmpData Tmp;
+  fextl::string Rel;
+  auto C = GetRootFSCreatePath(Path, Tmp, Rel);
+  if (C.FD == -1) {
+    return false;
+  }
+  char FDLink[64];
+  snprintf(FDLink, sizeof(FDLink), "/proc/self/fd/%d", C.FD);
+  char Root[PATH_MAX];
+  const ssize_t N = ::readlink(FDLink, Root, sizeof(Root) - 1);
+  if (N <= 0) {
+    return false;
+  }
+  Root[N] = '\0';
+  const fextl::string Full = fextl::string(Root) + "/" + C.Path;
+  if (Full.size() >= sizeof(Out.sun_path)) {
+    return false; // Would not fit: keep the ENOENT the guest gets anyway.
+  }
+  memset(&Out, 0, sizeof(Out));
+  Out.sun_family = AF_UNIX;
+  memcpy(Out.sun_path, Full.c_str(), Full.size());
+  OutLen = PathOff + Full.size() + 1;
+  return true;
 }
 
 // fexdroid: removing something that only exists inside the RootFS (created there by
@@ -192,7 +286,49 @@ uint64_t FileManager::Mkdirat(int dirfd, const char* pathname, uint32_t mode) {
 
 """
 
+HIDE_IN = ["Open(const char* pathname, int flags, uint32_t mode)", "Stat(const char* pathname, void* buf)",
+           "Lstat(const char* pathname, void* buf)", "Access(const char* pathname, [[maybe_unused]] int mode)",
+           "FAccessat(int dirfd, const char* pathname, int mode)",
+           "FAccessat2(int dirfd, const char* pathname, int mode, int flags)",
+           "Openat([[maybe_unused]] int dirfs, const char* pathname, int flags, uint32_t mode)",
+           "Openat2(int dirfs, const char* pathname, FEX::HLE::open_how* how, size_t usize)",
+           "Statx(int dirfd, const char* pathname, int flags, uint32_t mask, struct statx* statxbuf)",
+           "NewFSStatAt(int dirfd, const char* pathname, struct stat* buf, int flag)",
+           "NewFSStatAt64(int dirfd, const char* pathname, struct stat64* buf, int flag)"]
+
+GETSELF_OLD = """  if (strcmp(Pathname, "/proc/self/exe") == 0 || strcmp(Pathname, "/proc/thread-self/exe") == 0 || strcmp(Pathname, PidSelfPath) == 0) {
+    return Filename();
+  }
+
+  return Pathname;
+}"""
+GETSELF_NEW = """  if (strcmp(Pathname, "/proc/self/exe") == 0 || strcmp(Pathname, "/proc/thread-self/exe") == 0 || strcmp(Pathname, PidSelfPath) == 0) {
+    return Filename();
+  }
+
+  // fexdroid: libpci exit()s when it finds no usable access method, and apps can read
+  // neither /sys/bus/pci nor /proc/bus/pci (the latter is hidden above). Guests get an
+  // empty sysfs PCI tree instead (<data dir>/fexdroid-empty-pci/devices/, from the payload):
+  // a machine without PCI devices, which Chromium's GPU process accepts.
+  constexpr char SysPci[] = "/sys/bus/pci";
+  if (strncmp(Pathname, SysPci, sizeof(SysPci) - 1) == 0 && (Pathname[sizeof(SysPci) - 1] == '\\0' || Pathname[sizeof(SysPci) - 1] == '/')) {
+    thread_local fextl::string Fake;
+    Fake = FEXCore::Config::GetDataDirectory(true) + "fexdroid-empty-pci" + (Pathname + sizeof(SysPci) - 1);
+    return Fake;
+  }
+
+  return Pathname;
+}"""
+
 def filemanagement(text):
+    if text.count(GETSELF_OLD) != 1:
+        sys.exit("FileManagement.cpp: GetSelf anchor not found")
+    text = text.replace(GETSELF_OLD, GETSELF_NEW)
+    for sig in HIDE_IN:
+        a = f"uint64_t FileManager::{sig} {{\n"
+        if text.count(a) != 1:
+            sys.exit(f"FileManagement.cpp: anchor not found: {sig}")
+        text = text.replace(a, a + "  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid\n    errno = ENOENT;\n    return -1;\n  }\n")
     anchor = "uint64_t FileManager::Open(const char* pathname, int flags, uint32_t mode) {"
     if text.count(anchor) != 1:
         sys.exit("FileManagement.cpp: Open anchor not found")
@@ -295,12 +431,16 @@ def fmheader(text):
     text = text.replace(a, a + "  uint64_t Mkdirat(int dirfd, const char* pathname, uint32_t mode); // fexdroid\n"
                               "  uint64_t Unlinkat(int dirfd, const char* pathname, int flags); // fexdroid\n")
     text = text.replace(b, b + "  EmulatedFDPathResult GetRootFSCreatePath(const char* pathname, FDPathTmpData& Tmp, fextl::string& Rel) const; // fexdroid\n")
-    return text
+    text = text.replace(a, a + "  bool RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const; // fexdroid\n")
+    inc = "#include <sys/stat.h>\n"
+    if text.count(inc) != 1:
+        sys.exit("FileManagement.h: include anchor not found")
+    return text.replace(inc, inc + "#include <sys/socket.h> // fexdroid\n#include <sys/un.h> // fexdroid\n")
 
 files = []
 for rel, fn in ((LS + "Syscalls/Passthrough.cpp", passthrough), (LS + "FileManagement.cpp", filemanagement),
                 (LS + "FileManagement.h", fmheader), (LS + "Syscalls/FS.cpp", fs),
-                (LS + "x32/Semaphore.cpp", x32semaphore)):
+                (LS + "x32/Semaphore.cpp", x32semaphore), (LS + "x32/Socket.cpp", x32socket)):
     old = (src / rel).read_text()
     files.append((rel, old, fn(old)))
 files.append((LS + "AndroidSeccomp.h", "", table))

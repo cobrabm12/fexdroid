@@ -98,7 +98,7 @@
    register uint64_t x0 asm("x0") = arg1;
    register uint64_t x1 asm("x1") = arg2;
    register uint64_t x2 asm("x2") = arg3;
-@@ -216,8 +256,15 @@
+@@ -216,21 +256,52 @@
    REGISTER_SYSCALL_IMPL(sched_yield, SyscallPassthrough0<SYSCALL_DEF(sched_yield)>);
    REGISTER_SYSCALL_IMPL(msync, SyscallPassthrough3<SYSCALL_DEF(msync)>);
    REGISTER_SYSCALL_IMPL(mincore, SyscallPassthrough3<SYSCALL_DEF(mincore)>);
@@ -115,8 +115,35 @@
 +  });
    REGISTER_SYSCALL_IMPL(getpid, SyscallPassthrough0<SYSCALL_DEF(getpid)>);
    REGISTER_SYSCALL_IMPL(socket, SyscallPassthrough3<SYSCALL_DEF(socket)>);
-   REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);
-@@ -230,7 +277,11 @@
+-  REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);
++  // fexdroid: AF_UNIX paths under guest-only directories map into the RootFS (FileManager::RootFSSocketAddr).
++  REGISTER_SYSCALL_IMPL(connect, [](FEXCore::Core::CpuStateFrame* Frame, int sockfd, const struct sockaddr* addr, socklen_t addrlen) -> uint64_t {
++    struct sockaddr_un Un;
++    uint32_t UnLen;
++    if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(addr, addrlen, Un, UnLen)) {
++      addr = reinterpret_cast<const struct sockaddr*>(&Un);
++      addrlen = UnLen;
++    }
++    uint64_t Result = ::connect(sockfd, addr, addrlen);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(sendto, SyscallPassthrough6<SYSCALL_DEF(sendto)>);
+   REGISTER_SYSCALL_IMPL(recvfrom, SyscallPassthrough6<SYSCALL_DEF(recvfrom)>);
+   REGISTER_SYSCALL_IMPL(shutdown, SyscallPassthrough2<SYSCALL_DEF(shutdown)>);
+-  REGISTER_SYSCALL_IMPL(bind, SyscallPassthrough3<SYSCALL_DEF(bind)>);
++  // fexdroid: AF_UNIX paths under guest-only directories map into the RootFS (FileManager::RootFSSocketAddr).
++  REGISTER_SYSCALL_IMPL(bind, [](FEXCore::Core::CpuStateFrame* Frame, int sockfd, const struct sockaddr* addr, socklen_t addrlen) -> uint64_t {
++    struct sockaddr_un Un;
++    uint32_t UnLen;
++    if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(addr, addrlen, Un, UnLen)) {
++      addr = reinterpret_cast<const struct sockaddr*>(&Un);
++      addrlen = UnLen;
++    }
++    uint64_t Result = ::bind(sockfd, addr, addrlen);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(listen, SyscallPassthrough2<SYSCALL_DEF(listen)>);
+   REGISTER_SYSCALL_IMPL(getsockname, SyscallPassthrough3<SYSCALL_DEF(getsockname)>);
    REGISTER_SYSCALL_IMPL(getpeername, SyscallPassthrough3<SYSCALL_DEF(getpeername)>);
    REGISTER_SYSCALL_IMPL(socketpair, SyscallPassthrough4<SYSCALL_DEF(socketpair)>);
    REGISTER_SYSCALL_IMPL(kill, SyscallPassthrough2<SYSCALL_DEF(kill)>);
@@ -129,7 +156,7 @@
    REGISTER_SYSCALL_IMPL(msgget, SyscallPassthrough2<SYSCALL_DEF(msgget)>);
    REGISTER_SYSCALL_IMPL(msgsnd, SyscallPassthrough4<SYSCALL_DEF(msgsnd)>);
    REGISTER_SYSCALL_IMPL(msgrcv, SyscallPassthrough5<SYSCALL_DEF(msgrcv)>);
-@@ -315,7 +366,11 @@
+@@ -315,7 +386,11 @@
    REGISTER_SYSCALL_IMPL(inotify_add_watch, SyscallPassthrough3<SYSCALL_DEF(inotify_add_watch)>);
    REGISTER_SYSCALL_IMPL(inotify_rm_watch, SyscallPassthrough2<SYSCALL_DEF(inotify_rm_watch)>);
    REGISTER_SYSCALL_IMPL(migrate_pages, SyscallPassthrough4<SYSCALL_DEF(migrate_pages)>);
@@ -142,7 +169,7 @@
    REGISTER_SYSCALL_IMPL(mknodat, SyscallPassthrough4<SYSCALL_DEF(mknodat)>);
    REGISTER_SYSCALL_IMPL(fchownat, SyscallPassthrough5<SYSCALL_DEF(fchownat)>);
    REGISTER_SYSCALL_IMPL(unlinkat, SyscallPassthrough3<SYSCALL_DEF(unlinkat)>);
-@@ -426,13 +481,21 @@
+@@ -426,13 +501,21 @@
      REGISTER_SYSCALL_IMPL_X64(getitimer, SyscallPassthrough2<SYSCALL_DEF(getitimer)>);
      REGISTER_SYSCALL_IMPL_X64(setitimer, SyscallPassthrough3<SYSCALL_DEF(setitimer)>);
      REGISTER_SYSCALL_IMPL_X64(sendfile, SyscallPassthrough4<SYSCALL_DEF(sendfile)>);
@@ -166,7 +193,7 @@
      REGISTER_SYSCALL_IMPL_X64(getrlimit, SyscallPassthrough2<SYSCALL_DEF(getrlimit)>);
      REGISTER_SYSCALL_IMPL_X64(getrusage, SyscallPassthrough2<SYSCALL_DEF(getrusage)>);
      REGISTER_SYSCALL_IMPL_X64(sysinfo, SyscallPassthrough1<SYSCALL_DEF(sysinfo)>);
-@@ -448,7 +511,12 @@
+@@ -448,7 +531,12 @@
      REGISTER_SYSCALL_IMPL_X64(readahead, SyscallPassthrough3<SYSCALL_DEF(readahead)>);
      REGISTER_SYSCALL_IMPL_X64(futex, SyscallPassthrough6<SYSCALL_DEF(futex)>);
      REGISTER_SYSCALL_IMPL_X64(io_getevents, SyscallPassthrough5<SYSCALL_DEF(io_getevents)>);
@@ -180,7 +207,7 @@
      REGISTER_SYSCALL_IMPL_X64(timer_create, SyscallPassthrough3<SYSCALL_DEF(timer_create)>);
      REGISTER_SYSCALL_IMPL_X64(timer_settime, SyscallPassthrough4<SYSCALL_DEF(timer_settime)>);
      REGISTER_SYSCALL_IMPL_X64(timer_gettime, SyscallPassthrough2<SYSCALL_DEF(timer_gettime)>);
-@@ -464,8 +532,28 @@
+@@ -464,8 +552,28 @@
      REGISTER_SYSCALL_IMPL_X64(waitid, SyscallPassthrough5<SYSCALL_DEF(waitid)>);
      REGISTER_SYSCALL_IMPL_X64(pselect6, SyscallPassthrough6<SYSCALL_DEF(pselect6)>);
      REGISTER_SYSCALL_IMPL_X64(ppoll, SyscallPassthrough5<SYSCALL_DEF(ppoll)>);
@@ -211,7 +238,7 @@
      REGISTER_SYSCALL_IMPL_X64(sync_file_range, SyscallPassthrough4<SYSCALL_DEF(sync_file_range)>);
      REGISTER_SYSCALL_IMPL_X64(vmsplice, SyscallPassthrough4<SYSCALL_DEF(vmsplice)>);
      REGISTER_SYSCALL_IMPL_X64(utimensat, SyscallPassthrough4<SYSCALL_DEF(utimensat)>);
-@@ -534,7 +622,13 @@
+@@ -534,7 +642,13 @@
      REGISTER_SYSCALL_IMPL_X32(io_pgetevents_time64, SyscallPassthrough6<SYSCALL_DEF(io_pgetevents)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedsend_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedsend)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedreceive_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedreceive)>);
@@ -236,10 +263,40 @@
  #include <fcntl.h>
  #include <filesystem>
  #include <optional>
-@@ -658,6 +659,65 @@
+@@ -610,6 +611,17 @@
+     return Filename();
+   }
+ 
++  // fexdroid: libpci exit()s when it finds no usable access method, and apps can read
++  // neither /sys/bus/pci nor /proc/bus/pci (the latter is hidden above). Guests get an
++  // empty sysfs PCI tree instead (<data dir>/fexdroid-empty-pci/devices/, from the payload):
++  // a machine without PCI devices, which Chromium's GPU process accepts.
++  constexpr char SysPci[] = "/sys/bus/pci";
++  if (strncmp(Pathname, SysPci, sizeof(SysPci) - 1) == 0 && (Pathname[sizeof(SysPci) - 1] == '\0' || Pathname[sizeof(SysPci) - 1] == '/')) {
++    thread_local fextl::string Fake;
++    Fake = FEXCore::Config::GetDataDirectory(true) + "fexdroid-empty-pci" + (Pathname + sizeof(SysPci) - 1);
++    return Fake;
++  }
++
+   return Pathname;
+ }
+ 
+@@ -658,7 +670,122 @@
    return true;
  }
  
++
++// fexdroid: host paths that exist on Android but that no app can read. Guests see
++// them as missing, like on a machine without them. /proc/bus/pci: Android lists it but
++// SELinux denies reading it; libpci's default error handler then calls exit(1), which
++// kills Chromium's GPU process (steamwebhelper) at every start.
++static bool FEXDroidIsHiddenHostPath(const char* pathname) {
++  if (!pathname) {
++    return false;
++  }
++  constexpr char Pci[] = "/proc/bus/pci";
++  return strncmp(pathname, Pci, sizeof(Pci) - 1) == 0 && (pathname[sizeof(Pci) - 1] == '\0' || pathname[sizeof(Pci) - 1] == '/');
++}
 +
 +// fexdroid: Android has no /tmp, /var/tmp, ... on the host. Files and directories
 +// that guests create under such paths would fail with ENOENT although the RootFS
@@ -271,6 +328,46 @@
 +  return EmulatedFDPathResult {P.FD, Rel.c_str()};
 +}
 +
++// fexdroid: bind()/connect() pass AF_UNIX paths to the host verbatim, so a socket under
++// a guest-only directory (/tmp on Android) fails with ENOENT. A path whose parent is missing
++// on the host but present in the RootFS is rewritten to that RootFS directory, the same
++// rule Open/Mkdirat use for files. Both ends of a socket go through here, so they agree.
++bool FileManager::RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const {
++  constexpr auto PathOff = offsetof(struct sockaddr_un, sun_path);
++  if (!Addr || Len <= PathOff || Len > sizeof(Out)) {
++    return false;
++  }
++  const auto In = static_cast<const struct sockaddr_un*>(Addr);
++  if (In->sun_family != AF_UNIX || In->sun_path[0] != '/') {
++    return false; // Abstract or relative: nothing to map.
++  }
++  char Path[sizeof(Out.sun_path) + 1] {};
++  memcpy(Path, In->sun_path, Len - PathOff);
++  FDPathTmpData Tmp;
++  fextl::string Rel;
++  auto C = GetRootFSCreatePath(Path, Tmp, Rel);
++  if (C.FD == -1) {
++    return false;
++  }
++  char FDLink[64];
++  snprintf(FDLink, sizeof(FDLink), "/proc/self/fd/%d", C.FD);
++  char Root[PATH_MAX];
++  const ssize_t N = ::readlink(FDLink, Root, sizeof(Root) - 1);
++  if (N <= 0) {
++    return false;
++  }
++  Root[N] = '\0';
++  const fextl::string Full = fextl::string(Root) + "/" + C.Path;
++  if (Full.size() >= sizeof(Out.sun_path)) {
++    return false; // Would not fit: keep the ENOENT the guest gets anyway.
++  }
++  memset(&Out, 0, sizeof(Out));
++  Out.sun_family = AF_UNIX;
++  memcpy(Out.sun_path, Full.c_str(), Full.size());
++  OutLen = PathOff + Full.size() + 1;
++  return true;
++}
++
 +// fexdroid: removing something that only exists inside the RootFS (created there by
 +// Mkdirat/Open above): resolve it to the RootFS fd + relative path.
 +uint64_t FileManager::Unlinkat(int dirfd, const char* pathname, int flags) {
@@ -300,9 +397,14 @@
 +}
 +
  uint64_t FileManager::Open(const char* pathname, int flags, uint32_t mode) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
-@@ -672,7 +732,7 @@
+   int fd = -1;
+@@ -672,7 +799,7 @@
          .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this
          .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
        };
@@ -311,7 +413,7 @@
  
        if (fd == -1 && errno == EXDEV) {
          // This means a magic symlink (/proc/foo) was involved. In this case we
-@@ -688,7 +748,15 @@
+@@ -688,7 +815,15 @@
  
      ReplaceEmuFd(fd, flags, mode);
    } else {
@@ -328,7 +430,73 @@
    }
  
    return fd;
-@@ -926,7 +994,7 @@
+@@ -720,6 +855,10 @@
+ }
+ 
+ uint64_t FileManager::Stat(const char* pathname, void* buf) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -736,6 +875,10 @@
+ }
+ 
+ uint64_t FileManager::Lstat(const char* pathname, void* buf) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -753,6 +896,10 @@
+ }
+ 
+ uint64_t FileManager::Access(const char* pathname, [[maybe_unused]] int mode) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -769,6 +916,10 @@
+ }
+ 
+ uint64_t FileManager::FAccessat(int dirfd, const char* pathname, int mode) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -785,6 +936,10 @@
+ }
+ 
+ uint64_t FileManager::FAccessat2(int dirfd, const char* pathname, int mode, int flags) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -912,6 +1067,10 @@
+ }
+ 
+ uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char* pathname, int flags, uint32_t mode) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -926,7 +1085,7 @@
          .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this,
          .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
        };
@@ -337,7 +505,7 @@
        if (fd == -1 && errno == EXDEV) {
          // This means a magic symlink (/proc/foo) was involved. In this case we
          // just punt and do the access without RESOLVE_IN_ROOT.
-@@ -941,7 +1009,15 @@
+@@ -941,13 +1100,25 @@
  
      ReplaceEmuFd(fd, flags, mode);
    } else {
@@ -354,7 +522,17 @@
    }
  
    return fd;
-@@ -961,23 +1037,23 @@
+ }
+ 
+ uint64_t FileManager::Openat2(int dirfs, const char* pathname, FEX::HLE::open_how* how, size_t usize) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+ 
+@@ -961,29 +1132,33 @@
        if (Path.FD != AT_FDCWD) {
          how->resolve |= RESOLVE_IN_ROOT;
        }
@@ -382,18 +560,60 @@
    }
  
    return fd;
+ }
+ 
+ uint64_t FileManager::Statx(int dirfd, const char* pathname, int flags, uint32_t mask, struct statx* statxbuf) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   if (IsSelfNoFollow(pathname, flags)) {
+     // If we aren't following the symlink for self then we need to return data about the symlink itself.
+     // Let's just /actually/ return FEX symlink information in this case.
+@@ -1031,6 +1206,10 @@
+ }
+ 
+ uint64_t FileManager::NewFSStatAt(int dirfd, const char* pathname, struct stat* buf, int flag) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   if (IsSelfNoFollow(pathname, flag)) {
+     // See Statx
+     return ::fstatat(dirfd, pathname, buf, flag);
+@@ -1051,6 +1230,10 @@
+ }
+ 
+ uint64_t FileManager::NewFSStatAt64(int dirfd, const char* pathname, struct stat64* buf, int flag) {
++  if (FEXDroidIsHiddenHostPath(pathname)) { // fexdroid
++    errno = ENOENT;
++    return -1;
++  }
+   if (IsSelfNoFollow(pathname, flag)) {
+     // See Statx
+     return ::fstatat64(dirfd, pathname, buf, flag);
 --- a/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.h
 +++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.h
-@@ -62,6 +62,8 @@
+@@ -23,6 +23,8 @@
+ #include <linux/limits.h>
+ #include <optional>
+ #include <sys/stat.h>
++#include <sys/socket.h> // fexdroid
++#include <sys/un.h> // fexdroid
+ #include <unistd.h>
+ 
+ #include "LinuxSyscalls/EmulatedFiles/EmulatedFiles.h"
+@@ -62,6 +64,9 @@
    uint64_t Access(const char* pathname, int mode);
    uint64_t FAccessat(int dirfd, const char* pathname, int mode);
    uint64_t FAccessat2(int dirfd, const char* pathname, int mode, int flags);
++  bool RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const; // fexdroid
 +  uint64_t Mkdirat(int dirfd, const char* pathname, uint32_t mode); // fexdroid
 +  uint64_t Unlinkat(int dirfd, const char* pathname, int flags); // fexdroid
    uint64_t Readlink(const char* pathname, char* buf, size_t bufsiz);
    uint64_t Chmod(const char* pathname, mode_t mode);
    uint64_t Readlinkat(int dirfd, const char* pathname, char* buf, size_t bufsiz);
-@@ -161,6 +163,7 @@
+@@ -161,6 +166,7 @@
      const char* Path;
    };
    EmulatedFDPathResult GetEmulatedFDPath(int dirfd, const char* pathname, bool FollowSymlink, FDPathTmpData& TmpFilename) const;
@@ -455,6 +675,40 @@
  
      switch (cmd) {
      case IPC_SET: {
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/x32/Socket.cpp
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/x32/Socket.cpp
+@@ -659,11 +659,29 @@
+       break;
+     }
+     case OP_BIND: {
+-      Result = ::bind(Arguments[0], reinterpret_cast<const struct sockaddr*>(Arguments[1]), Arguments[2]);
++      // fexdroid: AF_UNIX paths under guest-only directories (FileManager::RootFSSocketAddr).
++      auto Addr = reinterpret_cast<const struct sockaddr*>(Arguments[1]);
++      socklen_t AddrLen = Arguments[2];
++      struct sockaddr_un Un;
++      uint32_t UnLen;
++      if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(Addr, AddrLen, Un, UnLen)) {
++        Addr = reinterpret_cast<const struct sockaddr*>(&Un);
++        AddrLen = UnLen;
++      }
++      Result = ::bind(Arguments[0], Addr, AddrLen);
+       break;
+     }
+     case OP_CONNECT: {
+-      Result = ::connect(Arguments[0], reinterpret_cast<const struct sockaddr*>(Arguments[1]), Arguments[2]);
++      // fexdroid: AF_UNIX paths under guest-only directories (FileManager::RootFSSocketAddr).
++      auto Addr = reinterpret_cast<const struct sockaddr*>(Arguments[1]);
++      socklen_t AddrLen = Arguments[2];
++      struct sockaddr_un Un;
++      uint32_t UnLen;
++      if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(Addr, AddrLen, Un, UnLen)) {
++        Addr = reinterpret_cast<const struct sockaddr*>(&Un);
++        AddrLen = UnLen;
++      }
++      Result = ::connect(Arguments[0], Addr, AddrLen);
+       break;
+     }
+     case OP_LISTEN: {
 --- /dev/null
 +++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/AndroidSeccomp.h
 @@ -0,0 +1,136 @@

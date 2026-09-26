@@ -89,16 +89,35 @@ class LinuxEnv(private val ctx: Context) {
         val uid = Os.getuid()
         val gid = Os.getgid()
         home.mkdirs()
+        val dns = runCatching {
+            val cm = ctx.getSystemService(ConnectivityManager::class.java)
+            // Scoped IPv6 (fe80::...%wlan0) does not parse in resolv.conf; glibc uses 3 at most.
+            cm.getLinkProperties(cm.activeNetwork)?.dnsServers?.mapNotNull { it.hostAddress }
+                ?.filter { '%' !in it }?.take(3)
+        }.getOrNull().orEmpty().ifEmpty { listOf("1.1.1.1", "8.8.8.8") }
+        val resolv = dns.joinToString("") { "nameserver $it\n" }
         File(root, "etc/passwd").writeText(
             "root:x:0:0:root:/root:/bin/sh\nuser:x:$uid:$gid:fexdroid:${home.path}:${root.path}/bin/sh\n")
         File(root, "etc/group").writeText("root:x:0:\nuser:x:$gid:\n")
         File(root, "etc/hosts").writeText("127.0.0.1 localhost\n::1 localhost\n")
-        val dns = runCatching {
-            val cm = ctx.getSystemService(ConnectivityManager::class.java)
-            cm.getLinkProperties(cm.activeNetwork)?.dnsServers?.mapNotNull { it.hostAddress }
-        }.getOrNull().orEmpty().ifEmpty { listOf("1.1.1.1", "8.8.8.8") }
-        File(root, "etc/resolv.conf").writeText(dns.joinToString("") { "nameserver $it\n" })
+        File(root, "etc/resolv.conf").writeText(resolv)
+        // x86 trees: FEX serves a guest /etc file from the tree when it exists there, else the
+        // Android one, and Android has no resolv.conf (Steam: "http error 0", NOTES.md N-028).
+        for (tree in guestTrees) {
+            if (!File(tree, "etc").isDirectory) continue
+            runCatching {
+                File(tree, "etc/resolv.conf").run { delete(); writeText(resolv) } // may be a symlink
+                File(tree, "etc/hosts").run { delete(); writeText("127.0.0.1 localhost\n::1 localhost\n") }
+                // FEX opens /proc and /sys inside the tree when the tree has them, and Docker/OCI
+                // exports ship both as empty dirs. openat(that fd, "self/task") then fails, which
+                // kills Chromium's zygote (steamwebhelper). delete() only removes empty dirs.
+                File(tree, "proc").delete(); File(tree, "sys").delete()
+            }
+        }
     }
+
+    /** x86_64 guest rootfs trees FEX may run with (FEX_ROOTFS): base, Steam, game (sniper). */
+    val guestTrees: List<File> get() = listOf(x86Base, x86Steam, File(files, "sniper-rootfs"))
 
     /** Adreno (KGSL) -> Turnip; anything else -> lavapipe, Vulkan on the CPU (NOTES.md N-027). */
     val hasTurnipGpu: Boolean get() = File("/dev/kgsl-3d0").exists()

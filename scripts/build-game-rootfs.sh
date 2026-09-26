@@ -20,6 +20,8 @@ docker rm "$cid" >/dev/null
 rm -f "$STAGE/.dockerenv"
 python3 scripts/lib/relativize-symlinks.py "$STAGE"
 mkdir -p "$STAGE/tmp" "$STAGE/var/tmp" "$STAGE/dev/shm" "$STAGE/run/pressure-vessel"
+# No empty /proc or /sys: FEX would open those instead of the real ones (NOTES.md N-028).
+rm -rf "$STAGE/proc" "$STAGE/sys"
 chmod 1777 "$STAGE/tmp" "$STAGE/var/tmp" "$STAGE/dev/shm"
 grep -q 'VERSION_CODENAME=sniper' "$STAGE/usr/lib/os-release"
 # Newer core libraries win, as pressure-vessel does with the host's (glibc 2.41 from the

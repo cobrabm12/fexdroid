@@ -53,6 +53,8 @@ install -D -m 0755 build/fxshmd/shmtest "$A/opt/fexdroid-tests/shmtest"
 install -D -m 0755 build/fxshmd/semtest "$A/opt/fexdroid-tests/semtest"
 # Directories glibc was built to use instead of /tmp, /dev/shm, /etc.
 mkdir -p "$A/tmp" "$A/var/tmp" "$A/dev/shm" "$A/home"
+# Empty sysfs PCI tree FEX shows guests as /sys/bus/pci (patches/fex/0002, NOTES.md N-028).
+mkdir -p "$A/usr/share/fex-emu/fexdroid-empty-pci/devices" "$A/usr/share/fex-emu/fexdroid-empty-pci/drivers"
 chmod 1777 "$A/tmp" "$A/var/tmp" "$A/dev/shm"
 
 # Point every dynamically linked ELF at the on-device loader, and rewrite
