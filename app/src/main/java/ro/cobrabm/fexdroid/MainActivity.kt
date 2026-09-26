@@ -1,0 +1,100 @@
+package ro.cobrabm.fexdroid
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import java.io.File
+
+/** Bottom navigation destinations. */
+enum class Dest(val label: String, val icon: ImageVector) {
+    HOME("Acasă", AppIcons.Home),
+    SETTINGS("Setări", AppIcons.Settings),
+    ADVANCED("Avansat", AppIcons.Build),
+}
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        AppSettings.init(this)
+        enableEdgeToEdge()
+        // Games and long test runs: never let the screen time out while we are visible.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // `adb shell am start -n <pkg>/ro.cobrabm.fexdroid.MainActivity --ez autorun true`
+        // `--es action phase1|fex-static|fex-dynamic|vulkaninfo|fex-vulkaninfo` runs a Linux step
+        // (output in files/linux.txt); `--es action x|vkcube|fex-vkcube` opens the X11 screen.
+        // Any of these extras opens Avansat (the developer screens) instead of Acasă.
+        val autorun = intent.getBooleanExtra("autorun", false)
+        val action = intent.getStringExtra("action")
+        val cmd = intent.getStringExtra("cmd")
+        val devIntent = autorun || action != null
+        // `--es action steam|dota` starts the game session at once, without waiting for a
+        // visible surface (works with the screen locked; the player attaches when shown).
+        when (action) {
+            "steam" -> GameSession.start(this, Game.STEAM)
+            "dota" -> GameSession.start(this, Game.DOTA)
+        }
+        setContent {
+            FexdroidTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    var dest by rememberSaveable { mutableStateOf(if (devIntent) Dest.ADVANCED else Dest.HOME) }
+                    if (GameSession.active && GameSession.playerVisible) {
+                        PlayerScreen()
+                    } else {
+                        Scaffold(
+                            bottomBar = {
+                                NavigationBar {
+                                    for (d in Dest.entries) NavigationBarItem(
+                                        selected = dest == d, onClick = { dest = d },
+                                        icon = { Icon(d.icon, null) }, label = { Text(d.label) },
+                                    )
+                                }
+                            },
+                        ) { padding ->
+                            Surface(Modifier.fillMaxSize().padding(padding)) {
+                                when (dest) {
+                                    Dest.HOME -> HomeScreen(onOpenSettings = { dest = Dest.SETTINGS })
+                                    Dest.SETTINGS -> SettingsScreen()
+                                    Dest.ADVANCED -> AdvancedScreen(advancedTabFor(action), autorun, action, cmd)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        // Leaving the app for good: do not keep Xvfb/PulseAudio/the game running without a UI.
+        if (isFinishing) GameSession.stop()
+        super.onDestroy()
+    }
+
+    /** Output file, readable over adb without root: /sdcard/Android/data/<pkg>/files/recon.txt */
+    fun reportFile(): File = File(getExternalFilesDir(null), "recon.txt")
+
+    fun share(text: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "fexdroid recon")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(send, "Trimite raportul"))
+    }
+}

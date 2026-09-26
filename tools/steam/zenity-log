@@ -1,0 +1,7 @@
+#!/bin/bash
+# fexdroid: stand-in for zenity in the game rootfs. Games/SDL use zenity for error
+# and info dialogs; the real one needs a full GTK stack that doesn't match the runtime
+# here. Print the dialog to stderr (the app log) and answer "OK".
+[ "$1" = "--version" ] && { echo "3.44.0"; exit 0; }
+echo "[zenity] $*" >&2
+exit 0

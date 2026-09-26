@@ -1,0 +1,270 @@
+// fxpath: LD_PRELOAD shim that maps absolute Linux paths into the fexdroid rootfs.
+//
+// Android has no /tmp, /usr, /var, ...; Debian binaries (Xvfb, xkbcomp,
+// PulseAudio) hardcode them. For the prefixes below, a path P becomes
+// $FXD_ROOT/P. /dev, /proc, /sys, /data, /system etc. pass through unchanged.
+// glibc itself was built with these paths inside the rootfs; this covers the
+// programs' own hardcoded strings. x86 guests don't need it: FEX overlays
+// their RootFS.
+//
+// Only libc entry points that take paths are wrapped; raw syscalls are not.
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+static const char *const kPrefixes[] = { "/tmp", "/usr", "/etc", "/var", "/bin", "/sbin",
+                                         "/lib", "/opt", "/run", "/root", "/home", "/srv" };
+static char g_root[PATH_MAX];
+static size_t g_root_len;
+static int g_debug;  // FXPATH_DEBUG=1: log every mapping to stderr
+
+__attribute__((constructor)) static void fxpath_init(void) {
+    const char *r = getenv("FXD_ROOT");
+    if (r && *r && strlen(r) < sizeof g_root - 1) {
+        strcpy(g_root, r);
+        g_root_len = strlen(g_root);
+    }
+    const char *d = getenv("FXPATH_DEBUG");
+    g_debug = d && *d == '1';
+}
+
+// Returns the path to use: either `path` itself or `buf` holding the mapped path.
+static const char *map(const char *path, char *buf) {
+    if (!path || path[0] != '/' || !g_root_len) return path;
+    if (strncmp(path, g_root, g_root_len) == 0) return path;  // already inside
+    for (size_t i = 0; i < sizeof kPrefixes / sizeof *kPrefixes; i++) {
+        size_t n = strlen(kPrefixes[i]);
+        if (strncmp(path, kPrefixes[i], n) == 0 && (path[n] == '/' || path[n] == '\0')) {
+            if (g_root_len + strlen(path) + 1 > PATH_MAX) return path;
+            memcpy(buf, g_root, g_root_len);
+            strcpy(buf + g_root_len, path);
+            if (g_debug) dprintf(2, "fxpath[%d]: %s -> %s\n", getpid(), path, buf);
+            return buf;
+        }
+    }
+    return path;
+}
+
+#define REAL(ret, name, ...) \
+    static ret (*real_##name)(__VA_ARGS__); \
+    if (!real_##name) real_##name = (ret (*)(__VA_ARGS__))dlsym(RTLD_NEXT, #name)
+
+// ---- open family (mode only matters with O_CREAT/O_TMPFILE) --------------------
+#define OPEN_MODE(flags, mode) \
+    mode_t mode = 0; \
+    if ((flags) & (O_CREAT | O_TMPFILE)) { va_list ap; va_start(ap, flags); mode = va_arg(ap, mode_t); va_end(ap); }
+
+int open(const char *path, int flags, ...) {
+    OPEN_MODE(flags, mode);
+    REAL(int, open, const char *, int, ...);
+    char b[PATH_MAX];
+    return real_open(map(path, b), flags, mode);
+}
+int open64(const char *path, int flags, ...) {
+    OPEN_MODE(flags, mode);
+    REAL(int, open64, const char *, int, ...);
+    char b[PATH_MAX];
+    return real_open64(map(path, b), flags, mode);
+}
+int openat(int dirfd, const char *path, int flags, ...) {
+    OPEN_MODE(flags, mode);
+    REAL(int, openat, int, const char *, int, ...);
+    char b[PATH_MAX];
+    return real_openat(dirfd, map(path, b), flags, mode);
+}
+int openat64(int dirfd, const char *path, int flags, ...) {
+    OPEN_MODE(flags, mode);
+    REAL(int, openat64, int, const char *, int, ...);
+    char b[PATH_MAX];
+    return real_openat64(dirfd, map(path, b), flags, mode);
+}
+FILE *fopen(const char *path, const char *m) {
+    REAL(FILE *, fopen, const char *, const char *);
+    char b[PATH_MAX];
+    return real_fopen(map(path, b), m);
+}
+FILE *fopen64(const char *path, const char *m) {
+    REAL(FILE *, fopen64, const char *, const char *);
+    char b[PATH_MAX];
+    return real_fopen64(map(path, b), m);
+}
+
+// ---- one-path functions ------------------------------------------------------------
+#define WRAP1(ret, name, T1)                                     \
+    ret name(const char *p, T1 a) {                              \
+        REAL(ret, name, const char *, T1);                       \
+        char b[PATH_MAX];                                        \
+        return real_##name(map(p, b), a);                        \
+    }
+WRAP1(int, access, int)
+WRAP1(int, mkdir, mode_t)
+WRAP1(int, chmod, mode_t)
+WRAP1(int, stat, struct stat *)
+WRAP1(int, lstat, struct stat *)
+WRAP1(int, stat64, struct stat64 *)
+WRAP1(int, lstat64, struct stat64 *)
+WRAP1(int, truncate, off_t)
+
+int unlink(const char *p) { REAL(int, unlink, const char *); char b[PATH_MAX]; return real_unlink(map(p, b)); }
+int rmdir(const char *p) { REAL(int, rmdir, const char *); char b[PATH_MAX]; return real_rmdir(map(p, b)); }
+int chdir(const char *p) { REAL(int, chdir, const char *); char b[PATH_MAX]; return real_chdir(map(p, b)); }
+ssize_t readlink(const char *p, char *buf, size_t n) {
+    REAL(ssize_t, readlink, const char *, char *, size_t);
+    char b[PATH_MAX];
+    return real_readlink(map(p, b), buf, n);
+}
+int chown(const char *p, uid_t u, gid_t g) {
+    REAL(int, chown, const char *, uid_t, gid_t);
+    char b[PATH_MAX];
+    return real_chown(map(p, b), u, g);
+}
+
+// ---- *at variants -------------------------------------------------------------------
+int faccessat(int d, const char *p, int m, int f) {
+    REAL(int, faccessat, int, const char *, int, int);
+    char b[PATH_MAX];
+    return real_faccessat(d, map(p, b), m, f);
+}
+int fstatat(int d, const char *p, struct stat *s, int f) {
+    REAL(int, fstatat, int, const char *, struct stat *, int);
+    char b[PATH_MAX];
+    return real_fstatat(d, map(p, b), s, f);
+}
+int fstatat64(int d, const char *p, struct stat64 *s, int f) {
+    REAL(int, fstatat64, int, const char *, struct stat64 *, int);
+    char b[PATH_MAX];
+    return real_fstatat64(d, map(p, b), s, f);
+}
+int statx(int d, const char *p, int f, unsigned int m, struct statx *s) {
+    REAL(int, statx, int, const char *, int, unsigned int, struct statx *);
+    char b[PATH_MAX];
+    return real_statx(d, map(p, b), f, m, s);
+}
+int mkdirat(int d, const char *p, mode_t m) {
+    REAL(int, mkdirat, int, const char *, mode_t);
+    char b[PATH_MAX];
+    return real_mkdirat(d, map(p, b), m);
+}
+int unlinkat(int d, const char *p, int f) {
+    REAL(int, unlinkat, int, const char *, int);
+    char b[PATH_MAX];
+    return real_unlinkat(d, map(p, b), f);
+}
+ssize_t readlinkat(int d, const char *p, char *buf, size_t n) {
+    REAL(ssize_t, readlinkat, int, const char *, char *, size_t);
+    char b[PATH_MAX];
+    return real_readlinkat(d, map(p, b), buf, n);
+}
+
+// ---- two-path functions --------------------------------------------------------------
+// Android's SELinux policy forbids hard links for apps (EACCES). Lock-file code
+// (Xvfb: write .tX0-lock, link() it to .X0-lock) only needs "create the target
+// atomically if absent, with the same content": emulate that with O_EXCL + copy.
+static int link_fallback(int da, const char *a, int db, const char *b) {
+    int in = openat(da, a, O_RDONLY | O_CLOEXEC);
+    if (in < 0) return -1;
+    int out = openat(db, b, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+    if (out < 0) { int e = errno; close(in); errno = e; return -1; }
+    char buf[8192];
+    ssize_t n;
+    while ((n = read(in, buf, sizeof buf)) > 0)
+        if (write(out, buf, (size_t)n) != n) { n = -1; break; }
+    int e = errno;
+    close(in);
+    close(out);
+    if (n < 0) { unlinkat(db, b, 0); errno = e; return -1; }
+    return 0;
+}
+
+int link(const char *a, const char *b2) {
+    REAL(int, link, const char *, const char *);
+    char x[PATH_MAX], y[PATH_MAX];
+    const char *ma = map(a, x), *mb = map(b2, y);
+    int r = real_link(ma, mb);
+    if (r != 0 && (errno == EACCES || errno == EPERM)) r = link_fallback(AT_FDCWD, ma, AT_FDCWD, mb);
+    return r;
+}
+int symlink(const char *target, const char *linkpath) {
+    // The target is stored verbatim (resolved later through this same shim).
+    REAL(int, symlink, const char *, const char *);
+    char y[PATH_MAX];
+    return real_symlink(target, map(linkpath, y));
+}
+int rename(const char *a, const char *b2) {
+    REAL(int, rename, const char *, const char *);
+    char x[PATH_MAX], y[PATH_MAX];
+    return real_rename(map(a, x), map(b2, y));
+}
+int renameat(int da, const char *a, int db, const char *b2) {
+    REAL(int, renameat, int, const char *, int, const char *);
+    char x[PATH_MAX], y[PATH_MAX];
+    return real_renameat(da, map(a, x), db, map(b2, y));
+}
+int linkat(int da, const char *a, int db, const char *b2, int f) {
+    REAL(int, linkat, int, const char *, int, const char *, int);
+    char x[PATH_MAX], y[PATH_MAX];
+    const char *ma = map(a, x), *mb = map(b2, y);
+    int r = real_linkat(da, ma, db, mb, f);
+    if (r != 0 && (errno == EACCES || errno == EPERM) && !(f & AT_EMPTY_PATH)) r = link_fallback(da, ma, db, mb);
+    return r;
+}
+
+// ---- exec: the program path (argv untouched) ------------------------------------
+int execve(const char *p, char *const argv[], char *const envp[]) {
+    REAL(int, execve, const char *, char *const[], char *const[]);
+    char b[PATH_MAX];
+    return real_execve(map(p, b), argv, envp);
+}
+int execv(const char *p, char *const argv[]) {
+    extern char **environ;
+    return execve(p, argv, environ);
+}
+int execl(const char *p, const char *arg, ...) {
+    // Used by Xvfb's Popen("/bin/sh", "sh", "-c", cmd, NULL).
+    char *argv[64];
+    int n = 0;
+    va_list ap;
+    va_start(ap, arg);
+    argv[n++] = (char *)arg;
+    while (n < 63 && (argv[n] = va_arg(ap, char *)) != NULL) n++;
+    va_end(ap);
+    argv[n] = NULL;
+    return execv(p, argv);
+}
+
+// ---- AF_UNIX filesystem sockets (abstract names start with '\0' and pass) ----------
+static const struct sockaddr *map_sun(const struct sockaddr *sa, socklen_t *len, struct sockaddr_un *tmp) {
+    if (!sa || sa->sa_family != AF_UNIX || *len <= offsetof(struct sockaddr_un, sun_path)) return sa;
+    const struct sockaddr_un *un = (const struct sockaddr_un *)sa;
+    if (un->sun_path[0] != '/') return sa;
+    char b[PATH_MAX];
+    const char *m = map(un->sun_path, b);
+    if (m == un->sun_path || strlen(m) >= sizeof tmp->sun_path) return sa;
+    memset(tmp, 0, sizeof *tmp);
+    tmp->sun_family = AF_UNIX;
+    strcpy(tmp->sun_path, m);
+    *len = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + strlen(m) + 1);
+    return (const struct sockaddr *)tmp;
+}
+int bind(int fd, const struct sockaddr *sa, socklen_t len) {
+    REAL(int, bind, int, const struct sockaddr *, socklen_t);
+    struct sockaddr_un t;
+    const struct sockaddr *m = map_sun(sa, &len, &t);
+    return real_bind(fd, m, len);
+}
+int connect(int fd, const struct sockaddr *sa, socklen_t len) {
+    REAL(int, connect, int, const struct sockaddr *, socklen_t);
+    struct sockaddr_un t;
+    const struct sockaddr *m = map_sun(sa, &len, &t);
+    return real_connect(fd, m, len);
+}

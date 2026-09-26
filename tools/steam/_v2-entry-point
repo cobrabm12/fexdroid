@@ -1,0 +1,35 @@
+#!/bin/bash
+# fexdroid stand-in for pressure-vessel's _v2-entry-point.
+#
+# Steam starts steamwebhelper and games through Steam Linux Runtime containers
+# (pressure-vessel + bubblewrap), which need user namespaces. Android kernels have
+# none, so this script is put where Steam looks for the entry point and runs the
+# command after "--" directly. Everything before "--" (--verb=..., ...) is ignored.
+#
+# When this copy sits in a game runtime (e.g. SteamLinuxRuntime_sniper), the game
+# should see that runtime as its root filesystem, as it would inside the container
+# (dota.sh even checks /etc/os-release for "sniper"). FEX re-reads FEX_ROOTFS at
+# every execve, so pointing it at $FXD_FILES/sniper-rootfs (Valve's public sniper
+# platform image, scripts/build-game-rootfs.sh) is enough. Steam's own deployed
+# tree (var/tmp-*) is not usable: it links glibc/drivers from /run/host.
+# Set FXD_GAME_ROOTFS=0 to keep the Steam rootfs instead.
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --) shift; break ;;
+        *) shift ;;
+    esac
+done
+[ $# -gt 0 ] || exit 0
+
+here="$(cd "${0%/*}" && pwd)"
+# Only for game runtimes (this copy inside SteamLinuxRuntime_*), not for steamwebhelper.
+case "$here" in
+    */SteamLinuxRuntime_*)
+        tree="${FXD_FILES:-}/sniper-rootfs"
+        if [ "${FXD_GAME_ROOTFS:-1}" = 1 ] && [ -f "$tree/.complete" ]; then
+            export FEX_ROOTFS="$tree"
+            echo "fexdroid entry point: game rootfs $tree" >&2
+        fi
+        ;;
+esac
+exec "$@"

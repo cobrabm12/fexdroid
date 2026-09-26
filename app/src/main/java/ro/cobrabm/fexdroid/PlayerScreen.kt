@@ -1,0 +1,352 @@
+package ro.cobrabm.fexdroid
+
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.view.SurfaceHolder
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.inputmethod.InputMethodManager
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+
+/**
+ * Full-screen game view: the X screen (landscape, immersive, letterboxed), a floating
+ * menu button, and panels for startup progress, errors and the raw log.
+ */
+@Composable
+fun PlayerScreen() {
+    val ctx = LocalContext.current
+    val activity = ctx as Activity
+    val state = GameSession.state
+    val res = GameSession.resolution
+    var view by remember { mutableStateOf<InputSurfaceView?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var logOpen by remember { mutableStateOf(false) }
+    var confirmStop by remember { mutableStateOf(false) }
+    var keyboardShown by remember { mutableStateOf(false) }
+    var mouseCaptured by remember { mutableStateOf(false) }
+
+    // Landscape + hidden system bars while the player is shown.
+    DisposableEffect(Unit) {
+        val prev = activity.requestedOrientation
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        val ic = activity.window.insetsController
+        ic?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        ic?.hide(WindowInsets.Type.systemBars())
+        onDispose {
+            ic?.show(WindowInsets.Type.systemBars())
+            activity.requestedOrientation = prev
+            view?.releasePointerCapture()
+        }
+    }
+
+    BackHandler {
+        when {
+            logOpen -> logOpen = false
+            menuOpen -> menuOpen = false
+            state is SessionState.Running || state is SessionState.Starting -> menuOpen = true
+            else -> GameSession.stop()
+        }
+    }
+
+    fun toggleKeyboard() {
+        val v = view ?: return
+        val imm = ctx.getSystemService(InputMethodManager::class.java)
+        if (keyboardShown) imm.hideSoftInputFromWindow(v.windowToken, 0)
+        else { v.requestFocus(); imm.showSoftInput(v, 0) }
+        keyboardShown = !keyboardShown
+    }
+
+    fun toggleMouse() {
+        val v = view ?: return
+        if (v.hasPointerCapture()) { v.releasePointerCapture(); mouseCaptured = false }
+        else { v.requestFocus(); v.requestPointerCapture(); mouseCaptured = true }
+    }
+
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        // Recreate the view when the X resolution changes (it maps touches to X coordinates).
+        androidx.compose.runtime.key(res) {
+            AndroidView(
+                modifier = Modifier.fillMaxHeight().aspectRatio(res.width.toFloat() / res.height, matchHeightConstraintsFirst = true),
+                factory = { c ->
+                    InputSurfaceView(c, res.width, res.height).apply {
+                        view = this
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(h: SurfaceHolder) { GameSession.attachSurface(h.surface) }
+                            override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) {}
+                            override fun surfaceDestroyed(h: SurfaceHolder) { GameSession.detachSurface() }
+                        })
+                    }
+                },
+                update = { v ->
+                    val enable = GameSession.inputReady
+                    if (enable && !v.inputEnabled) v.post { v.requestFocus() }
+                    v.inputEnabled = enable
+                },
+            )
+        }
+
+        when (state) {
+            is SessionState.Starting -> StartupPanel(state, onLog = { logOpen = true }, onCancel = { GameSession.stop() })
+            is SessionState.Exited -> EndPanel(
+                title = "${state.game.title} s-a închis",
+                message = if (state.code == 0) "Programul s-a încheiat normal." else "Programul s-a oprit cu codul ${state.code}.",
+                game = state.game, onLog = { logOpen = true },
+            )
+            is SessionState.Failed -> EndPanel("${state.game.title} nu a pornit", state.message, state.game, onLog = { logOpen = true })
+            is SessionState.Running -> RunningHint(state)
+            SessionState.Idle -> {}
+        }
+
+        if (state is SessionState.Running || state is SessionState.Starting) {
+            FloatingMenuButton(Modifier.align(Alignment.TopEnd).displayCutoutPadding()) { menuOpen = !menuOpen }
+        }
+
+        AnimatedVisibility(menuOpen, Modifier.align(Alignment.TopEnd).displayCutoutPadding(), enter = fadeIn(), exit = fadeOut()) {
+            GameMenu(
+                keyboardShown = keyboardShown, mouseCaptured = mouseCaptured,
+                onKeyboard = { menuOpen = false; toggleKeyboard() },
+                onMouse = { menuOpen = false; toggleMouse() },
+                onLog = { menuOpen = false; logOpen = true },
+                onMinimize = { menuOpen = false; GameSession.playerVisible = false },
+                onStop = { menuOpen = false; confirmStop = true },
+                onClose = { menuOpen = false },
+            )
+        }
+
+        if (logOpen) LogPanel { logOpen = false }
+    }
+
+    if (confirmStop) {
+        AlertDialog(
+            onDismissRequest = { confirmStop = false },
+            title = { Text("Oprești jocul?") },
+            text = { Text("Progresul nesalvat se pierde.") },
+            confirmButton = { Button(onClick = { confirmStop = false; GameSession.stop() }) { Text("Oprește") } },
+            dismissButton = { TextButton(onClick = { confirmStop = false }) { Text("Anulează") } },
+        )
+    }
+}
+
+@Composable
+private fun FloatingMenuButton(modifier: Modifier, onClick: () -> Unit) {
+    var dy by remember { mutableFloatStateOf(0f) }
+    Box(
+        modifier
+            .offset { IntOffset(0, dy.roundToInt().coerceAtLeast(0)) }
+            .padding(12.dp)
+            .size(44.dp)
+            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            .pointerInput(Unit) { detectDragGestures { change, drag -> change.consume(); dy = (dy + drag.y).coerceAtLeast(0f) } }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(AppIcons.Menu, "Meniu", tint = Color.White.copy(alpha = 0.85f))
+    }
+}
+
+@Composable
+private fun GameMenu(
+    keyboardShown: Boolean, mouseCaptured: Boolean,
+    onKeyboard: () -> Unit, onMouse: () -> Unit, onLog: () -> Unit,
+    onMinimize: () -> Unit, onStop: () -> Unit, onClose: () -> Unit,
+) {
+    var frames by remember { mutableLongStateOf(DisplayBridge.frames()) }
+    var fps by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) { delay(1000); val f = DisplayBridge.frames(); fps = f - frames; frames = f }
+    }
+    Card(
+        Modifier.padding(12.dp).widthIn(max = 300.dp).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
+    ) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Meniu", style = MaterialTheme.typography.titleMedium)
+                    Text("${GameSession.resolution.label} · $fps cadre/s", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = onClose) { Icon(AppIcons.Close, "Închide") }
+            }
+            MenuItem(AppIcons.Keyboard, if (keyboardShown) "Ascunde tastatura" else "Tastatură", onKeyboard)
+            MenuItem(AppIcons.Mouse, if (mouseCaptured) "Eliberează mouse-ul" else "Captează mouse-ul",
+                onMouse, "Ctrl+Alt îl eliberează")
+            MenuItem(AppIcons.Log, "Jurnal", onLog)
+            MenuItem(AppIcons.Back, "Înapoi la meniu", onMinimize, "Jocul rămâne pornit")
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            MenuItem(AppIcons.Stop, "Oprește", onStop, tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun MenuItem(icon: ImageVector, text: String, onClick: () -> Unit, hint: String? = null, tint: Color = Color.Unspecified) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else tint)
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = if (tint == Color.Unspecified) Color.Unspecified else tint)
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun StartupPanel(st: SessionState.Starting, onLog: () -> Unit, onCancel: () -> Unit) {
+    PanelCard {
+        Text("Pornesc ${st.game.title}", style = MaterialTheme.typography.headlineSmall)
+        LinearProgressIndicator(
+            progress = { (st.step.ordinal + 0.5f) / StartStep.entries.size },
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        )
+        for (step in StartStep.entries) {
+            val label = if (step == StartStep.LAUNCH) "Pornesc ${st.game.title}" else step.label
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    step.ordinal < st.step.ordinal -> Icon(AppIcons.CheckCircle, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    step == st.step -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else -> Icon(AppIcons.Pending, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.outline)
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(label, style = MaterialTheme.typography.bodyLarge,
+                    color = if (step.ordinal > st.step.ordinal) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified)
+            }
+        }
+        if (st.step == StartStep.PREPARE && st.detail.isNotEmpty()) {
+            Text(st.detail, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 32.dp))
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onLog) { Text("Vezi jurnal") }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = onCancel) { Text("Anulează") }
+        }
+    }
+}
+
+@Composable
+private fun EndPanel(title: String, message: String, game: Game, onLog: () -> Unit) {
+    val ctx = LocalContext.current
+    PanelCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(AppIcons.Error, null, tint = MaterialTheme.colorScheme.error)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall)
+        }
+        Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onLog) { Text("Vezi jurnal") }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = { GameSession.stop() }) { Text("Închide") }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { GameSession.start(ctx, game) }) { Text("Încearcă din nou") }
+        }
+    }
+}
+
+/** Short hint right after the game starts (the first frames can take a while under FEX). */
+@Composable
+private fun RunningHint(st: SessionState.Running) {
+    var visible by remember(st) { mutableStateOf(true) }
+    LaunchedEffect(st) { delay(10_000); visible = false }
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
+        AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
+            Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.6f), contentColor = Color.White) {
+                Text("${st.game.title} se încarcă — prima pornire poate dura câteva minute. Meniul: butonul din dreapta sus.",
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PanelCard(content: @Composable () -> Unit) {
+    Card(Modifier.padding(24.dp).widthIn(max = 520.dp).fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) { content() }
+    }
+}
+
+@Composable
+private fun LogPanel(onClose: () -> Unit) {
+    val scroll = rememberScrollState()
+    val log = GameSession.log
+    LaunchedEffect(log.length) { scroll.scrollTo(scroll.maxValue) }
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Jurnal", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(AppIcons.Close, "Închide") }
+            }
+            SelectionContainer(Modifier.fillMaxSize().verticalScroll(scroll).horizontalScroll(rememberScrollState())) {
+                Text(log.ifEmpty { "(gol)" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+            }
+        }
+    }
+}

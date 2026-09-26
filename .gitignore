@@ -1,0 +1,15 @@
+/build/
+/out/
+.gradle/
+local.properties
+app/build/
+app/.cxx/
+*.iml
+.idea/
+*.apk
+*.aab
+*.jks
+*.keystore
+.env
+.env.*
+docs/recon/*.txt

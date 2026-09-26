@@ -1,0 +1,756 @@
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/Syscalls/Passthrough.cpp
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/Syscalls/Passthrough.cpp
+@@ -9,15 +9,25 @@
+ #include "LinuxSyscalls/Syscalls.h"
+ #include "LinuxSyscalls/x64/Syscalls.h"
+ #include "LinuxSyscalls/x32/Syscalls.h"
++#include "LinuxSyscalls/AndroidSeccomp.h"
+ 
+ #include <stdint.h>
+ #include <sys/epoll.h>
++#include <sys/shm.h>
++#include <sys/sem.h>
++#include <sys/socket.h>
++#include <errno.h>
+ 
+ namespace FEX::HLE {
+ #ifdef ARCHITECTURE_arm64
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough0(FEXCore::Core::CpuStateFrame* Frame) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0");
+   register int x8 asm("x8") = syscall_num;
+   __asm volatile(R"(
+@@ -32,6 +42,11 @@
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough1(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register int x8 asm("x8") = syscall_num;
+   __asm volatile(R"(
+@@ -46,6 +61,11 @@
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough2(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1, uint64_t arg2) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register uint64_t x1 asm("x1") = arg2;
+   register int x8 asm("x8") = syscall_num;
+@@ -61,6 +81,11 @@
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough3(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register uint64_t x1 asm("x1") = arg2;
+   register uint64_t x2 asm("x2") = arg3;
+@@ -77,6 +102,11 @@
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough4(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register uint64_t x1 asm("x1") = arg2;
+   register uint64_t x2 asm("x2") = arg3;
+@@ -94,6 +124,11 @@
+ template<int syscall_num>
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough5(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register uint64_t x1 asm("x1") = arg2;
+   register uint64_t x2 asm("x2") = arg3;
+@@ -113,6 +148,11 @@
+ requires (syscall_num != -1)
+ uint64_t SyscallPassthrough6(FEXCore::Core::CpuStateFrame* Frame, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5,
+                              uint64_t arg6) {
++  if constexpr (FEXDroid::IsFakeSuccessOnAndroid(syscall_num)) {
++    return 0; // fexdroid: setuid family, a no-op for a non-root app; the syscall is trapped.
++  } else if constexpr (FEXDroid::IsTrappedOnAndroid(syscall_num)) {
++    return -ENOSYS; // fexdroid: Android's seccomp filter would SIGSYS here.
++  }
+   register uint64_t x0 asm("x0") = arg1;
+   register uint64_t x1 asm("x1") = arg2;
+   register uint64_t x2 asm("x2") = arg3;
+@@ -216,8 +256,15 @@
+   REGISTER_SYSCALL_IMPL(sched_yield, SyscallPassthrough0<SYSCALL_DEF(sched_yield)>);
+   REGISTER_SYSCALL_IMPL(msync, SyscallPassthrough3<SYSCALL_DEF(msync)>);
+   REGISTER_SYSCALL_IMPL(mincore, SyscallPassthrough3<SYSCALL_DEF(mincore)>);
+-  REGISTER_SYSCALL_IMPL(shmget, SyscallPassthrough3<SYSCALL_DEF(shmget)>);
+-  REGISTER_SYSCALL_IMPL(shmctl, SyscallPassthrough3<SYSCALL_DEF(shmctl)>);
++  // fexdroid: via glibc (userspace SysV shm over memfd + fxshmd); the syscalls are trapped.
++  REGISTER_SYSCALL_IMPL(shmget, [](FEXCore::Core::CpuStateFrame* Frame, key_t key, size_t size, int shmflg) -> uint64_t {
++    uint64_t Result = ::shmget(key, size, shmflg);
++    SYSCALL_ERRNO();
++  });
++  REGISTER_SYSCALL_IMPL(shmctl, [](FEXCore::Core::CpuStateFrame* Frame, int shmid, int cmd, struct shmid_ds* buf) -> uint64_t {
++    uint64_t Result = ::shmctl(shmid, cmd, buf);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(getpid, SyscallPassthrough0<SYSCALL_DEF(getpid)>);
+   REGISTER_SYSCALL_IMPL(socket, SyscallPassthrough3<SYSCALL_DEF(socket)>);
+   REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);
+@@ -230,7 +277,11 @@
+   REGISTER_SYSCALL_IMPL(getpeername, SyscallPassthrough3<SYSCALL_DEF(getpeername)>);
+   REGISTER_SYSCALL_IMPL(socketpair, SyscallPassthrough4<SYSCALL_DEF(socketpair)>);
+   REGISTER_SYSCALL_IMPL(kill, SyscallPassthrough2<SYSCALL_DEF(kill)>);
+-  REGISTER_SYSCALL_IMPL(semget, SyscallPassthrough3<SYSCALL_DEF(semget)>);
++  // fexdroid: SysV semaphores via glibc (memfd sets from fxshmd + futexes); the syscalls are trapped.
++  REGISTER_SYSCALL_IMPL(semget, [](FEXCore::Core::CpuStateFrame* Frame, key_t key, int nsems, int semflg) -> uint64_t {
++    uint64_t Result = ::semget(key, nsems, semflg);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(msgget, SyscallPassthrough2<SYSCALL_DEF(msgget)>);
+   REGISTER_SYSCALL_IMPL(msgsnd, SyscallPassthrough4<SYSCALL_DEF(msgsnd)>);
+   REGISTER_SYSCALL_IMPL(msgrcv, SyscallPassthrough5<SYSCALL_DEF(msgrcv)>);
+@@ -315,7 +366,11 @@
+   REGISTER_SYSCALL_IMPL(inotify_add_watch, SyscallPassthrough3<SYSCALL_DEF(inotify_add_watch)>);
+   REGISTER_SYSCALL_IMPL(inotify_rm_watch, SyscallPassthrough2<SYSCALL_DEF(inotify_rm_watch)>);
+   REGISTER_SYSCALL_IMPL(migrate_pages, SyscallPassthrough4<SYSCALL_DEF(migrate_pages)>);
+-  REGISTER_SYSCALL_IMPL(mkdirat, SyscallPassthrough3<SYSCALL_DEF(mkdirat)>);
++  // fexdroid: new directories under a RootFS-only parent (e.g. /tmp on Android) go into the RootFS.
++  REGISTER_SYSCALL_IMPL(mkdirat, [](FEXCore::Core::CpuStateFrame* Frame, int dirfd, const char* pathname, mode_t mode) -> uint64_t {
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Mkdirat(dirfd, pathname, mode);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(mknodat, SyscallPassthrough4<SYSCALL_DEF(mknodat)>);
+   REGISTER_SYSCALL_IMPL(fchownat, SyscallPassthrough5<SYSCALL_DEF(fchownat)>);
+   REGISTER_SYSCALL_IMPL(unlinkat, SyscallPassthrough3<SYSCALL_DEF(unlinkat)>);
+@@ -426,13 +481,21 @@
+     REGISTER_SYSCALL_IMPL_X64(getitimer, SyscallPassthrough2<SYSCALL_DEF(getitimer)>);
+     REGISTER_SYSCALL_IMPL_X64(setitimer, SyscallPassthrough3<SYSCALL_DEF(setitimer)>);
+     REGISTER_SYSCALL_IMPL_X64(sendfile, SyscallPassthrough4<SYSCALL_DEF(sendfile)>);
+-    REGISTER_SYSCALL_IMPL_X64(accept, SyscallPassthrough3<SYSCALL_DEF(accept)>);
++    // fexdroid: plain accept is trapped on Android (bionic only uses accept4).
++    REGISTER_SYSCALL_IMPL_X64(accept, [](FEXCore::Core::CpuStateFrame* Frame, int fd, struct sockaddr* addr, socklen_t* addrlen) -> uint64_t {
++      uint64_t Result = ::accept4(fd, addr, addrlen, 0);
++      SYSCALL_ERRNO();
++    });
+     REGISTER_SYSCALL_IMPL_X64(sendmsg, SyscallPassthrough3<SYSCALL_DEF(sendmsg)>);
+     REGISTER_SYSCALL_IMPL_X64(recvmsg, SyscallPassthrough3<SYSCALL_DEF(recvmsg)>);
+     REGISTER_SYSCALL_IMPL_X64(setsockopt, SyscallPassthrough5<SYSCALL_DEF(setsockopt)>);
+     REGISTER_SYSCALL_IMPL_X64(getsockopt, SyscallPassthrough5<SYSCALL_DEF(getsockopt)>);
+     REGISTER_SYSCALL_IMPL_X64(wait4, SyscallPassthrough4<SYSCALL_DEF(wait4)>);
+-    REGISTER_SYSCALL_IMPL_X64(semop, SyscallPassthrough3<SYSCALL_DEF(semop)>);
++    // fexdroid: via glibc (userspace SysV semaphores); the syscall is trapped.
++    REGISTER_SYSCALL_IMPL_X64(semop, [](FEXCore::Core::CpuStateFrame* Frame, int semid, struct sembuf* sops, size_t nsops) -> uint64_t {
++      uint64_t Result = ::semop(semid, sops, nsops);
++      SYSCALL_ERRNO();
++    });
+     REGISTER_SYSCALL_IMPL_X64(getrlimit, SyscallPassthrough2<SYSCALL_DEF(getrlimit)>);
+     REGISTER_SYSCALL_IMPL_X64(getrusage, SyscallPassthrough2<SYSCALL_DEF(getrusage)>);
+     REGISTER_SYSCALL_IMPL_X64(sysinfo, SyscallPassthrough1<SYSCALL_DEF(sysinfo)>);
+@@ -448,7 +511,12 @@
+     REGISTER_SYSCALL_IMPL_X64(readahead, SyscallPassthrough3<SYSCALL_DEF(readahead)>);
+     REGISTER_SYSCALL_IMPL_X64(futex, SyscallPassthrough6<SYSCALL_DEF(futex)>);
+     REGISTER_SYSCALL_IMPL_X64(io_getevents, SyscallPassthrough5<SYSCALL_DEF(io_getevents)>);
+-    REGISTER_SYSCALL_IMPL_X64(semtimedop, SyscallPassthrough4<SYSCALL_DEF(semtimedop)>);
++    // fexdroid: via glibc (userspace SysV semaphores); the syscall is trapped.
++    REGISTER_SYSCALL_IMPL_X64(
++      semtimedop, [](FEXCore::Core::CpuStateFrame* Frame, int semid, struct sembuf* sops, size_t nsops, const struct timespec* timeout) -> uint64_t {
++        uint64_t Result = ::semtimedop(semid, sops, nsops, timeout);
++        SYSCALL_ERRNO();
++      });
+     REGISTER_SYSCALL_IMPL_X64(timer_create, SyscallPassthrough3<SYSCALL_DEF(timer_create)>);
+     REGISTER_SYSCALL_IMPL_X64(timer_settime, SyscallPassthrough4<SYSCALL_DEF(timer_settime)>);
+     REGISTER_SYSCALL_IMPL_X64(timer_gettime, SyscallPassthrough2<SYSCALL_DEF(timer_gettime)>);
+@@ -464,8 +532,28 @@
+     REGISTER_SYSCALL_IMPL_X64(waitid, SyscallPassthrough5<SYSCALL_DEF(waitid)>);
+     REGISTER_SYSCALL_IMPL_X64(pselect6, SyscallPassthrough6<SYSCALL_DEF(pselect6)>);
+     REGISTER_SYSCALL_IMPL_X64(ppoll, SyscallPassthrough5<SYSCALL_DEF(ppoll)>);
+-    REGISTER_SYSCALL_IMPL_X64(set_robust_list, SyscallPassthrough2<SYSCALL_DEF(set_robust_list)>);
+-    REGISTER_SYSCALL_IMPL_X64(get_robust_list, SyscallPassthrough3<SYSCALL_DEF(get_robust_list)>);
++    // fexdroid: set_robust_list is trapped on Android. Keep the head in FEX, as FEX
++    // already does for 32-bit guests; the kernel's cleanup on thread death is lost.
++    REGISTER_SYSCALL_IMPL_X64(set_robust_list, [](FEXCore::Core::CpuStateFrame* Frame, struct robust_list_head* head, size_t len) -> uint64_t {
++      if (len != 24) {
++        return -EINVAL;
++      }
++      auto ThreadObject = FEX::HLE::ThreadManager::GetStateObjectFromCPUState(Frame);
++      ThreadObject->ThreadInfo.robust_list_head = reinterpret_cast<uint64_t>(head);
++      return 0;
++    });
++    REGISTER_SYSCALL_IMPL_X64(
++      get_robust_list, [](FEXCore::Core::CpuStateFrame* Frame, int pid, struct robust_list_head** head, size_t* len_ptr) -> uint64_t {
++        if (pid != 0) {
++          return -EPERM;
++        }
++        FaultSafeUserMemAccess::VerifyIsWritable(head, sizeof(*head));
++        FaultSafeUserMemAccess::VerifyIsWritable(len_ptr, sizeof(*len_ptr));
++        auto ThreadObject = FEX::HLE::ThreadManager::GetStateObjectFromCPUState(Frame);
++        *head = reinterpret_cast<struct robust_list_head*>(ThreadObject->ThreadInfo.robust_list_head);
++        *len_ptr = 24;
++        return 0;
++      });
+     REGISTER_SYSCALL_IMPL_X64(sync_file_range, SyscallPassthrough4<SYSCALL_DEF(sync_file_range)>);
+     REGISTER_SYSCALL_IMPL_X64(vmsplice, SyscallPassthrough4<SYSCALL_DEF(vmsplice)>);
+     REGISTER_SYSCALL_IMPL_X64(utimensat, SyscallPassthrough4<SYSCALL_DEF(utimensat)>);
+@@ -534,7 +622,13 @@
+     REGISTER_SYSCALL_IMPL_X32(io_pgetevents_time64, SyscallPassthrough6<SYSCALL_DEF(io_pgetevents)>);
+     REGISTER_SYSCALL_IMPL_X32(mq_timedsend_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedsend)>);
+     REGISTER_SYSCALL_IMPL_X32(mq_timedreceive_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedreceive)>);
+-    REGISTER_SYSCALL_IMPL_X32(semtimedop_time64, SyscallPassthrough4<SYSCALL_DEF(semtimedop)>);
++    // fexdroid: via glibc (userspace SysV semaphores); the syscall is trapped. The i386
++    // __kernel_timespec has the same layout as the host's struct timespec.
++    REGISTER_SYSCALL_IMPL_X32(
++      semtimedop_time64, [](FEXCore::Core::CpuStateFrame* Frame, int semid, struct sembuf* sops, size_t nsops, const struct timespec* timeout) -> uint64_t {
++        uint64_t Result = ::semtimedop(semid, sops, nsops, timeout);
++        SYSCALL_ERRNO();
++      });
+     REGISTER_SYSCALL_IMPL_X32(futex_time64, SyscallPassthrough6<SYSCALL_DEF(futex)>);
+     REGISTER_SYSCALL_IMPL_X32(sched_rr_get_interval_time64, SyscallPassthrough2<SYSCALL_DEF(sched_rr_get_interval)>);
+   }
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.cpp
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.cpp
+@@ -30,6 +30,7 @@
+ #include <errno.h>
+ #include <cstring>
+ #include <linux/openat2.h>
++#include "LinuxSyscalls/AndroidOpenat2.h" // fexdroid
+ #include <fcntl.h>
+ #include <filesystem>
+ #include <optional>
+@@ -658,6 +659,65 @@
+   return true;
+ }
+ 
++
++// fexdroid: Android has no /tmp, /var/tmp, ... on the host. Files and directories
++// that guests create under such paths would fail with ENOENT although the RootFS
++// has them. For an absolute path whose parent is missing on the host but present
++// in the RootFS, returns the RootFS fd and the relative path to create there.
++FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* pathname, FDPathTmpData& Tmp, fextl::string& Rel) const {
++  constexpr auto NoEntry = EmulatedFDPathResult {-1, nullptr};
++  if (!pathname || pathname[0] != '/' || RootFSFD == AT_FDCWD) {
++    return NoEntry;
++  }
++  fextl::string Full = pathname;
++  while (Full.size() > 1 && Full.back() == '/') {
++    Full.pop_back();
++  }
++  const auto Slash = Full.rfind('/');
++  if (Slash == fextl::string::npos || Slash == 0 || Slash + 1 >= Full.size()) {
++    return NoEntry;
++  }
++  const fextl::string Parent = Full.substr(0, Slash);
++  struct stat st;
++  if (::stat(Parent.c_str(), &st) == 0) {
++    return NoEntry; // The host has the parent: normal behaviour.
++  }
++  auto P = GetEmulatedFDPath(AT_FDCWD, Parent.c_str(), true, Tmp);
++  if (P.FD == -1 || P.FD == AT_FDCWD) {
++    return NoEntry;
++  }
++  Rel = fextl::string(P.Path) + "/" + Full.substr(Slash + 1);
++  return EmulatedFDPathResult {P.FD, Rel.c_str()};
++}
++
++// fexdroid: removing something that only exists inside the RootFS (created there by
++// Mkdirat/Open above): resolve it to the RootFS fd + relative path.
++uint64_t FileManager::Unlinkat(int dirfd, const char* pathname, int flags) {
++  if (pathname && pathname[0] == '/') {
++    struct stat st;
++    if (::lstat(pathname, &st) != 0) {
++      FDPathTmpData Tmp;
++      auto P = GetEmulatedFDPath(AT_FDCWD, pathname, false, Tmp);
++      if (P.FD != -1 && P.FD != AT_FDCWD) {
++        return ::unlinkat(P.FD, P.Path, flags);
++      }
++    }
++  }
++  return ::unlinkat(dirfd, pathname, flags);
++}
++
++uint64_t FileManager::Mkdirat(int dirfd, const char* pathname, uint32_t mode) {
++  if (pathname && pathname[0] == '/') {
++    FDPathTmpData Tmp;
++    fextl::string Rel;
++    auto C = GetRootFSCreatePath(pathname, Tmp, Rel);
++    if (C.FD != -1) {
++      return ::mkdirat(C.FD, C.Path, mode);
++    }
++  }
++  return ::mkdirat(dirfd, pathname, mode);
++}
++
+ uint64_t FileManager::Open(const char* pathname, int flags, uint32_t mode) {
+   auto NewPath = GetSelf(pathname);
+   const char* SelfPath = NewPath ? NewPath->data() : nullptr;
+@@ -672,7 +732,7 @@
+         .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this
+         .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
+       };
+-      fd = ::syscall(SYSCALL_DEF(openat2), Path.FD, Path.Path, &how, sizeof(how));
++      fd = FEXDroid::OpenAt2(Path.FD, Path.Path, &how, sizeof(how));
+ 
+       if (fd == -1 && errno == EXDEV) {
+         // This means a magic symlink (/proc/foo) was involved. In this case we
+@@ -688,7 +748,15 @@
+ 
+     ReplaceEmuFd(fd, flags, mode);
+   } else {
+-    fd = ::open(SelfPath, flags, mode);
++    // fexdroid: creating/writing a file under a RootFS-only parent (see GetRootFSCreatePath).
++    FDPathTmpData CreateTmp;
++    fextl::string CreateRel;
++    auto C = GetRootFSCreatePath(SelfPath, CreateTmp, CreateRel);
++    if (C.FD != -1) {
++      fd = ::openat(C.FD, C.Path, flags, mode);
++    } else {
++      fd = ::open(SelfPath, flags, mode);
++    }
+   }
+ 
+   return fd;
+@@ -926,7 +994,7 @@
+         .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this,
+         .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
+       };
+-      fd = ::syscall(SYSCALL_DEF(openat2), Path.FD, Path.Path, &how, sizeof(how));
++      fd = FEXDroid::OpenAt2(Path.FD, Path.Path, &how, sizeof(how));
+       if (fd == -1 && errno == EXDEV) {
+         // This means a magic symlink (/proc/foo) was involved. In this case we
+         // just punt and do the access without RESOLVE_IN_ROOT.
+@@ -941,7 +1009,15 @@
+ 
+     ReplaceEmuFd(fd, flags, mode);
+   } else {
+-    fd = ::syscall(SYSCALL_DEF(openat), dirfs, SelfPath, flags, mode);
++    // fexdroid: creating/writing a file under a RootFS-only parent (see GetRootFSCreatePath).
++    FDPathTmpData CreateTmp;
++    fextl::string CreateRel;
++    auto C = GetRootFSCreatePath(SelfPath, CreateTmp, CreateRel);
++    if (C.FD != -1) {
++      fd = ::openat(C.FD, C.Path, flags, mode);
++    } else {
++      fd = ::syscall(SYSCALL_DEF(openat), dirfs, SelfPath, flags, mode);
++    }
+   }
+ 
+   return fd;
+@@ -961,23 +1037,23 @@
+       if (Path.FD != AT_FDCWD) {
+         how->resolve |= RESOLVE_IN_ROOT;
+       }
+-      fd = ::syscall(SYSCALL_DEF(openat2), Path.FD, Path.Path, how, usize);
++      fd = FEXDroid::OpenAt2(Path.FD, Path.Path, how, usize);
+       how->resolve &= ~RESOLVE_IN_ROOT;
+       if (fd == -1 && errno == EXDEV) {
+         // This means a magic symlink (/proc/foo) was involved. In this case we
+         // just punt and do the access without RESOLVE_IN_ROOT.
+-        fd = ::syscall(SYSCALL_DEF(openat2), Path.FD, Path.Path, how, usize);
++        fd = FEXDroid::OpenAt2(Path.FD, Path.Path, how, usize);
+       }
+     }
+ 
+     // Open through RootFS failed (probably nonexistent), so open directly.
+     if (fd == -1) {
+-      fd = ::syscall(SYSCALL_DEF(openat2), dirfs, SelfPath, how, usize);
++      fd = FEXDroid::OpenAt2(dirfs, SelfPath, how, usize);
+     }
+ 
+     ReplaceEmuFd(fd, how->flags, how->mode);
+   } else {
+-    fd = ::syscall(SYSCALL_DEF(openat2), dirfs, SelfPath, how, usize);
++    fd = FEXDroid::OpenAt2(dirfs, SelfPath, how, usize);
+   }
+ 
+   return fd;
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.h
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/FileManagement.h
+@@ -62,6 +62,8 @@
+   uint64_t Access(const char* pathname, int mode);
+   uint64_t FAccessat(int dirfd, const char* pathname, int mode);
+   uint64_t FAccessat2(int dirfd, const char* pathname, int mode, int flags);
++  uint64_t Mkdirat(int dirfd, const char* pathname, uint32_t mode); // fexdroid
++  uint64_t Unlinkat(int dirfd, const char* pathname, int flags); // fexdroid
+   uint64_t Readlink(const char* pathname, char* buf, size_t bufsiz);
+   uint64_t Chmod(const char* pathname, mode_t mode);
+   uint64_t Readlinkat(int dirfd, const char* pathname, char* buf, size_t bufsiz);
+@@ -161,6 +163,7 @@
+     const char* Path;
+   };
+   EmulatedFDPathResult GetEmulatedFDPath(int dirfd, const char* pathname, bool FollowSymlink, FDPathTmpData& TmpFilename) const;
++  EmulatedFDPathResult GetRootFSCreatePath(const char* pathname, FDPathTmpData& Tmp, fextl::string& Rel) const; // fexdroid
+ 
+   std::optional<std::string_view> GetSelf(const char* Pathname) const;
+   bool IsSelfNoFollow(const char* Pathname, int flags) const;
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/Syscalls/FS.cpp
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/Syscalls/FS.cpp
+@@ -27,12 +27,12 @@
+   });
+ 
+   REGISTER_SYSCALL_IMPL(mkdir, [](FEXCore::Core::CpuStateFrame* Frame, const char* pathname, mode_t mode) -> uint64_t {
+-    uint64_t Result = ::mkdir(pathname, mode);
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Mkdirat(AT_FDCWD, pathname, mode); // fexdroid
+     SYSCALL_ERRNO();
+   });
+ 
+   REGISTER_SYSCALL_IMPL(rmdir, [](FEXCore::Core::CpuStateFrame* Frame, const char* pathname) -> uint64_t {
+-    uint64_t Result = ::rmdir(pathname);
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Unlinkat(AT_FDCWD, pathname, AT_REMOVEDIR); // fexdroid
+     SYSCALL_ERRNO();
+   });
+ 
+@@ -42,7 +42,7 @@
+   });
+ 
+   REGISTER_SYSCALL_IMPL(unlink, [](FEXCore::Core::CpuStateFrame* Frame, const char* pathname) -> uint64_t {
+-    uint64_t Result = ::unlink(pathname);
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Unlinkat(AT_FDCWD, pathname, 0); // fexdroid
+     SYSCALL_ERRNO();
+   });
+ 
+@@ -67,7 +67,7 @@
+   });
+ 
+   REGISTER_SYSCALL_IMPL(creat, [](FEXCore::Core::CpuStateFrame* Frame, const char* pathname, mode_t mode) -> uint64_t {
+-    uint64_t Result = ::creat(pathname, mode);
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode); // fexdroid
+     SYSCALL_ERRNO();
+   });
+ 
+--- a/Source/Tools/LinuxEmulation/LinuxSyscalls/x32/Semaphore.cpp
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/x32/Semaphore.cpp
+@@ -385,9 +385,15 @@
+ void RegisterSemaphore(FEX::HLE::SyscallHandler* Handler) {
+   REGISTER_SYSCALL_IMPL_X32(ipc, _ipc);
+ 
+-  REGISTER_SYSCALL_IMPL_X32(semctl, [](FEXCore::Core::CpuStateFrame* Frame, int semid, int semnum, int cmd, semun_32* semun) -> uint64_t {
++  // fexdroid: the i386 semctl syscall passes union semun by value (only ipc(SEMCTL) passes a
++  // pointer to it), and glibc built for kernels >= 5.1 sets IPC_64 in cmd.
++  REGISTER_SYSCALL_IMPL_X32(semctl, [](FEXCore::Core::CpuStateFrame* Frame, int semid, int semnum, int cmd, uint32_t semun_raw) -> uint64_t {
+     uint64_t Result {};
+     bool IPC64 = cmd & 0x100;
++    cmd &= 0xFF;
++    semun_32 semun_val {};
++    semun_val.val = semun_raw;
++    semun_32* semun = &semun_val;
+ 
+     switch (cmd) {
+     case IPC_SET: {
+--- /dev/null
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/AndroidSeccomp.h
+@@ -0,0 +1,136 @@
++/* Generated by scripts/lib/gen-android-seccomp.py from AOSP bionic policy files
++   (android12-release, android13-release, android14-release, android15-release, android16-release, main).
++   aarch64 syscalls some Android release's untrusted_app seccomp filter traps (SIGSYS).  */
++#pragma once
++
++namespace FEXDroid {
++constexpr bool IsTrappedOnAndroid(int nr) {
++  switch (nr) {
++  case 18: // lookup_dcookie
++  case 39: // umount2
++  case 40: // mount
++  case 42: // nfsservctl
++  case 51: // chroot
++  case 58: // vhangup
++  case 89: // acct
++  case 99: // set_robust_list
++  case 100: // get_robust_list
++  case 104: // kexec_load
++  case 105: // init_module
++  case 106: // delete_module
++  case 112: // clock_settime
++  case 116: // syslog
++  case 142: // reboot
++  case 143: // setregid
++  case 144: // setgid
++  case 145: // setreuid
++  case 146: // setuid
++  case 149: // setresgid
++  case 151: // setfsuid
++  case 152: // setfsgid
++  case 159: // setgroups
++  case 161: // sethostname
++  case 162: // setdomainname
++  case 170: // settimeofday
++  case 171: // adjtimex
++  case 180: // mq_open
++  case 181: // mq_unlink
++  case 182: // mq_timedsend
++  case 183: // mq_timedreceive
++  case 184: // mq_notify
++  case 185: // mq_getsetattr
++  case 186: // msgget
++  case 187: // msgctl
++  case 188: // msgrcv
++  case 189: // msgsnd
++  case 190: // semget
++  case 191: // semctl
++  case 192: // semtimedop
++  case 193: // semop
++  case 194: // shmget
++  case 195: // shmctl
++  case 196: // shmat
++  case 197: // shmdt
++  case 202: // accept
++  case 217: // add_key
++  case 218: // request_key
++  case 219: // keyctl
++  case 224: // swapon
++  case 225: // swapoff
++  case 234: // remap_file_pages
++  case 235: // mbind
++  case 236: // get_mempolicy
++  case 237: // set_mempolicy
++  case 238: // migrate_pages
++  case 239: // move_pages
++  case 262: // fanotify_init
++  case 263: // fanotify_mark
++  case 264: // name_to_handle_at
++  case 265: // open_by_handle_at
++  case 266: // clock_adjtime
++  case 272: // kcmp
++  case 273: // finit_module
++  case 280: // bpf
++  case 288: // pkey_mprotect
++  case 289: // pkey_alloc
++  case 290: // pkey_free
++  case 292: // io_pgetevents
++  case 293: // rseq
++  case 294: // kexec_file_load
++  case 425: // io_uring_setup
++  case 426: // io_uring_enter
++  case 427: // io_uring_register
++  case 428: // open_tree
++  case 429: // move_mount
++  case 430: // fsopen
++  case 431: // fsconfig
++  case 432: // fsmount
++  case 433: // fspick
++  case 435: // clone3
++  case 436: // close_range
++  case 437: // openat2
++  case 439: // faccessat2
++  case 441: // epoll_pwait2
++  case 442: // mount_setattr
++  case 443: // quotactl_fd
++  case 444: // landlock_create_ruleset
++  case 445: // landlock_add_rule
++  case 446: // landlock_restrict_self
++  case 447: // memfd_secret
++  case 448: // process_mrelease
++  case 449: // futex_waitv
++  case 450: // set_mempolicy_home_node
++  case 451: // cachestat
++  case 452: // fchmodat2
++  case 453: // map_shadow_stack
++  case 454: // futex_wake
++  case 455: // futex_wait
++  case 456: // futex_requeue
++  case 457: // statmount
++  case 458: // listmount
++  case 459: // lsm_get_self_attr
++  case 460: // lsm_set_self_attr
++  case 461: // lsm_list_modules
++  case 462: // mseal
++    return true;
++  default:
++    return false;
++  }
++}
++// Trapped identity-changing calls answered with success (the app is never root).
++constexpr bool IsFakeSuccessOnAndroid(int nr) {
++  switch (nr) {
++  case 143:
++  case 144:
++  case 145:
++  case 146:
++  case 149:
++  case 151:
++  case 152:
++  case 159:
++    return true;
++  default:
++    return false;
++  }
++}
++} // namespace FEXDroid
+--- /dev/null
++++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/AndroidOpenat2.h
+@@ -0,0 +1,157 @@
++// SPDX-License-Identifier: MIT
++// fexdroid (local patch, not upstream): userspace openat2() for Android.
++//
++// Android's app seccomp filter traps openat2 with SIGSYS (our glibc's syscall()
++// turns that into ENOSYS). FEX opens every guest path through the x86 RootFS with
++// openat2(RESOLVE_IN_ROOT), so it is emulated here: the path is walked component
++// by component below `dirfd`; ".." and absolute symlinks never leave it.
++#pragma once
++
++#include <cerrno>
++#include <climits>
++#include <fcntl.h>
++#include <linux/openat2.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++#include <FEXCore/fextl/string.h>
++#include <FEXCore/fextl/vector.h>
++
++namespace FEXDroid {
++
++class DirStack {
++public:
++  explicit DirStack(int Root) { Fds.push_back(Root); }
++  ~DirStack() {
++    for (int Fd : Fds) {
++      ::close(Fd);
++    }
++  }
++  int Top() const { return Fds.back(); }
++  void Push(int Fd) { Fds.push_back(Fd); }
++  void Pop() {
++    if (Fds.size() > 1) {
++      ::close(Fds.back());
++      Fds.pop_back();
++    }
++  }
++  void ToRoot() {
++    while (Fds.size() > 1) {
++      Pop();
++    }
++  }
++private:
++  fextl::vector<int> Fds;
++};
++
++// Resolves Path beneath RootFd with RESOLVE_IN_ROOT semantics, then opens it.
++inline int OpenInRoot(int RootFd, const char* Path, int Flags, mode_t Mode) {
++  int Root = RootFd == AT_FDCWD ? ::open(".", O_PATH | O_DIRECTORY | O_CLOEXEC) : ::fcntl(RootFd, F_DUPFD_CLOEXEC, 0);
++  if (Root < 0) {
++    return -1;
++  }
++  DirStack Dirs(Root);
++  fextl::string Rest = Path;
++  int Links = 0;
++
++  auto OpenHere = [&](const char* Name, int ExtraFlags) {
++    int Fd = ::openat(Dirs.Top(), Name, Flags | ExtraFlags, Mode);
++    return Fd;
++  };
++
++  for (;;) {
++    size_t Start = Rest.find_first_not_of('/');
++    if (Start == fextl::string::npos) {
++      // Path exhausted (or it was "/"): open the current directory itself.
++      return OpenHere(".", 0);
++    }
++    Rest.erase(0, Start);
++    size_t Slash = Rest.find('/');
++    fextl::string Comp = Rest.substr(0, Slash);
++    Rest = Slash == fextl::string::npos ? fextl::string {} : Rest.substr(Slash);
++    const bool Last = Rest.find_first_not_of('/') == fextl::string::npos;
++    const bool TrailingSlash = Last && !Rest.empty();
++
++    if (Comp == ".") {
++      if (Last) {
++        return OpenHere(".", 0);
++      }
++      continue;
++    }
++    if (Comp == "..") {
++      Dirs.Pop(); // never above the root
++      if (Last) {
++        return OpenHere(".", 0);
++      }
++      continue;
++    }
++
++    struct stat St {};
++    const int StatResult = ::fstatat(Dirs.Top(), Comp.c_str(), &St, AT_SYMLINK_NOFOLLOW);
++    const bool FollowLink = !Last || TrailingSlash || !(Flags & O_NOFOLLOW);
++    if (StatResult == 0 && S_ISLNK(St.st_mode) && FollowLink) {
++      if (++Links > 40) {
++        errno = ELOOP;
++        return -1;
++      }
++      char Target[PATH_MAX];
++      ssize_t Len = ::readlinkat(Dirs.Top(), Comp.c_str(), Target, sizeof(Target) - 1);
++      if (Len <= 0) {
++        if (Len == 0) {
++          errno = ENOENT;
++        }
++        return -1;
++      }
++      Target[Len] = '\0';
++      if (Target[0] == '/') {
++        Dirs.ToRoot();
++      }
++      Rest = fextl::string(Target) + (Rest.empty() ? fextl::string {} : Rest);
++      if (Rest.find_first_not_of('/') == fextl::string::npos && Target[0] == '/') {
++        return OpenHere(".", 0);
++      }
++      // A relative target is resolved from the directory holding the link.
++      if (Target[0] != '/') {
++        Rest = "/" + Rest;
++      }
++      continue;
++    }
++
++    if (Last) {
++      return OpenHere(Comp.c_str(), TrailingSlash ? O_DIRECTORY : 0);
++    }
++    if (StatResult != 0) {
++      return -1;
++    }
++    if (!S_ISDIR(St.st_mode)) {
++      errno = ENOTDIR;
++      return -1;
++    }
++    int Fd = ::openat(Dirs.Top(), Comp.c_str(), O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
++    if (Fd < 0) {
++      return -1;
++    }
++    Dirs.Push(Fd);
++  }
++}
++
++// Drop-in for ::syscall(SYSCALL_DEF(openat2), ...): returns an fd or -1/errno.
++// HowT is the kernel's struct open_how or FEX's own FEX::HLE::open_how (same layout).
++template<typename HowT>
++inline int OpenAt2(int DirFd, const char* Path, const HowT* How, size_t Size) {
++  if (Size < 24) { // OPEN_HOW_SIZE_VER0
++    errno = EINVAL;
++    return -1;
++  }
++  if (How->resolve == 0) {
++    return ::openat(DirFd, Path, static_cast<int>(How->flags), static_cast<mode_t>(How->mode));
++  }
++  if (How->resolve == RESOLVE_IN_ROOT) {
++    return OpenInRoot(DirFd, Path, static_cast<int>(How->flags), static_cast<mode_t>(How->mode));
++  }
++  // Other RESOLVE_* flags are not emulated; callers treat ENOSYS as "no openat2".
++  errno = ENOSYS;
++  return -1;
++}
++
++} // namespace FEXDroid
