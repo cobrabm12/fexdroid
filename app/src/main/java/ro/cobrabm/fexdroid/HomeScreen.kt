@@ -24,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -54,7 +55,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
     var status by remember { mutableStateOf<InstallStatus?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) { refresh++; onPauseOrDispose { } }
-    LaunchedEffect(refresh, GameSession.state) {
+    LaunchedEffect(refresh, GameSession.state, SteamRootfs.state is SteamRootfs.State.Done) {
         status = withContext(Dispatchers.IO) { runCatching { InstallStatus.check(env) }.getOrNull() }
     }
 
@@ -168,6 +169,7 @@ private fun StatusCard(s: InstallStatus?, env: LinuxEnv) {
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             StatusRow(if (s.steamRootfs) Level.OK else Level.ERROR, "Biblioteci Steam (x86)",
                 if (s.steamRootfs) "Instalate" else "Lipsesc — necesare pentru Steam")
+            if (!s.steamRootfs || SteamRootfs.state !is SteamRootfs.State.Idle) SteamRootfsInstall()
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             StatusRow(if (s.steamClient) Level.OK else Level.INFO, "Client Steam",
                 if (s.steamClient) "Prezent" else "Se descarcă la prima pornire a Steam")
@@ -175,6 +177,38 @@ private fun StatusCard(s: InstallStatus?, env: LinuxEnv) {
             StatusRow(if (s.dota) Level.OK else Level.INFO, "Dota 2",
                 if (s.dota) "Instalat" else "Neinstalat")
         }
+    }
+}
+
+/** Download + install of the Steam x86 rootfs from the GitHub release (SteamRootfs). */
+@Composable
+private fun SteamRootfsInstall() {
+    val ctx = LocalContext.current
+    val st = SteamRootfs.state
+    Column(Modifier.fillMaxWidth().padding(start = 56.dp, end = 16.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (st) {
+            is SteamRootfs.State.Working -> {
+                val mb = st.doneBytes shr 20
+                if (st.totalBytes > 0) {
+                    LinearProgressIndicator(progress = { st.doneBytes.toFloat() / st.totalBytes }, modifier = Modifier.fillMaxWidth())
+                    Text("Descarc și instalez: $mb / ${st.totalBytes shr 20} MB", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text("Descarc și instalez: $mb MB", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            is SteamRootfs.State.Failed -> Text("Instalarea a eșuat: ${st.message}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error)
+            SteamRootfs.State.Done -> Text("Instalate.", style = MaterialTheme.typography.bodySmall)
+            SteamRootfs.State.Idle -> Text("Pachete Debian (amd64 + i386), fără fișiere Valve. ~250 MB descărcare, ~600 MB instalate.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (st is SteamRootfs.State.Idle || st is SteamRootfs.State.Failed)
+            FilledTonalButton(onClick = { SteamRootfs.install(ctx) }) {
+                Icon(AppIcons.Play, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                Text(if (st is SteamRootfs.State.Failed) "Încearcă din nou" else "Descarcă și instalează")
+            }
     }
 }
 

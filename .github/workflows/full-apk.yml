@@ -16,6 +16,9 @@ on:
       - 'app/**'
       - '.github/workflows/full-apk.yml'
 
+permissions:
+  contents: write
+
 concurrency:
   group: full-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -49,7 +52,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ninja-build patchelf squashfs-tools erofs-utils ccache zstd \
-            libarchive-tools bison flex file gcc-multilib >/dev/null
+            libarchive-tools bison flex file gcc-multilib glslang-tools >/dev/null
           sudo pip3 install --break-system-packages -q 'meson>=1.4' mako pyyaml packaging
           wget -q https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 22 >/dev/null
           sudo apt-get install -y -qq libclang-cpp22-dev libclang-22-dev llvm-22-dev lld-22 >/dev/null
@@ -69,16 +72,48 @@ jobs:
           key: ccache-${{ github.sha }}
           restore-keys: ccache-
 
-      - name: Build payload
+      # Each stage's output is cached under a key made of the inputs that shape it, so a
+      # run that only changes the app (or one stage) skips the unchanged stages.
+      - name: Cache rootfs + sysroots
+        id: c-rootfs
+        uses: actions/cache@v4
+        with:
+          path: build/rootfs
+          key: rootfs-v1-${{ hashFiles('scripts/build-rootfs.sh', 'scripts/build-x86-sysroot.sh', 'scripts/config.sh') }}
+      - name: Cache glibc
+        id: c-glibc
+        uses: actions/cache@v4
+        with:
+          path: build/glibc/install
+          key: glibc-v1-${{ hashFiles('scripts/build-glibc.sh', 'scripts/config.sh', 'patches/glibc/**', 'scripts/lib/make-glibc*', 'scripts/lib/gen-android-seccomp.py', 'third_party/aosp-bionic-seccomp/**', 'tools/fxshmd/*.h') }}
+      - name: Cache FEX
+        id: c-fex
+        uses: actions/cache@v4
+        with:
+          path: build/fex/install
+          key: fex-v1-${{ hashFiles('scripts/build-fex.sh', 'scripts/config.sh', 'patches/fex/**', 'scripts/cmake/**', 'scripts/lib/make-fex*', 'scripts/lib/gen-android-seccomp.py', 'third_party/aosp-bionic-seccomp/**', 'scripts/build-rootfs.sh', 'scripts/build-x86-sysroot.sh') }}
+      - name: Cache Mesa
+        id: c-mesa
+        uses: actions/cache@v4
+        with:
+          path: build/mesa/install
+          key: mesa-v1-${{ hashFiles('scripts/build-mesa.sh', 'scripts/config.sh', 'patches/mesa/**', 'scripts/build-rootfs.sh') }}
+
+      - name: Build rootfs + sysroots
+        if: steps.c-rootfs.outputs.cache-hit != 'true'
+        run: scripts/build-rootfs.sh && scripts/build-x86-sysroot.sh
+      - name: Build glibc
+        if: steps.c-glibc.outputs.cache-hit != 'true'
+        run: scripts/build-glibc.sh 2>&1 | tail -40
+      - name: Build FEX
+        if: steps.c-fex.outputs.cache-hit != 'true'
+        run: scripts/build-fex.sh 2>&1 | tail -40
+      - name: Build Mesa
+        if: steps.c-mesa.outputs.cache-hit != 'true'
+        run: scripts/build-mesa.sh 2>&1 | tail -60
+      - name: Assemble payload
         run: |
-          set -o pipefail
-          for s in build-rootfs build-x86-sysroot build-glibc build-fex build-mesa build-payload; do
-            echo "::group::$s"
-            start=$(date +%s)
-            scripts/$s.sh 2>&1 | tail -60
-            echo "$s: $(( $(date +%s) - start )) s"
-            echo "::endgroup::"
-          done
+          scripts/build-payload.sh 2>&1 | tail -40
           ls -la build/payload/assets build/payload/jniLibs/arm64-v8a
 
       - name: Payload self-tests (qemu)
@@ -87,6 +122,13 @@ jobs:
           FXD_ROOT=/data/data/ro.cobrabm.fexdroid/files/rootfs
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/seccomp-wrap" || true
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/shmtest all" || true
+
+      # Same debug signing key on every run, so a new APK installs over the previous one
+      # (a fresh key would force an uninstall and wipe the installed Linux environment).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: fexdroid-debug-keystore-v1
 
       - name: Build APK
         run: ./gradlew --no-daemon --stacktrace assembleLegacyDebug
@@ -97,3 +139,13 @@ jobs:
           path: app/build/outputs/apk/legacy/debug/*.apk
           if-no-files-found: error
           compression-level: 0
+
+      - name: Publish APK (release "apk-latest", downloadable from the phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/legacy/debug/app-legacy-debug.apk fexdroid-legacy.apk
+          gh release view apk-latest >/dev/null 2>&1 || \
+            gh release create apk-latest --target "$GITHUB_SHA" --prerelease --title "fexdroid APK (latest build)" \
+              --notes "Full APK with the Linux payload, built by the Full APK workflow. Install fexdroid-legacy.apk."
+          gh release upload apk-latest --clobber fexdroid-legacy.apk

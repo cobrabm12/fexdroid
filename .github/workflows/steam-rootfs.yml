@@ -1,0 +1,40 @@
+# Steam x86 rootfs (scripts/build-rootfs-steam.sh: Debian amd64 + i386 packages the Steam
+# client needs, no Valve files), published as the "steam-rootfs" release so the app can
+# download and install it without a PC (SteamRootfs.kt). gzip instead of zstd: Android
+# inflates gzip natively (java.util.zip), zstd would need an extra library.
+name: Steam rootfs release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'scripts/build-rootfs-steam.sh'
+      - 'scripts/lib/relativize-symlinks.py'
+      - '.github/workflows/steam-rootfs.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  steam-rootfs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          sudo apt-get install -y -qq zstd pigz >/dev/null
+          scripts/build-rootfs-steam.sh
+          zstd -dc build/rootfs/rootfs-x86_64-steam.tar.zst | pigz -9 > build/rootfs/rootfs-x86_64-steam.tar.gz
+          cd build/rootfs && sha256sum rootfs-x86_64-steam.tar.gz > rootfs-x86_64-steam.tar.gz.sha256
+          ls -la
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view steam-rootfs >/dev/null 2>&1 || \
+            gh release create steam-rootfs --target "$GITHUB_SHA" --prerelease --title "Steam x86 rootfs" \
+              --notes "Debian trixie amd64 + i386 libraries for the Steam client under FEX (no Valve files). Installed by the app: Acasă › Biblioteci Steam › Descarcă."
+          gh release upload steam-rootfs --clobber build/rootfs/rootfs-x86_64-steam.tar.gz \
+            build/rootfs/rootfs-x86_64-steam.tar.gz.sha256 build/rootfs/rootfs-x86_64-steam.packages.txt
