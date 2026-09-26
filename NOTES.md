@@ -506,5 +506,16 @@ Următorii pași: login Steam (QR, date mobile/WiFi) ca jocul să fie online; pe
   cerință: arm64, pagini 4 KB, ARMv8.2 (LSE + FP16, cerut de `TUNE_ARCH=armv8.2-a`), GPU Adreno 6xx/7xx/8xx cu
   `/dev/kgsl-3d0` (Mali, Xclipse și PowerVR nu au driver Turnip), kernel, varianta legacy/modern, RAM, spațiu,
   limita de procese copil. Butonul „Trimite” exportă raportul, ca testerii să-l poată trimite.
+- **Profiluri FEX + cache de cod** (`FexConfig.kt`, Setări › Performanță): aplicația scrie `~/.fex-emu/Config.json`
+  (stratul utilizator, peste cel global din `build-fex.sh`) la fiecare pornire. Opțiunile și valorile implicite sunt
+  verificate în FEX-2609 `Config.json.in`:
+  - **Compatibil:** TSO complet, inclusiv vectori și memcpy;
+  - **Echilibrat:** valorile implicite FEX;
+  - **Rapid:** `TSOEnabled=0`, `HalfBarrierTSOEnabled=0`, `X87ReducedPrecision=1`.
+
+  `DiskCache=1` (implicit oprit în FEX) păstrează codul tradus în `FEX_APP_CACHE_LOCATION=~/.cache/fex-emu/`. Același
+  director e folosit și de Steam și de pornirea directă (HOME diferit). Fișierele cache au lock (`FOZFile::Open`), deci
+  merg și cu mai multe procese simultan. De măsurat pe telefon: a doua pornire a Dota 2 față de ~4–5 min acum.
+- **Manifest:** `appCategory="game"` + `isGame`, ca modurile de joc ale producătorilor să se aplice.
 - **CI:** `.github/workflows/android-apk.yml` compilează ambele variante la fiecare push. APK-urile din CI **nu conțin
   payload-ul** (rootfs/FEX/Mesa se construiesc local cu Docker), deci servesc la verificarea compatibilității, nu la jocuri.

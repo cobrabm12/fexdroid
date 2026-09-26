@@ -139,6 +139,9 @@ object GameSession {
                     return@thread fail("Dota 2 nu este instalat pe telefon. Vezi Setări › Instalare jocuri.")
                 if (!env.ensureInstalled(::append))
                     return@thread fail(env.pathProblem() ?: "Mediul Linux nu a putut fi instalat.")
+                runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache) }
+                    .onSuccess { append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}") }
+                    .onFailure { append("FEX: nu pot scrie Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.DISPLAY)
                 if (!xs.startX()) return@thread fail("Ecranul virtual (Xvfb) nu a pornit.")

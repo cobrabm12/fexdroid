@@ -118,6 +118,9 @@ class LinuxEnv(private val ctx: Context) {
             "FEX_ROOTFS" to x86Root.path,
             "FEX_APP_CONFIG_LOCATION" to "${home.path}/.fex-emu/",
             "FEX_APP_DATA_LOCATION" to "${home.path}/.fex-emu/",
+            // JIT disk cache (FexConfig): outside HOME-dependent defaults, so Steam and the
+            // direct Dota start (different HOME) share one cache.
+            "FEX_APP_CACHE_LOCATION" to "${home.path}/.cache/fex-emu/",
         )
     }
 
