@@ -17,6 +17,7 @@ allowlist. FEX forwards many guest syscalls to the host verbatim; this patch:
   * replaces raw openat2 calls in FileManagement with a userspace RESOLVE_IN_ROOT
     implementation (patches/fex/src/AndroidOpenat2.h);
   * bind/connect: AF_UNIX paths under guest-only dirs (/tmp) map into the RootFS;
+  * TCP connect/bind/accept are recorded for tools/lsof (patches/fex/src/AndroidTcpRegistry.h);
   * hides host paths apps cannot read (/proc/bus/pci) from guests: ENOENT, and shows
     /sys/bus/pci as an empty tree (libpci exit()s without a working access method).
 Raw ::syscall() sites are covered by our glibc's syscall() wrapper (glibc 0003).
@@ -49,8 +50,21 @@ SOCKADDR_IMPL = """  // fexdroid: AF_UNIX paths under guest-only directories map
       addrlen = UnLen;
     }}
     uint64_t Result = ::{name}(sockfd, addr, addrlen);
+    if (FEXDroid::IsInetAddr(addr) && (Result == 0 || errno == EINPROGRESS)) {{
+      FEXDroid::RecordTcpSocket(sockfd, addr, addrlen); // fexdroid: lsof for Steam (AndroidTcpRegistry.h)
+    }}
     SYSCALL_ERRNO();
   }});
+"""
+
+ACCEPT4_IMPL = """  // fexdroid: record accepted TCP sockets for lsof (AndroidTcpRegistry.h).
+  REGISTER_SYSCALL_IMPL(accept4, [](FEXCore::Core::CpuStateFrame* Frame, int fd, struct sockaddr* addr, socklen_t* addrlen, int flags) -> uint64_t {
+    uint64_t Result = ::accept4(fd, addr, addrlen, flags);
+    if (static_cast<int64_t>(Result) >= 0) {
+      FEXDroid::RecordTcpSocket(static_cast<int>(Result));
+    }
+    SYSCALL_ERRNO();
+  });
 """
 
 def x32socket(text):
@@ -70,10 +84,33 @@ def x32socket(text):
         AddrLen = UnLen;
       }}
       Result = ::{name}(Arguments[0], Addr, AddrLen);
+      if (FEXDroid::IsInetAddr(Addr) && (Result == 0 || errno == EINPROGRESS)) {{
+        FEXDroid::RecordTcpSocket(Arguments[0], Addr, AddrLen);
+      }}
       break;
     }}"""
         if text.count(a) != 1:
             sys.exit(f"x32/Socket.cpp: {op} anchor not found")
+        text = text.replace(a, b)
+    reps = [
+        ("""      Result = ::accept(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]));
+      break;""",
+         """      Result = ::accept(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]));
+      if (static_cast<int64_t>(Result) >= 0) {
+        FEXDroid::RecordTcpSocket(static_cast<int>(Result)); // fexdroid
+      }
+      break;"""),
+        ("""      return ::accept4(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]), Arguments[3]);""",
+         """      Result = ::accept4(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]), Arguments[3]);
+      if (static_cast<int64_t>(Result) >= 0) {
+        FEXDroid::RecordTcpSocket(static_cast<int>(Result)); // fexdroid
+      }
+      break;"""),
+        ('#include "LinuxSyscalls/x64/Syscalls.h"\n', '#include "LinuxSyscalls/x64/Syscalls.h"\n#include "LinuxSyscalls/AndroidTcpRegistry.h" // fexdroid\n'),
+    ]
+    for a, b in reps:
+        if text.count(a) != 1:
+            sys.exit(f"x32/Socket.cpp: anchor not found: {a[:60]!r}")
         text = text.replace(a, b)
     return text
 
@@ -89,8 +126,9 @@ def passthrough(text):
     reps = [
         ("  REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);\n", SOCKADDR_IMPL.format(name="connect")),
         ("  REGISTER_SYSCALL_IMPL(bind, SyscallPassthrough3<SYSCALL_DEF(bind)>);\n", SOCKADDR_IMPL.format(name="bind")),
+        ("  REGISTER_SYSCALL_IMPL(accept4, SyscallPassthrough4<SYSCALL_DEF(accept4)>);\n", ACCEPT4_IMPL),
         ('#include "LinuxSyscalls/x32/Syscalls.h"\n',
-         '#include "LinuxSyscalls/x32/Syscalls.h"\n#include "LinuxSyscalls/AndroidSeccomp.h"\n'),
+         '#include "LinuxSyscalls/x32/Syscalls.h"\n#include "LinuxSyscalls/AndroidSeccomp.h"\n#include "LinuxSyscalls/AndroidTcpRegistry.h"\n'),
         ('#include <sys/epoll.h>\n', '#include <sys/epoll.h>\n#include <sys/shm.h>\n#include <sys/sem.h>\n#include <sys/socket.h>\n#include <errno.h>\n'),
         ("  REGISTER_SYSCALL_IMPL(semget, SyscallPassthrough3<SYSCALL_DEF(semget)>);\n",
          "  // fexdroid: SysV semaphores via glibc (memfd sets from fxshmd + futexes); the syscalls are trapped.\n"
@@ -140,6 +178,9 @@ def passthrough(text):
          "    // fexdroid: plain accept is trapped on Android (bionic only uses accept4).\n"
          "    REGISTER_SYSCALL_IMPL_X64(accept, [](FEXCore::Core::CpuStateFrame* Frame, int fd, struct sockaddr* addr, socklen_t* addrlen) -> uint64_t {\n"
          "      uint64_t Result = ::accept4(fd, addr, addrlen, 0);\n"
+         "      if (static_cast<int64_t>(Result) >= 0) {\n"
+         "        FEXDroid::RecordTcpSocket(static_cast<int>(Result));\n"
+         "      }\n"
          "      SYSCALL_ERRNO();\n"
          "    });\n"),
         ("    REGISTER_SYSCALL_IMPL_X64(set_robust_list, SyscallPassthrough2<SYSCALL_DEF(set_robust_list)>);\n"
@@ -445,6 +486,7 @@ for rel, fn in ((LS + "Syscalls/Passthrough.cpp", passthrough), (LS + "FileManag
     files.append((rel, old, fn(old)))
 files.append((LS + "AndroidSeccomp.h", "", table))
 files.append((LS + "AndroidOpenat2.h", "", (repo / "patches/fex/src/AndroidOpenat2.h").read_text()))
+files.append((LS + "AndroidTcpRegistry.h", "", (repo / "patches/fex/src/AndroidTcpRegistry.h").read_text()))
 
 chunks = []
 for rel, old, new in files:

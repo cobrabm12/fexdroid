@@ -112,6 +112,13 @@ class LinuxEnv(private val ctx: Context) {
                 // exports ship both as empty dirs. openat(that fd, "self/task") then fails, which
                 // kills Chromium's zygote (steamwebhelper). delete() only removes empty dirs.
                 File(tree, "proc").delete(); File(tree, "sys").delete()
+                // lsof that works without /proc/net (tools/lsof/fxlsof.c), from the base tree.
+                val lsof = File(x86Base, "usr/bin/lsof")
+                val dst = File(tree, "usr/bin/lsof")
+                if (tree != x86Base && lsof.isFile && File(tree, "usr/bin").isDirectory &&
+                    (dst.length() != lsof.length() || !dst.canExecute())) {
+                    dst.delete(); lsof.copyTo(dst); dst.setExecutable(true)
+                }
             }
         }
     }
