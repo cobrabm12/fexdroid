@@ -16,6 +16,9 @@ on:
       - 'app/**'
       - '.github/workflows/full-apk.yml'
 
+permissions:
+  contents: write
+
 concurrency:
   group: full-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -88,6 +91,13 @@ jobs:
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/seccomp-wrap" || true
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/shmtest all" || true
 
+      # Same debug signing key on every run, so a new APK installs over the previous one
+      # (a fresh key would force an uninstall and wipe the installed Linux environment).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: fexdroid-debug-keystore-v1
+
       - name: Build APK
         run: ./gradlew --no-daemon --stacktrace assembleLegacyDebug
 
@@ -97,3 +107,13 @@ jobs:
           path: app/build/outputs/apk/legacy/debug/*.apk
           if-no-files-found: error
           compression-level: 0
+
+      - name: Publish APK (release "apk-latest", downloadable from the phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/legacy/debug/app-legacy-debug.apk fexdroid-legacy.apk
+          gh release view apk-latest >/dev/null 2>&1 || \
+            gh release create apk-latest --target "$GITHUB_SHA" --prerelease --title "fexdroid APK (latest build)" \
+              --notes "Full APK with the Linux payload, built by the Full APK workflow. Install fexdroid-legacy.apk."
+          gh release upload apk-latest --clobber fexdroid-legacy.apk
