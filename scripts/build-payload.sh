@@ -58,6 +58,18 @@ chmod 1777 "$A/tmp" "$A/var/tmp" "$A/dev/shm"
 # Point every dynamically linked ELF at the on-device loader, and rewrite
 # absolute RUNPATHs (/usr/lib/...) into the rootfs.
 python3 scripts/lib/fix-elf.py "$A" "$FXD_ROOT" "$FXD_LDSO"
+# Debian's Vulkan manifests (lavapipe) name /usr/lib/...: point them into the rootfs.
+python3 - "$A/usr/share/vulkan/icd.d" "$FXD_ROOT" <<'PY'
+import json, pathlib, sys
+d, root = pathlib.Path(sys.argv[1]), sys.argv[2]
+for f in d.glob("*.json"):
+    j = json.loads(f.read_text())
+    p = j.get("ICD", {}).get("library_path", "")
+    if p.startswith("/") and not p.startswith(root):
+        j["ICD"]["library_path"] = root + p
+        f.write_text(json.dumps(j, indent=4) + "\n")
+        print(f"icd {f.name}: {j['ICD']['library_path']}")
+PY
 
 # ld.so.cache: Debian's cache and ld.so.conf name /lib/..., which does not exist on
 # Android. Rewrite the config with rootfs paths and regenerate the cache with our

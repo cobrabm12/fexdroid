@@ -490,3 +490,49 @@ Următorii pași: login Steam (QR, date mobile/WiFi) ca jocul să fie online; pe
   moare, seturile deja mapate continuă între procesele care le au, dar cheile se pierd (id-urile noi pornesc de la un
   offset aleator ca să nu se confunde); un proces oprit (SIGSTOP) cu lock-ul luat blochează setul (și daemonul la
   RMID/undo pe acel set); max 64 de procese cu SEM_UNDO nenul simultan pe un set (altfel ENOSPC).
+
+## N-026 · Oprire curată, jurnal fără cost pe CPU, compatibilitate pe mai multe telefoane  🟨 (compilat în CI; 🧪 telefon în așteptare)
+- **Procese orfane:** `Process.destroy()` oprea doar `sh`-ul pornit direct; FEX, Steam, `steamwebhelper` și jocul
+  rămâneau în viață după „Oprește”. `ProcessTree.kt` citește `/proc/*/stat` (același uid), trimite SIGTERM întregului
+  arbore, iar după 2 s SIGKILL la ce a rămas. Sunt prinse și procesele deja re-parentate la init care rulează din
+  `files/` (în afară de `fxshmd`, care e partajat și repornește la cerere). Oprirea rulează pe un fir separat, iar o
+  pornire nouă așteaptă terminarea ei (Xvfb `:0`, FIFO-ul audio).
+- **Jurnal:** `GameSession.append` reconstruia un șir de 40 KB și declanșa o recompunere Compose la fiecare linie
+  (mii de linii de la FEX/Steam). Acum liniile stau într-un buffer circular, iar UI-ul primește textul cel mult o dată la 250 ms.
+- **`GameService`** (foreground service, `specialUse`): Android nu mai omoară aplicația, și odată cu ea jocul, când
+  utilizatorul trece în altă aplicație. Notificarea readuce jocul pe ecran.
+- **Compatibilitate:** `minSdk` 31 → 28, cu verificări de API: culorile dinamice doar pe 12+, `WindowInsetsControllerCompat`,
+  `Build.SOC_*` doar pe 12+. `DeviceCheck.kt` afișează pe ecranul Acasă (și în raportul de recunoaștere) un verdict per
+  cerință: arm64, pagini 4 KB, ARMv8.2 (LSE + FP16, cerut de `TUNE_ARCH=armv8.2-a`), GPU Adreno 6xx/7xx/8xx cu
+  `/dev/kgsl-3d0` (Mali, Xclipse și PowerVR nu au driver Turnip), kernel, varianta legacy/modern, RAM, spațiu,
+  limita de procese copil. Butonul „Trimite” exportă raportul, ca testerii să-l poată trimite.
+- **Profiluri FEX + cache de cod** (`FexConfig.kt`, Setări › Performanță): aplicația scrie `~/.fex-emu/Config.json`
+  (stratul utilizator, peste cel global din `build-fex.sh`) la fiecare pornire. Opțiunile și valorile implicite sunt
+  verificate în FEX-2609 `Config.json.in`:
+  - **Compatibil:** TSO complet, inclusiv vectori și memcpy;
+  - **Echilibrat:** valorile implicite FEX;
+  - **Rapid:** `TSOEnabled=0`, `HalfBarrierTSOEnabled=0`, `X87ReducedPrecision=1`.
+
+  `DiskCache=1` (implicit oprit în FEX) păstrează codul tradus în `FEX_APP_CACHE_LOCATION=~/.cache/fex-emu/`. Același
+  director e folosit și de Steam și de pornirea directă (HOME diferit). Fișierele cache au lock (`FOZFile::Open`), deci
+  merg și cu mai multe procese simultan. De măsurat pe telefon: a doua pornire a Dota 2 față de ~4–5 min acum.
+- **Manifest:** `appCategory="game"` + `isGame`, ca modurile de joc ale producătorilor să se aplice.
+- **CI:** `.github/workflows/android-apk.yml` compilează ambele variante la fiecare push. APK-urile din CI **nu conțin
+  payload-ul** (rootfs/FEX/Mesa se construiesc local cu Docker), deci servesc la verificarea compatibilității, nu la jocuri.
+
+## N-027 · Telefoane fără Adreno: Vulkan pe CPU (lavapipe)  🟨 (build în CI; 🧪 telefon în așteptare)
+- Primul tester fără Snapdragon: Xiaomi 23090RA98G „zircon” (Redmi Note 13 Pro+, Dimensity 7200, Mali-G610),
+  Android 16, kernel 5.15, pagini de 4 KB, ARMv8.2 cu LSE2. FEX poate rula, dar nu există `/dev/kgsl-3d0`, deci
+  nici Turnip. Driverul Mali al Android-ului e bionic și nu se poate încărca într-un proces glibc fără un wrapper.
+  PanVK cere kernel DRM (panthor), nu kbase.
+- **Soluția:** `mesa-vulkan-drivers` (Debian arm64) în rootfs-ul arm64 aduce lavapipe (`libvulkan_lvp.so`, cu LLVM).
+  `build-rootfs.sh` păstrează doar lavapipe din acel pachet. Celelalte drivere Vulkan Debian (intel, radeon, panfrost…)
+  țintesc GPU-uri DRM de desktop, inaccesibile unei aplicații. `build-payload.sh` rescrie `library_path` din
+  manifestele Debian spre rootfs.
+- `LinuxEnv.vulkanIcd()`: cu `/dev/kgsl-3d0` → Turnip, altfel → lavapipe. Thunk-ul Vulkan FEX folosește același
+  loader, deci jocurile x86 ajung la lavapipe fără alte schimbări. `DeviceCheck` raportează acum GPU-ul non-Adreno
+  ca INFO („grafică pe procesor”), nu ca eroare.
+- **Așteptări:** interfața Steam (CEF rulează oricum cu `-cef-disable-gpu`) și jocurile 2D/ușoare merg. Jocurile 3D
+  mari (Dota 2) vor fi foarte lente. Pasul următor pentru Mali ar fi un wrapper spre driverul vendor
+  (ideea vulkan-wrapper-android).
+- Cost: ~150 MB în plus în rootfs-ul arm64 (LLVM).

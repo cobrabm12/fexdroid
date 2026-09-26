@@ -1,0 +1,42 @@
+# Builds the Android app (both flavors) on every push, so Kotlin/NDK changes are
+# compiled even without a local Android SDK. The Linux payload (rootfs, glibc, FEX,
+# Mesa: scripts/build-payload.sh) is NOT built here, it needs Docker/qemu and hours;
+# these APKs therefore contain the UI, the device compatibility check and the recon
+# probes, but no Linux environment. For a full APK build the payload locally first.
+name: Android APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK components (versions from app/build.gradle.kts)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses >/dev/null
+          "$SDKM" --install "platform-tools" "ndk;29.0.14206865" "cmake;3.22.1" >/dev/null
+          # AGP installs the compileSdk platform itself when missing; try it here first.
+          "$SDKM" --install "platforms;android-37" >/dev/null || true
+
+      - name: Build debug APKs (legacy + modern)
+        run: ./gradlew --no-daemon --stacktrace assembleLegacyDebug assembleModernDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fexdroid-apks-no-payload
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

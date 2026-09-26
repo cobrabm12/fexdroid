@@ -27,6 +27,7 @@ RUNTIME_PKGS=(
   xvfb                                               # phase 3: X server (PLAN.md D3)
   x11-utils                                          # phase 4: xev/xdpyinfo to verify input
   pulseaudio pulseaudio-utils                        # phase 4: audio server (pipe sink -> AAudio)
+  mesa-vulkan-drivers                                # lavapipe: CPU Vulkan for GPUs without Turnip (Mali, ...)
 )
 # Extra packages only needed to cross-compile FEX/Mesa against this sysroot.
 DEV_PKGS=(
@@ -66,10 +67,15 @@ tar -C "$OUT/stage" -xf "$OUT/rootfs-arm64-raw.tar" 2>/dev/null || true
   rm -rf usr/share/doc/* usr/share/man/* usr/share/info/* usr/share/lintian \
          var/cache/debconf/*-old var/log/* .dockerenv
   find usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'locale.alias' -exec rm -rf {} + 2>/dev/null || true
-  # xvfb drags in Mesa's software GL (llvmpipe + LLVM, ~150 MB) for GLX only.
-  # 3D goes through Turnip; without these Xvfb just runs without GLX.
-  rm -f usr/lib/aarch64-linux-gnu/libgallium-*.so usr/lib/aarch64-linux-gnu/libLLVM*.so* \
-        usr/lib/aarch64-linux-gnu/libz3.so*
+  # Vulkan: Turnip (our build, scripts/build-mesa.sh) on Adreno; lavapipe (LLVM, from
+  # Debian's mesa-vulkan-drivers) as the software fallback on phones without KGSL
+  # (Mali, Xclipse, PowerVR; NOTES.md N-027). Every other Debian Vulkan driver targets
+  # desktop/DRM GPUs that an Android app can never open: drop them and their manifests.
+  for icd in usr/share/vulkan/icd.d/*.json; do
+    case "$icd" in */lvp_icd.*) ;; *) rm -f "$icd" ;; esac
+  done
+  find usr/lib/aarch64-linux-gnu -maxdepth 1 -name 'libvulkan_*.so' ! -name 'libvulkan_lvp.so' -delete
+  # GL drivers (Xvfb GLX): not used, 3D goes through Vulkan.
   rm -rf usr/lib/aarch64-linux-gnu/dri
 )
 mv "$OUT/stage/packages.txt" "$OUT/rootfs-arm64.packages.txt"

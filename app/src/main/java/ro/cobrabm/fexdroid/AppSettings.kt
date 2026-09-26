@@ -33,6 +33,10 @@ object AppSettings {
     var theme by mutableStateOf(ThemeMode.DARK); private set
     /** Home screen: Dota 2 direct start (no Steam client) as the main action. */
     var gameWithoutSteam by mutableStateOf(false); private set
+    /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
+    var fexProfile by mutableStateOf(FexProfile.BALANCED); private set
+    /** FEX JIT disk cache: faster loading after the first start of a game. */
+    var fexDiskCache by mutableStateOf(true); private set
 
     fun init(ctx: Context) {
         if (::prefs.isInitialized) return
@@ -45,6 +49,9 @@ object AppSettings {
         dynamicColor = prefs.getBoolean("dynamic_color", true)
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null) ?: "DARK") }.getOrDefault(ThemeMode.DARK)
         gameWithoutSteam = prefs.getBoolean("game_without_steam", false)
+        fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
+            .getOrDefault(FexProfile.BALANCED)
+        fexDiskCache = prefs.getBoolean("fex_disk_cache", true)
     }
 
     fun updateResolution(r: Resolution) {
@@ -55,5 +62,7 @@ object AppSettings {
     fun updateFps(v: Int) { fps = v; prefs.edit().putInt("fps", v).apply() }
     fun updateDynamicColor(v: Boolean) { dynamicColor = v; prefs.edit().putBoolean("dynamic_color", v).apply() }
     fun updateTheme(v: ThemeMode) { theme = v; prefs.edit().putString("theme", v.name).apply() }
+    fun updateFexProfile(v: FexProfile) { fexProfile = v; prefs.edit().putString("fex_profile", v.name).apply() }
+    fun updateFexDiskCache(v: Boolean) { fexDiskCache = v; prefs.edit().putBoolean("fex_disk_cache", v).apply() }
     fun updateGameWithoutSteam(v: Boolean) { gameWithoutSteam = v; prefs.edit().putBoolean("game_without_steam", v).apply() }
 }

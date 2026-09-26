@@ -1,5 +1,6 @@
 package ro.cobrabm.fexdroid
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -23,6 +24,9 @@ private val LightColors = lightColorScheme(
     secondary = Color(0xFF4B635A), tertiary = Color(0xFF3F6377),
 )
 
+/** Wallpaper colors (Material You) exist from Android 12. */
+val dynamicColorAvailable get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
 /** Material3 theme: dark by default, wallpaper colors (Material You) when enabled. */
 @Composable
 fun FexdroidTheme(content: @Composable () -> Unit) {
@@ -33,8 +37,8 @@ fun FexdroidTheme(content: @Composable () -> Unit) {
     }
     val ctx = LocalContext.current
     val colors = when {
-        AppSettings.dynamicColor && dark -> dynamicDarkColorScheme(ctx)
-        AppSettings.dynamicColor -> dynamicLightColorScheme(ctx)
+        dynamicColorAvailable && AppSettings.dynamicColor && dark -> dynamicDarkColorScheme(ctx)
+        dynamicColorAvailable && AppSettings.dynamicColor -> dynamicLightColorScheme(ctx)
         dark -> DarkColors
         else -> LightColors
     }

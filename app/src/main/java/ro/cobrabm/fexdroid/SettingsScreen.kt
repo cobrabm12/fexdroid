@@ -26,8 +26,17 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +66,26 @@ fun SettingsScreen() {
                 if (GameSession.active) Note("Un joc rulează acum: noile valori se aplică după repornire.")
             }
 
+            Section("Performanță") {
+                Setting("Profil FEX", AppSettings.fexProfile.description) {
+                    Choice(FexProfile.entries, AppSettings.fexProfile, { it.label }, AppSettings::updateFexProfile)
+                }
+                SwitchSetting("Cache de cod pe disc",
+                    "Codul x86 tradus o dată e păstrat și refolosit: pornirile următoare ale unui joc sunt mult mai rapide.",
+                    AppSettings.fexDiskCache, AppSettings::updateFexDiskCache)
+                var cacheBytes by remember { mutableStateOf<Long?>(null) }
+                LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { runCatching { FexConfig.cacheSize(env) }.getOrNull() } }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Cache: ${cacheBytes?.let { "${it shr 20} MB" } ?: "…"}", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    val scope = rememberCoroutineScope()
+                    TextButton(enabled = !GameSession.active, onClick = {
+                        scope.launch { cacheBytes = withContext(Dispatchers.IO) { FexConfig.clearCache(env); 0L } }
+                    }) { Text("Șterge cache-ul") }
+                }
+                if (GameSession.active) Note("Se aplică la următoarea pornire a jocului.")
+            }
+
             Section("Joc") {
                 SwitchSetting(
                     "Rulează jocul fără Steam",
@@ -73,7 +102,8 @@ fun SettingsScreen() {
                         when (it) { ThemeMode.DARK -> "Întunecată"; ThemeMode.SYSTEM -> "Sistem"; ThemeMode.LIGHT -> "Luminoasă" }
                     }, AppSettings::updateTheme)
                 }
-                SwitchSetting("Culori din imaginea de fundal", "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
+                if (dynamicColorAvailable)
+                    SwitchSetting("Culori din imaginea de fundal", "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
             }
 
             Section("Instalare Steam și jocuri") {
