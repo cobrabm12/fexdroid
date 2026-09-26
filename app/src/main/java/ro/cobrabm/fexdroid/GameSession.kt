@@ -1,6 +1,8 @@
 package ro.cobrabm.fexdroid
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import androidx.compose.runtime.getValue
@@ -70,13 +72,42 @@ object GameSession {
     val active get() = state !is SessionState.Idle
 
     private var session: XSession? = null
+    private var appContext: Context? = null
     private var surface: Surface? = null
     private var bridgeOn = false
     private var generation = 0
+    /** Background stop of the previous session; a new start waits for it (Xvfb :0, the FIFO). */
+    @Volatile private var stopping: Thread? = null
+
+    // Log: FEX and Steam print thousands of lines. Keep them in a bounded ring and publish
+    // the text to Compose at most every LOG_PUBLISH_MS, instead of rebuilding a 40 KB
+    // string and recomposing on every line (which cost CPU the game needs).
+    private const val LOG_MAX_CHARS = 40_000
+    private const val LOG_PUBLISH_MS = 250L
+    private val logLines = ArrayDeque<String>()
+    private var logChars = 0
+    private var logPending = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val publishLog = Runnable {
+        log = synchronized(logLines) {
+            logPending = false
+            logLines.joinToString("\n", postfix = if (logLines.isEmpty()) "" else "\n")
+        }
+    }
+
+    private fun clearLog() {
+        synchronized(logLines) { logLines.clear(); logChars = 0 }
+        log = ""
+    }
 
     private fun append(line: String) {
         Log.i("fexdroid-game", line)
-        synchronized(this) { log = (log + line + "\n").takeLast(40_000) }
+        synchronized(logLines) {
+            logLines.addLast(line)
+            logChars += line.length + 1
+            while (logChars > LOG_MAX_CHARS && logLines.size > 1) logChars -= logLines.removeFirst().length + 1
+            if (!logPending) { logPending = true; mainHandler.postDelayed(publishLog, LOG_PUBLISH_MS) }
+        }
         val s = state
         if (s is SessionState.Starting && s.step == StartStep.PREPARE && line.isNotBlank())
             state = s.copy(detail = line.trim())
@@ -85,21 +116,25 @@ object GameSession {
     fun start(ctx: Context, game: Game) {
         if (active && state !is SessionState.Exited && state !is SessionState.Failed) { playerVisible = true; return }
         stop()
+        appContext = ctx.applicationContext
+        GameService.start(ctx.applicationContext, game.title)
         val env = LinuxEnv(ctx.applicationContext)
         val res = AppSettings.resolution
         val gen = synchronized(this) { ++generation }
         val xs = XSession(env, res.width, res.height, ::append)
         session = xs
         resolution = res
-        log = ""
+        clearLog()
         inputReady = false
         state = SessionState.Starting(game, StartStep.PREPARE)
         playerVisible = true
+        val previous = stopping
         thread(name = "game-start") {
             fun current() = synchronized(this) { gen == generation }
             fun step(s: StartStep) { if (current()) state = SessionState.Starting(game, s) }
             fun fail(msg: String) { append(msg); if (current()) state = SessionState.Failed(game, msg) }
             try {
+                previous?.join()
                 if (game == Game.DOTA && !File(env.steamLibrary, "steamapps/common/dota 2 beta/game/dota.sh").exists())
                     return@thread fail("Dota 2 nu este instalat pe telefon. Vezi Setări › Instalare jocuri.")
                 if (!env.ensureInstalled(::append))
@@ -130,8 +165,10 @@ object GameSession {
         DisplayBridge.stop()
         bridgeOn = false
         inputReady = false
-        session?.stopAll()
+        // Killing the process trees waits up to ~2 s for a clean exit: not on the UI thread.
+        session?.let { old -> stopping = thread(name = "game-stop") { old.stopAll() } }
         session = null
+        appContext?.let(GameService::stop)
         state = SessionState.Idle
         playerVisible = false
     }

@@ -3,10 +3,11 @@ package ro.cobrabm.fexdroid
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.view.SurfaceHolder
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.BackHandler
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -92,11 +93,12 @@ fun PlayerScreen() {
     DisposableEffect(Unit) {
         val prev = activity.requestedOrientation
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        val ic = activity.window.insetsController
-        ic?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        ic?.hide(WindowInsets.Type.systemBars())
+        // Compat controller: WindowInsetsController itself is Android 11+ (minSdk is 28).
+        val ic = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        ic.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        ic.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
-            ic?.show(WindowInsets.Type.systemBars())
+            ic.show(WindowInsetsCompat.Type.systemBars())
             activity.requestedOrientation = prev
             view?.releasePointerCapture()
         }
@@ -337,7 +339,7 @@ private fun PanelCard(content: @Composable () -> Unit) {
 private fun LogPanel(onClose: () -> Unit) {
     val scroll = rememberScrollState()
     val log = GameSession.log
-    LaunchedEffect(log.length) { scroll.scrollTo(scroll.maxValue) }
+    LaunchedEffect(log) { scroll.scrollTo(scroll.maxValue) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

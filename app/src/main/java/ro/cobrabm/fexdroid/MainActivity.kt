@@ -35,6 +35,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Games and long test runs: never let the screen time out while we are visible.
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Android 13+: the game notification (GameService) needs this; the service runs without it too.
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         // `adb shell am start -n <pkg>/ro.cobrabm.fexdroid.MainActivity --ez autorun true`
         // `--es action phase1|fex-static|fex-dynamic|vulkaninfo|fex-vulkaninfo` runs a Linux step
         // (output in files/linux.txt); `--es action x|vkcube|fex-vkcube` opens the X11 screen.

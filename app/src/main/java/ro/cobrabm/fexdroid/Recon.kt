@@ -22,6 +22,7 @@ class Recon(private val ctx: Context) {
 
     fun sections(): List<Pair<String, () -> String>> = listOf(
         "identity" to ::identity,
+        "compatibility (fexdroid)" to { DeviceCheck.report(DeviceCheck.run(ctx)) },
         "memory / page size" to ::memory,
         "kernel" to { readFile("/proc/version") },
         "cpu" to ::cpu,
@@ -48,7 +49,8 @@ class Recon(private val ctx: Context) {
         appendLine("android          ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
         appendLine("build            ${Build.DISPLAY}")
         appendLine("security patch   ${Build.VERSION.SECURITY_PATCH}")
-        appendLine("soc              ${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            appendLine("soc              ${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}")
         appendLine("board/hardware   ${Build.BOARD} / ${Build.HARDWARE}")
         appendLine("abis             ${Build.SUPPORTED_ABIS.joinToString()}")
         for (p in listOf("ro.hardware.vulkan", "ro.hardware.egl", "ro.board.platform",

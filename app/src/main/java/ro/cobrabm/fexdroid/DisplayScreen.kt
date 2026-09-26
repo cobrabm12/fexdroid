@@ -80,7 +80,7 @@ fun DisplayScreen(autoAction: String?) {
     }
     val toneRaw = "--raw --format=s16le --rate=48000 --channels=2"
 
-    DisposableEffect(Unit) { onDispose { DisplayBridge.stop(); session.stopAll() } }
+    DisposableEffect(Unit) { onDispose { DisplayBridge.stop(); thread(name = "x-stop") { session.stopAll() } } }
     var audioFrames by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) { frames = DisplayBridge.frames(); audioFrames = AudioBridge.frames(); delay(1000) }
@@ -148,7 +148,7 @@ fun DisplayScreen(autoAction: String?) {
                 sh("tone-x86", "${env.root}/opt/fexdroid-tests/tone 3 | ${env.root}/usr/bin/FEX ${env.x86Root}/usr/bin/pacat $toneRaw")
             }) { Text("Test sunet x86 (FEX)") }
             Button(onClick = { thread { startX().join(); session.launch("xev", listOf("${env.root}/usr/bin/xev")) } }) { Text("xev") }
-            OutlinedButton(onClick = { DisplayBridge.stop(); session.stopAll() }) { Text("Oprește tot") }
+            OutlinedButton(onClick = { DisplayBridge.stop(); thread(name = "x-stop") { session.stopAll() } }) { Text("Oprește tot") }
         }
         Text(log, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
     }

@@ -13,8 +13,10 @@ class XSession(
     val height: Int = Resolution.DEFAULT.height,
     private val log: (String) -> Unit,
 ) {
-    private var xvfb: Process? = null
+    @Volatile private var xvfb: Process? = null
     private val clients = mutableListOf<Process>()
+    /** Guards [clients]; not the instance monitor, which startX() holds while it waits for Xvfb. */
+    private val procLock = Any()
     @Volatile var shmid: Int = -1; private set
 
     val fxshmSocket get() = "${env.root}/tmp/.fxshm/sock"
@@ -22,7 +24,7 @@ class XSession(
 
     val pulseSocket get() = "${env.root}/tmp/pulse/native"
     private val audioFifo get() = "${env.root}/tmp/pa.fifo"
-    private var pulse: Process? = null
+    @Volatile private var pulse: Process? = null
 
     fun clientEnv(): Map<String, String> = env.environment() + mapOf(
         "DISPLAY" to ":0",
@@ -95,7 +97,7 @@ class XSession(
         val pb = ProcessBuilder(argv).redirectErrorStream(true)
         pb.environment().apply { clear(); putAll(clientEnv()) }
         val p = pb.start()
-        clients += p
+        synchronized(procLock) { clients += p }
         thread(name = title, isDaemon = true) {
             p.inputStream.bufferedReader().forEachLine { log("[$title] $it") }
             log("[$title] exit ${p.waitFor()}")
@@ -105,13 +107,21 @@ class XSession(
 
     val running get() = xvfb?.isAlive == true
 
+    /**
+     * Stops the clients with everything they spawned (FEX, Steam, the game...), then
+     * PulseAudio and Xvfb. Blocks up to ~2 s: call off the UI thread. fxshmd stays up
+     * (it is shared with other sessions and restarts on demand anyway).
+     */
     fun stopAll() {
-        clients.forEach { it.destroy() }
-        clients.clear()
-        xvfb?.destroy()
-        xvfb = null
-        pulse?.destroy()
-        pulse = null
-        shmid = -1
+        val procs = synchronized(procLock) {
+            val all = clients.toList() + listOfNotNull(pulse, xvfb)
+            clients.clear()
+            xvfb = null
+            pulse = null
+            shmid = -1
+            all
+        }
+        val orphans = ProcessTree.orphansUnder(env.files.path, keep = listOf("fxshmd"))
+        ProcessTree.killTrees(procs, orphans, log = log)
     }
 }

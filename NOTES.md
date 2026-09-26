@@ -490,3 +490,21 @@ Următorii pași: login Steam (QR, date mobile/WiFi) ca jocul să fie online; pe
   moare, seturile deja mapate continuă între procesele care le au, dar cheile se pierd (id-urile noi pornesc de la un
   offset aleator ca să nu se confunde); un proces oprit (SIGSTOP) cu lock-ul luat blochează setul (și daemonul la
   RMID/undo pe acel set); max 64 de procese cu SEM_UNDO nenul simultan pe un set (altfel ENOSPC).
+
+## N-026 · Oprire curată, jurnal fără cost pe CPU, compatibilitate pe mai multe telefoane  🟨 (compilat în CI; 🧪 telefon în așteptare)
+- **Procese orfane:** `Process.destroy()` oprea doar `sh`-ul pornit direct; FEX, Steam, `steamwebhelper` și jocul
+  rămâneau în viață după „Oprește”. `ProcessTree.kt` citește `/proc/*/stat` (același uid), trimite SIGTERM întregului
+  arbore, iar după 2 s SIGKILL la ce a rămas. Sunt prinse și procesele deja re-parentate la init care rulează din
+  `files/` (în afară de `fxshmd`, care e partajat și repornește la cerere). Oprirea rulează pe un fir separat, iar o
+  pornire nouă așteaptă terminarea ei (Xvfb `:0`, FIFO-ul audio).
+- **Jurnal:** `GameSession.append` reconstruia un șir de 40 KB și declanșa o recompunere Compose la fiecare linie
+  (mii de linii de la FEX/Steam). Acum liniile stau într-un buffer circular, iar UI-ul primește textul cel mult o dată la 250 ms.
+- **`GameService`** (foreground service, `specialUse`): Android nu mai omoară aplicația, și odată cu ea jocul, când
+  utilizatorul trece în altă aplicație. Notificarea readuce jocul pe ecran.
+- **Compatibilitate:** `minSdk` 31 → 28, cu verificări de API: culorile dinamice doar pe 12+, `WindowInsetsControllerCompat`,
+  `Build.SOC_*` doar pe 12+. `DeviceCheck.kt` afișează pe ecranul Acasă (și în raportul de recunoaștere) un verdict per
+  cerință: arm64, pagini 4 KB, ARMv8.2 (LSE + FP16, cerut de `TUNE_ARCH=armv8.2-a`), GPU Adreno 6xx/7xx/8xx cu
+  `/dev/kgsl-3d0` (Mali, Xclipse și PowerVR nu au driver Turnip), kernel, varianta legacy/modern, RAM, spațiu,
+  limita de procese copil. Butonul „Trimite” exportă raportul, ca testerii să-l poată trimite.
+- **CI:** `.github/workflows/android-apk.yml` compilează ambele variante la fiecare push. APK-urile din CI **nu conțin
+  payload-ul** (rootfs/FEX/Mesa se construiesc local cu Docker), deci servesc la verificarea compatibilității, nu la jocuri.

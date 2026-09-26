@@ -14,9 +14,11 @@ android {
 
     defaultConfig {
         applicationId = "ro.cobrabm.fexdroid"
-        minSdk = 31
-        versionCode = 1
-        versionName = "0.1.0-phase0"
+        // 28 (Android 9) so more phones can at least run the compatibility check; the
+        // Linux environment itself is verified on Android 14 (NOTES.md N-021).
+        minSdk = 28
+        versionCode = 2
+        versionName = "0.2.0"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
     }

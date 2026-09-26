@@ -73,7 +73,8 @@ fun SettingsScreen() {
                         when (it) { ThemeMode.DARK -> "Întunecată"; ThemeMode.SYSTEM -> "Sistem"; ThemeMode.LIGHT -> "Luminoasă" }
                     }, AppSettings::updateTheme)
                 }
-                SwitchSetting("Culori din imaginea de fundal", "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
+                if (dynamicColorAvailable)
+                    SwitchSetting("Culori din imaginea de fundal", "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
             }
 
             Section("Instalare Steam și jocuri") {

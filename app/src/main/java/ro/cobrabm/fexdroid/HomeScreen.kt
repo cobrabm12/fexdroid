@@ -73,6 +73,8 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
 
             StatusCard(status, env)
 
+            CompatibilityCard()
+
             val s = status
             val ready = s != null && s.payloadProblem == null
             val steamOk = ready && s.steamRootfs
@@ -172,6 +174,48 @@ private fun StatusCard(s: InstallStatus?, env: LinuxEnv) {
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             StatusRow(if (s.dota) Level.OK else Level.INFO, "Dota 2",
                 if (s.dota) "Instalat" else "Neinstalat")
+        }
+    }
+}
+
+/** Device requirements (DeviceCheck): collapsed to one line when everything is fine. */
+@Composable
+private fun CompatibilityCard() {
+    val ctx = LocalContext.current
+    var items by remember { mutableStateOf<List<DeviceCheck.Item>?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        items = withContext(Dispatchers.IO) { runCatching { DeviceCheck.run(ctx) }.getOrNull() }
+    }
+    val list = items
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Text("Compatibilitate dispozitiv", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            if (list == null) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp)); Text("Verific telefonul…")
+                }
+                return@Column
+            }
+            val verdict = DeviceCheck.verdict(list)
+            val problems = list.count { it.level != Level.OK }
+            StatusRow(verdict, when (verdict) {
+                Level.OK -> "Telefonul îndeplinește cerințele"
+                Level.INFO -> "Poate funcționa, cu $problems observații"
+                Level.ERROR -> "Mediul Linux nu poate rula pe acest telefon"
+            }, "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+            if (expanded || verdict != Level.OK) {
+                for (i in list.filter { expanded || it.level != Level.OK }) {
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    StatusRow(i.level, i.title, i.detail)
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Mai puțin" else "Toate verificările") }
+                TextButton(onClick = { (ctx as? MainActivity)?.share(DeviceCheck.report(list)) }) { Text("Trimite") }
+            }
         }
     }
 }
