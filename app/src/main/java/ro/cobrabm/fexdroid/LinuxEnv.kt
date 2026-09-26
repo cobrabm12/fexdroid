@@ -100,8 +100,20 @@ class LinuxEnv(private val ctx: Context) {
         File(root, "etc/resolv.conf").writeText(dns.joinToString("") { "nameserver $it\n" })
     }
 
+    /** Adreno (KGSL) -> Turnip; anything else -> lavapipe, Vulkan on the CPU (NOTES.md N-027). */
+    val hasTurnipGpu: Boolean get() = File("/dev/kgsl-3d0").exists()
+
+    /** Vulkan driver manifest for the arm64 loader (and FEX's host-side Vulkan thunk). */
+    fun vulkanIcd(): String {
+        val icdDir = File(root, "usr/share/vulkan/icd.d")
+        val turnip = File(icdDir, "freedreno_icd.aarch64.json")
+        if (hasTurnipGpu) return turnip.path
+        return icdDir.listFiles { f -> f.name.startsWith("lvp_icd") }?.firstOrNull()?.path ?: turnip.path
+    }
+
     fun environment(): Map<String, String> {
         home.mkdirs()
+        val icd = vulkanIcd()
         return mapOf(
             "PATH" to "${root.path}/usr/local/bin:${root.path}/usr/bin:${root.path}/bin",
             "HOME" to home.path,
@@ -111,9 +123,9 @@ class LinuxEnv(private val ctx: Context) {
             "XDG_RUNTIME_DIR" to "${root.path}/tmp",
             "FXD_ROOT" to root.path,
             "FXD_FILES" to files.path,
-            // Vulkan loader (arm64, also used by FEX's host-side Vulkan thunk): only Turnip.
-            "VK_ICD_FILENAMES" to "${root.path}/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json",
-            "VK_DRIVER_FILES" to "${root.path}/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json",
+            // Vulkan loader (arm64, also used by FEX's host-side Vulkan thunk): exactly one driver.
+            "VK_ICD_FILENAMES" to icd,
+            "VK_DRIVER_FILES" to icd,
             // FEX: guest rootfs and config/cache location.
             "FEX_ROOTFS" to x86Root.path,
             "FEX_APP_CONFIG_LOCATION" to "${home.path}/.fex-emu/",

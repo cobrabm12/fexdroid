@@ -519,3 +519,20 @@ Următorii pași: login Steam (QR, date mobile/WiFi) ca jocul să fie online; pe
 - **Manifest:** `appCategory="game"` + `isGame`, ca modurile de joc ale producătorilor să se aplice.
 - **CI:** `.github/workflows/android-apk.yml` compilează ambele variante la fiecare push. APK-urile din CI **nu conțin
   payload-ul** (rootfs/FEX/Mesa se construiesc local cu Docker), deci servesc la verificarea compatibilității, nu la jocuri.
+
+## N-027 · Telefoane fără Adreno: Vulkan pe CPU (lavapipe)  🟨 (build în CI; 🧪 telefon în așteptare)
+- Primul tester fără Snapdragon: Xiaomi 23090RA98G „zircon” (Redmi Note 13 Pro+, Dimensity 7200, Mali-G610),
+  Android 16, kernel 5.15, pagini de 4 KB, ARMv8.2 cu LSE2. FEX poate rula, dar nu există `/dev/kgsl-3d0`, deci
+  nici Turnip. Driverul Mali al Android-ului e bionic și nu se poate încărca într-un proces glibc fără un wrapper.
+  PanVK cere kernel DRM (panthor), nu kbase.
+- **Soluția:** `mesa-vulkan-drivers` (Debian arm64) în rootfs-ul arm64 aduce lavapipe (`libvulkan_lvp.so`, cu LLVM).
+  `build-rootfs.sh` păstrează doar lavapipe din acel pachet. Celelalte drivere Vulkan Debian (intel, radeon, panfrost…)
+  țintesc GPU-uri DRM de desktop, inaccesibile unei aplicații. `build-payload.sh` rescrie `library_path` din
+  manifestele Debian spre rootfs.
+- `LinuxEnv.vulkanIcd()`: cu `/dev/kgsl-3d0` → Turnip, altfel → lavapipe. Thunk-ul Vulkan FEX folosește același
+  loader, deci jocurile x86 ajung la lavapipe fără alte schimbări. `DeviceCheck` raportează acum GPU-ul non-Adreno
+  ca INFO („grafică pe procesor”), nu ca eroare.
+- **Așteptări:** interfața Steam (CEF rulează oricum cu `-cef-disable-gpu`) și jocurile 2D/ușoare merg. Jocurile 3D
+  mari (Dota 2) vor fi foarte lente. Pasul următor pentru Mali ar fi un wrapper spre driverul vendor
+  (ideea vulkan-wrapper-android).
+- Cost: ~150 MB în plus în rootfs-ul arm64 (LLVM).

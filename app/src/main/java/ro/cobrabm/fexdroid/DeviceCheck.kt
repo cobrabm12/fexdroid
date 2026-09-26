@@ -78,8 +78,9 @@ object DeviceCheck {
                 Regex("powervr|\\bimg\\b", RegexOption.IGNORE_CASE).containsMatchIn(hint) -> "PowerVR"
                 else -> "necunoscută (egl=$egl, vulkan=$vk)"
             }
-            return Item(Level.ERROR, title,
-                "GPU $what fără /dev/kgsl-3d0. Turnip merge doar pe Adreno (Snapdragon); pentru alte GPU-uri nu există încă un driver Vulkan Linux utilizabil din aplicație.")
+            return Item(Level.INFO, title,
+                "GPU $what: fără Turnip (merge doar pe Adreno/Snapdragon). Grafica rulează pe procesor (lavapipe): " +
+                    "Steam și jocurile 2D/ușoare merg, jocurile 3D mari vor fi foarte lente.")
         }
         if (m == null) return Item(Level.INFO, title, "Adreno (model necunoscut: \"$sysfs\"). Rulează Avansat › Recunoaștere pentru detalii.")
         val series = m.groupValues[1].toInt()
