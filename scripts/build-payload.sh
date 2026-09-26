@@ -126,10 +126,11 @@ gcc -O2 -static -o "$X/opt/fexdroid-tests/hello-static" tests/x86/hello.c
 gcc -O2 -o "$X/opt/fexdroid-tests/hello-dynamic" tests/x86/hello.c
 gcc -O2 -o "$X/opt/fexdroid-tests/tone" tests/common/tone.c -lm
 # SysV semaphores from an x86-64 guest: FEX semget/semop/semtimedop -> glibc -> fxshmd (N-025).
-gcc -O2 -static -o "$X/opt/fexdroid-tests/semtest" tests/sysvsem/semtest.c
+# Dynamic: static x86 binaries crash under FEX on older kernels (NOTES N-021).
+gcc -O2 -o "$X/opt/fexdroid-tests/semtest" tests/sysvsem/semtest.c
 # i386 variant (direct semget/semctl/semtimedop_time64 syscalls, FEX's x32 handlers); needs a
 # 32-bit static libc on the build host, optional.
-gcc -m32 -O2 -static -o "$X/opt/fexdroid-tests/semtest-i386" tests/sysvsem/semtest.c 2>/dev/null || \
+gcc -m32 -O2 -o "$X/opt/fexdroid-tests/semtest-i386" tests/sysvsem/semtest.c 2>/dev/null || \
   echo "note: no 32-bit static libc on this host, semtest-i386 not built"
 
 # ---- pack ----------------------------------------------------------------------------
