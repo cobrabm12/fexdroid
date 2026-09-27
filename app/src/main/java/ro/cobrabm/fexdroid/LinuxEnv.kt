@@ -171,7 +171,7 @@ class LinuxEnv(private val ctx: Context) {
         pb.environment().apply { clear(); putAll(environment()) }
         val p = pb.start()
         p.outputStream.close()
-        p.inputStream.bufferedReader().forEachLine(onLine)
+        p.forEachOutputLine(onLine)
         return p.waitFor()
     }
 
