@@ -797,5 +797,5 @@ aceleași limite (`scaling_max_freq`), alternate.
   `files/launch-options-<app id>.txt`, ca „Launch Options” din Steam.
 - `map_enable_background_maps` nu mai există în Dota (scos de Valve), deci fundalul meniului nu se poate opri
   din linia de comandă.
-- Oprirea forțată repetată a jocului (`kill -9`, pentru măsurători) a făcut Steam să valideze fișierele jocului
-  la pornirea următoare.
+- În timpul măsurătorilor Steam a instalat o actualizare Dota de 2,2 GB (descărcare 4 min, apoi „Validating”,
+  ~10 min): jocul nu se poate porni până nu termină.
