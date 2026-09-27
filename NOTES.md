@@ -829,3 +829,6 @@ aceleași limite (`scaling_max_freq`), alternate.
   e reprezentativ pentru un meci.
 - `taskset` pe procesele jocului din `run-as` e refuzat (Permission denied), deci afinitatea se poate încerca doar
   din aplicație. Planificatorul ține oricum firul principal pe cpu7.
+- **GT Mode (Realme) nu ridică limitele pe un telefon deja încins:** cu `gt_mode_state_setting=1`, după ore de
+  rulat pe încărcător (carcasă 45–47 °C, baterie 43–44 °C, nuclee 65–72 °C), limitele au rămas 1,61 / 1,21 / 1,42 GHz
+  și au coborât pe moment la 0,60 / 1,08 / 1,08 GHz. Meciul: 12–14 cadre/s, cu căderi la 5. De măsurat de la rece.
