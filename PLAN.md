@@ -151,7 +151,7 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 | 2 | ✅ x86_64 dinamic prin FEX pe telefon; static încă crapă | N-021 |
 | 3 | ✅ `vkcube` arm64 și x86_64 (FEX + thunk) pe ecran, Turnip Adreno 660 | N-021 |
 | 4 | ✅ input XTEST (touch/tastatură verificate cu xev) și audio PulseAudio→AAudio (arm64 + x86 prin FEX); BT real netestat | N-022 |
-| 5 | ✅ clientul Steam se instalează singur din aplicație, login, bibliotecă, magazin, instalare de jocuri, Big Picture | N-028, N-029, N-030 |
+| 5 | ✅ clientul Steam se instalează singur din aplicație, login, bibliotecă, magazin, instalare de jocuri, Big Picture; pornește și pe Galaxy S26 Ultra (Android 16) | N-028, N-029, N-030, N-033 |
 | 6 | 🟨 **Dota 2 pornit din Steam ajunge la meniul principal, online** (25–29 cadre/s în joc, Demo Hero); meci + performanță urmează | N-024, N-030, N-031 |
 
 ### Testare pe telefon (când e conectat)

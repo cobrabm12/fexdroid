@@ -707,7 +707,7 @@ Un tester cu Galaxy S26 Ultra (SM-S948B, SM8850, Adreno 840, Android 16, kernel 
   crăpat diferit de la o rulare la alta, iar un program i386 a rămas blocat minute întregi. Pe telefonul real FEX
   hello merge, deci comportamentul ține de qemu.
 
-## N-033 · Galaxy S26 Ultra: Steam nu poate crea `/tmp/dumps`  🟨 (2026-09-27; reparat în FEX, verificat pe Realme pe un caz echivalent)
+## N-033 · Galaxy S26 Ultra: Steam nu poate crea `/tmp/dumps`  ✅ (2026-09-27; reparat în FEX, confirmat de tester pe S26 Ultra)
 Raportul de pe S26 Ultra (Android 16): `/tmp/dumps: insufficient permissions - delete and recreate`, apoi
 `/tmp/dumps: failed to create, skipping` pentru toate cele zece nume (`dumps` … `dumps09`) și
 `FATAL: Steam cannot run. Please delete some /tmp/dumps* directories or change their ownership to the local user.`
@@ -727,3 +727,6 @@ Steam folosește doar un director de dump-uri creat de el; pe Realme GT aceeași
   native (FEX le rulează nativ), care văd căile telefonului, nu RootFS-ul. Testele folosesc `PATH=/usr/bin:/bin`.
 - `fexdroid-steam.sh` șterge la pornire `steam_chrome_shmem_uid*` rămase în `/tmp` (unul per pornire).
 - Rămâne de văzut pe S26: `vkcube` x86 nu apare (posibil aceeași cauză, prin socketul X din `/tmp`).
+- **Confirmat pe S26 Ultra (relatat de tester, 2026-09-27 ~20:00):** cu build-ul `e5d979c`, apoi cu `8afd73e`
+  (reinstalat, cheia stabilă), Steam pornește, se autentifică și instalează Dota 2. Primul telefon cu Adreno 840 și
+  Android 16 pe care rulează clientul Steam. Nemăsurat încă: pornirea jocului, cadre pe secundă, `vkcube` x86.
