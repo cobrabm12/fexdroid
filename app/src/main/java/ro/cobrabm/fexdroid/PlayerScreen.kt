@@ -366,6 +366,8 @@ internal fun shareSessionReport(ctx: android.content.Context) {
     val activity = ctx as? MainActivity ?: return
     kotlin.concurrent.thread(name = "session-report") { // The device checks read files.
         val text = GameSession.report(ctx)
+        // Also readable over adb without root: /sdcard/Android/data/<pkg>/files/report.txt
+        runCatching { java.io.File(ctx.getExternalFilesDir(null), "report.txt").writeText(text) }
         activity.runOnUiThread { activity.share(text, "fexdroid: jurnal") }
     }
 }
