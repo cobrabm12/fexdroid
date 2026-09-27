@@ -119,7 +119,7 @@ object GameSession {
         appContext = ctx.applicationContext
         GameService.start(ctx.applicationContext, game.title)
         val env = LinuxEnv(ctx.applicationContext)
-        val res = AppSettings.resolution
+        val res = AppSettings.sessionResolution(ctx.applicationContext)
         val gen = synchronized(this) { ++generation }
         val xs = XSession(env, res.width, res.height, ::append)
         session = xs

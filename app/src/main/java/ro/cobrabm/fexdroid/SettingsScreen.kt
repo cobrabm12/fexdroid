@@ -60,6 +60,9 @@ fun SettingsScreen() {
                 Setting("Rezoluție", "Mărimea ecranului virtual. Mai mică = mai rapid. Se aplică la următoarea pornire.") {
                     Choice(Resolution.PRESETS, AppSettings.resolution, { "${it.height}p" }, AppSettings::updateResolution)
                 }
+                SwitchSetting("Potrivește la ecranul telefonului",
+                    "Lățimea ecranului virtual urmează forma ecranului, fără benzi negre. Oprit: 16:9.",
+                    AppSettings.fitScreen, AppSettings::updateFitScreen)
                 Setting("Cadre pe secundă", "Cât de des se copiază imaginea pe ecranul telefonului.") {
                     Choice(AppSettings.FPS_PRESETS, AppSettings.fps, { "$it" }, AppSettings::updateFps)
                 }
