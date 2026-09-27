@@ -30,6 +30,18 @@ object SteamRootfs {
     var state by mutableStateOf<State>(State.Idle); private set
     val busy get() = state is State.Working
 
+    /** What went wrong, in words a player can act on. */
+    private fun explain(t: Throwable, env: LinuxEnv): String = when (t) {
+        is java.net.UnknownHostException, is java.net.ConnectException, is java.net.NoRouteToHostException ->
+            "Nu există conexiune la internet. Pornește Wi-Fi sau datele mobile și încearcă din nou."
+        is java.net.SocketTimeoutException, is javax.net.ssl.SSLException ->
+            "Conexiunea s-a întrerupt în timpul descărcării. Încearcă din nou."
+        is java.io.IOException ->
+            if (env.files.usableSpace < (700L shl 20)) "Nu mai este loc pe telefon: sunt necesari cam 700 MB liberi."
+            else "Descărcarea a eșuat: ${t.message ?: t}"
+        else -> t.message ?: t.toString()
+    }
+
     fun install(ctx: Context) {
         if (busy) return
         val env = LinuxEnv(ctx.applicationContext)
@@ -66,7 +78,7 @@ object SteamRootfs {
                 state = State.Done
             } catch (t: Throwable) {
                 tmp.deleteRecursively()
-                state = State.Failed(t.message ?: t.toString())
+                state = State.Failed(explain(t, env))
             }
         }
     }

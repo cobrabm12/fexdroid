@@ -575,3 +575,30 @@ Blocajele, în ordinea în care au apărut:
   `adb forward`) și `scripts/lib/cdp.py` (client DevTools fără dependențe).
 - **Baterie:** sub sarcină, portul USB al PC-ului nu ține pasul; telefonul s-a oprit la 0% în timpul validării
   Dota. Pentru sesiuni lungi e nevoie de încărcător de priză (adb prin Wi-Fi).
+
+## N-029 · Drumul „doar APK”: Steam se instalează singur, mediul jocului se construiește pe telefon  🟨 (2026-09-27)
+Scop: cineva care are doar APK-ul (fără PC, fără root) să ajungă la joc. Testat pe Realme GT, firmware oficial, fără root.
+- ✅ **Verificat pe telefon:** bibliotecile Steam x86 se descarcă din aplicație (release-ul `steam-rootfs`); Steam își
+  descarcă singur clientul (2,3 GB, ~3 min pe Wi-Fi) și ajunge la login; login; instalarea Dota 2 din magazin
+  (71 GB, 110–200 Mbps). Pe clientul proaspăt, Dota nu apărea în Library până la instalarea din Store › Play Game.
+- Reparat pe drum: `tar`-ul x86 din bootstrap rula cu PATH-ul arm64 și nu găsea `xz`; `-noverifyfiles` la prima
+  pornire sărea și descărcarea clientului („Verification skipped”, apoi `steamui.so` lipsă, exit 0). Acum se dă doar
+  când clientul e instalat.
+- ✅ **`tools/fxwmfit`:** fără manager de ferestre, Steam (1280×800) era tăiat jos pe ecranul virtual de 1280×720.
+  Utilitarul potrivește ferestrele top-level la ecran; nu ia redirect, nu atinge meniurile (override-redirect).
+- 🟨 **Compilat, netestat încă pe telefon** (APK-ul nou se instalează după descărcarea Dota):
+  - „Potrivește la ecranul telefonului”: lățimea ecranului virtual din forma ecranului real (4:3…21:9), citită de la
+    ecranul pe care e activitatea (pentru ecrane externe/DeX). Realme GT: 1600×720.
+  - `GameRootfs.kt`: mediul jocurilor (`files/sniper-rootfs`) construit din ce descarcă Steam. Depozitul are
+    `sniper_platform_*/files` + `usr-mtree.txt.gz`: mtree-ul descrie /usr, inclusiv symlink-urile (1538), fișierele
+    goale (nestocate în depozit) și fișierele cu nume incomode (`contents=./xx/yyyyyy-1.bin`). Peste el se pun
+    bibliotecile de bază din rootfs-ul Debian x86 (portul lui `sniper-overrides.py`). Validat pe PC în Python pe
+    platforma 3.0.20260805: toate sursele există, în afara fișierelor de mărime 0.
+  - Construirea pornește la începutul sesiunii (platformă nouă) sau la cererea entry point-ului
+    (`files/game-rootfs.request`), când jocul e pornit în aceeași sesiune în care s-a descărcat runtime-ul.
+  - `fexdroid-steam.sh` reînlocuiește entry point-ul containerului la fiecare 5 s, pentru că Steam instalează
+    runtime-urile în timp ce rulează.
+  - Atingere: tap = clic, glisare = rotiță (derulare), apăsare lungă = tragere, două degete = clic dreapta.
+  - Mesaje clare la descărcare fără internet / fără spațiu.
+- De făcut: Big Picture (`-gamepadui`) ca interfață pentru jucători; test pe Samsung DeX (S26 Ultra + monitor);
+  `steamsysinfo` nu poate crea instanța Vulkan (-9), de investigat.
