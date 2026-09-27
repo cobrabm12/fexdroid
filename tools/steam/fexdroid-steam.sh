@@ -76,5 +76,17 @@ export SDL_VIDEODRIVER=x11
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 log "starting Steam (FEX) with root $STEAMROOT"
 cd "$STEAMROOT"
-exec "$FEX" "$STEAMROOT/steam.sh" -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing \
-    -noverifyfiles "$@"
+# Debugging: files/strace-steam.txt holds strace options (e.g. "-e trace=bind,connect");
+# the trace of every process goes to files/steam.strace.
+set -- -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing -noverifyfiles "$@"
+# Extra Steam options, one line (e.g. "-cef-enable-debugging"), like dota-launch-options.txt.
+if [ -f "$FXD_FILES/steam-launch-options.txt" ]; then
+  # shellcheck disable=SC2046
+  set -- "$@" $(cat "$FXD_FILES/steam-launch-options.txt")
+fi
+if [ -f "$FXD_FILES/strace-steam.txt" ]; then
+  # shellcheck disable=SC2046
+  exec "$FXD_ROOT/usr/bin/strace" -f -o "$FXD_FILES/steam.strace" $(cat "$FXD_FILES/strace-steam.txt") \
+    "$FEX" "$STEAMROOT/steam.sh" "$@"
+fi
+exec "$FEX" "$STEAMROOT/steam.sh" "$@"

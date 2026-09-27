@@ -53,6 +53,8 @@ install -D -m 0755 build/fxshmd/shmtest "$A/opt/fexdroid-tests/shmtest"
 install -D -m 0755 build/fxshmd/semtest "$A/opt/fexdroid-tests/semtest"
 # Directories glibc was built to use instead of /tmp, /dev/shm, /etc.
 mkdir -p "$A/tmp" "$A/var/tmp" "$A/dev/shm" "$A/home"
+# Empty sysfs PCI tree FEX shows guests as /sys/bus/pci (patches/fex/0002, NOTES.md N-028).
+mkdir -p "$A/usr/share/fex-emu/fexdroid-empty-pci/devices" "$A/usr/share/fex-emu/fexdroid-empty-pci/drivers"
 chmod 1777 "$A/tmp" "$A/var/tmp" "$A/dev/shm"
 
 # Point every dynamically linked ELF at the on-device loader, and rewrite
@@ -126,10 +128,14 @@ gcc -O2 -static -o "$X/opt/fexdroid-tests/hello-static" tests/x86/hello.c
 gcc -O2 -o "$X/opt/fexdroid-tests/hello-dynamic" tests/x86/hello.c
 gcc -O2 -o "$X/opt/fexdroid-tests/tone" tests/common/tone.c -lm
 # SysV semaphores from an x86-64 guest: FEX semget/semop/semtimedop -> glibc -> fxshmd (N-025).
-gcc -O2 -static -o "$X/opt/fexdroid-tests/semtest" tests/sysvsem/semtest.c
+# lsof for Steam's websocket peer check, answered from FEX's TCP records (tools/lsof/fxlsof.c).
+# The app copies it into the Steam rootfs (LinuxEnv.writeIdentityFiles).
+gcc -O2 -Wall -o "$X/usr/bin/lsof" tools/lsof/fxlsof.c
+# Dynamic: static x86 binaries crash under FEX on older kernels (NOTES N-021).
+gcc -O2 -o "$X/opt/fexdroid-tests/semtest" tests/sysvsem/semtest.c
 # i386 variant (direct semget/semctl/semtimedop_time64 syscalls, FEX's x32 handlers); needs a
 # 32-bit static libc on the build host, optional.
-gcc -m32 -O2 -static -o "$X/opt/fexdroid-tests/semtest-i386" tests/sysvsem/semtest.c 2>/dev/null || \
+gcc -m32 -O2 -o "$X/opt/fexdroid-tests/semtest-i386" tests/sysvsem/semtest.c 2>/dev/null || \
   echo "note: no 32-bit static libc on this host, semtest-i386 not built"
 
 # ---- pack ----------------------------------------------------------------------------

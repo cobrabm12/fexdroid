@@ -71,7 +71,7 @@ fun SettingsScreen() {
                     Choice(FexProfile.entries, AppSettings.fexProfile, { it.label }, AppSettings::updateFexProfile)
                 }
                 SwitchSetting("Cache de cod pe disc",
-                    "Codul x86 tradus o dată e păstrat și refolosit: pornirile următoare ale unui joc sunt mult mai rapide.",
+                    "Experimental. Codul x86 tradus o dată e păstrat și refolosit, deci pornirile următoare sunt mai rapide. Cu FEX-2609 unele programe crapă (de ex. instalarea Steam), așa că e oprit implicit.",
                     AppSettings.fexDiskCache, AppSettings::updateFexDiskCache)
                 var cacheBytes by remember { mutableStateOf<Long?>(null) }
                 LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { runCatching { FexConfig.cacheSize(env) }.getOrNull() } }

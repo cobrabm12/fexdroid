@@ -28,6 +28,7 @@ RUNTIME_PKGS=(
   x11-utils                                          # phase 4: xev/xdpyinfo to verify input
   pulseaudio pulseaudio-utils                        # phase 4: audio server (pipe sink -> AAudio)
   mesa-vulkan-drivers                                # lavapipe: CPU Vulkan for GPUs without Turnip (Mali, ...)
+  libgl1-mesa-dri                                    # swrast: Xvfb's GLX extension (Steam's vgui needs a GLX visual)
 )
 # Extra packages only needed to cross-compile FEX/Mesa against this sysroot.
 DEV_PKGS=(
@@ -75,8 +76,15 @@ tar -C "$OUT/stage" -xf "$OUT/rootfs-arm64-raw.tar" 2>/dev/null || true
     case "$icd" in */lvp_icd.*) ;; *) rm -f "$icd" ;; esac
   done
   find usr/lib/aarch64-linux-gnu -maxdepth 1 -name 'libvulkan_*.so' ! -name 'libvulkan_lvp.so' -delete
-  # GL drivers (Xvfb GLX): not used, 3D goes through Vulkan.
-  rm -rf usr/lib/aarch64-linux-gnu/dri
+  # Mesa's layers: device_select is implicit (loaded into every Vulkan app, Turnip included)
+  # and only reorders GPUs; the overlay is a desktop HUD. Neither is wanted here.
+  rm -f usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json \
+        usr/share/vulkan/explicit_layer.d/VkLayer_MESA_overlay.json \
+        usr/lib/aarch64-linux-gnu/libVkLayer_MESA_*.so usr/bin/mesa-overlay-control.py
+  # GL drivers: Xvfb only needs swrast to bring up its GLX extension (software GLX,
+  # clients render with their own Mesa through drisw). Steam's vgui asserts without a
+  # GLX visual (NOTES.md N-028). Every hardware DRI driver goes: no DRM devices here.
+  find usr/lib/aarch64-linux-gnu/dri -mindepth 1 ! -name swrast_dri.so ! -name libdril_dri.so -delete 2>/dev/null || true
 )
 mv "$OUT/stage/packages.txt" "$OUT/rootfs-arm64.packages.txt"
 tar -C "$OUT/stage" --numeric-owner --owner=0 --group=0 -cf "$OUT/rootfs-arm64.tar" .

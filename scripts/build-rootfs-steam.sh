@@ -47,6 +47,8 @@ docker rm "$cname" >/dev/null
 )
 # Chromium (steamwebhelper) needs a working /dev/shm; on the phone it is this directory.
 mkdir -p "$OUT/steam-stage/dev/shm" "$OUT/steam-stage/run/pressure-vessel"
+# No empty /proc or /sys: FEX would open those instead of the real ones (NOTES.md N-028).
+rm -rf "$OUT/steam-stage/proc" "$OUT/steam-stage/sys"
 chmod 1777 "$OUT/steam-stage/tmp" "$OUT/steam-stage/var/tmp" "$OUT/steam-stage/dev/shm"
 mv "$OUT/steam-stage/packages.txt" "$OUT/rootfs-x86_64-steam.packages.txt"
 python3 scripts/lib/relativize-symlinks.py "$OUT/steam-stage"

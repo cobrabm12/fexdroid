@@ -35,8 +35,12 @@ object AppSettings {
     var gameWithoutSteam by mutableStateOf(false); private set
     /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
     var fexProfile by mutableStateOf(FexProfile.BALANCED); private set
-    /** FEX JIT disk cache: faster loading after the first start of a game. */
-    var fexDiskCache by mutableStateOf(true); private set
+    /**
+     * FEX JIT disk cache: faster loading after the first start of a game. Off by default:
+     * with FEX-2609 it makes Steam's runtime setup.sh segfault (NOTES N-028). New pref key so
+     * the old default (on) does not stick.
+     */
+    var fexDiskCache by mutableStateOf(false); private set
 
     fun init(ctx: Context) {
         if (::prefs.isInitialized) return
@@ -51,7 +55,7 @@ object AppSettings {
         gameWithoutSteam = prefs.getBoolean("game_without_steam", false)
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)
-        fexDiskCache = prefs.getBoolean("fex_disk_cache", true)
+        fexDiskCache = prefs.getBoolean("fex_disk_cache_v2", false)
     }
 
     fun updateResolution(r: Resolution) {
@@ -63,6 +67,6 @@ object AppSettings {
     fun updateDynamicColor(v: Boolean) { dynamicColor = v; prefs.edit().putBoolean("dynamic_color", v).apply() }
     fun updateTheme(v: ThemeMode) { theme = v; prefs.edit().putString("theme", v.name).apply() }
     fun updateFexProfile(v: FexProfile) { fexProfile = v; prefs.edit().putString("fex_profile", v.name).apply() }
-    fun updateFexDiskCache(v: Boolean) { fexDiskCache = v; prefs.edit().putBoolean("fex_disk_cache", v).apply() }
+    fun updateFexDiskCache(v: Boolean) { fexDiskCache = v; prefs.edit().putBoolean("fex_disk_cache_v2", v).apply() }
     fun updateGameWithoutSteam(v: Boolean) { gameWithoutSteam = v; prefs.edit().putBoolean("game_without_steam", v).apply() }
 }
