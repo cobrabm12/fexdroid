@@ -251,7 +251,8 @@ private fun CompatibilityCard() {
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Mai puțin" else "Toate verificările") }
-                TextButton(onClick = { (ctx as? MainActivity)?.share(DeviceCheck.report(list)) }) { Text("Trimite") }
+                // The full report: these checks, the emulator self-tests and the last session's log.
+                TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite") }
             }
         }
     }
