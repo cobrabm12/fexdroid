@@ -85,8 +85,8 @@ object GameSession {
     // the text to Compose at most every LOG_PUBLISH_MS, instead of rebuilding a 40 KB
     // string and recomposing on every line (which cost CPU the game needs).
     private const val LOG_MAX_CHARS = 40_000
-    private const val STEAM_LOG_TAIL = 40
-    private const val REPORT_LOG_LINES = 60
+    private const val STEAM_LOG_TAIL = 25
+    private const val REPORT_LOG_LINES = 40
     private const val SELF_TEST_SECONDS = 25L
     private const val SELF_TEST_LINES = 8
     private const val LOG_PUBLISH_MS = 250L
@@ -112,11 +112,13 @@ object GameSession {
             "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}), $soc")
         appendLine("screen: ${resolution.label}, state: $state")
         // Most useful first: messages get cut off on the way (chat apps, clipboards).
+        if (state is SessionState.Running) append(runCatching { PerfSnapshot.take(env, resolution.label) }
+            .getOrElse { "---- performance ----\nfailed: $it\n" })
         appendLine("---- session log (last $REPORT_LOG_LINES lines) ----")
         appendLine(synchronized(logLines) { logLines.toList() }.takeLast(REPORT_LOG_LINES).joinToString("\n"))
         // Steam's own logs: what its updater and client did (no passwords in them).
         val steamLogs = File(env.home, ".local/share/Steam/logs")
-        for (name in listOf("bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
+        for (name in listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
             val f = File(steamLogs, name)
             if (!f.isFile) continue
             appendLine("---- Steam logs/$name (last $STEAM_LOG_TAIL lines) ----")
