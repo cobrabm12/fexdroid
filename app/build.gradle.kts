@@ -49,10 +49,28 @@ android {
         }
     }
 
+    // Published builds (.github/workflows/full-apk.yml) are signed with the project's own key,
+    // the same on every run: Android installs an update only over an app signed with the same
+    // key. Without FEXDROID_KEYSTORE (a developer's PC, a fork) the debug key of that machine.
+    val publishKeystore = providers.environmentVariable("FEXDROID_KEYSTORE").orNull
+    val publishPassword = providers.environmentVariable("FEXDROID_KEYSTORE_PASSWORD").orNull
+    signingConfigs {
+        if (publishKeystore != null && publishPassword != null) {
+            create("published") {
+                storeFile = file(publishKeystore)
+                storePassword = publishPassword
+                keyAlias = "fexdroid"
+                keyPassword = publishPassword
+            }
+        }
+    }
+    val signing = signingConfigs.findByName("published") ?: signingConfigs.getByName("debug")
+
     buildTypes {
+        debug { signingConfig = signing }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signing
         }
     }
 

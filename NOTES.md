@@ -692,6 +692,13 @@ Un tester cu Galaxy S26 Ultra (SM-S948B, SM8850, Adreno 840, Android 16, kernel 
   (commit, dată, mărime, SHA-256). Alt commit decât al aplicației = versiune nouă. APK-ul se descarcă direct
   într-o sesiune `PackageInstaller`, se verifică SHA-256, Android cere confirmarea. `files/update-url.txt` schimbă
   adresa (teste cu fișiere locale).
+- **Cheia de semnare:** prima actualizare reală a eșuat pe două telefoane cu
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. `full-apk.yml` păstra cheia de debug cu `actions/cache`, dar calea
+  `~/.android/debug.keystore` nu există pe runner („Path Validation Error … no cache is being saved”), deci fiecare
+  build avea altă cheie. Acum build-urile publicate sunt semnate cu cheia proiectului (`CN=fexdroid`, SHA-256
+  `2735ed06…37eca6`), din secretele repo-ului `FEXDROID_KEYSTORE_B64` și `FEXDROID_KEYSTORE_PASSWORD`; copia e pe
+  PC-ul de dezvoltare în `~/.config/fexdroid/` (în afara repo-ului; pierderea ei = toți testerii reinstalează).
+  Build-urile locale fără `FEXDROID_KEYSTORE` rămân pe cheia de debug a PC-ului.
 - **S26 Ultra, ce știm:** FEX hello și `vulkaninfo` prin FEX merg, Turnip recunoaște Adreno 840; Steam se închide
   imediat după pornire, `vkcube` x86 nu apare. Într-un raport testul de semafoare x86_64 a avut 5 eșecuri
   (`semtimedop` întors după 35 ms cu EIDRM), cel i386 a trecut: posibil două rapoarte pornite deodată (acum
