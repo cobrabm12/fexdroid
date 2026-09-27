@@ -586,7 +586,7 @@ Scop: cineva care are doar APK-ul (fără PC, fără root) să ajungă la joc. T
   când clientul e instalat.
 - ✅ **`tools/fxwmfit`:** fără manager de ferestre, Steam (1280×800) era tăiat jos pe ecranul virtual de 1280×720.
   Utilitarul potrivește ferestrele top-level la ecran; nu ia redirect, nu atinge meniurile (override-redirect).
-- 🟨 **Compilat, netestat încă pe telefon** (APK-ul nou se instalează după descărcarea Dota):
+- ✅ **Verificat pe telefon** (APK instalat peste, sesiune nouă):
   - „Potrivește la ecranul telefonului”: lățimea ecranului virtual din forma ecranului real (4:3…21:9), citită de la
     ecranul pe care e activitatea (pentru ecrane externe/DeX). Realme GT: 1600×720.
   - `GameRootfs.kt`: mediul jocurilor (`files/sniper-rootfs`) construit din ce descarcă Steam. Depozitul are
@@ -599,6 +599,43 @@ Scop: cineva care are doar APK-ul (fără PC, fără root) să ajungă la joc. T
   - `fexdroid-steam.sh` reînlocuiește entry point-ul containerului la fiecare 5 s, pentru că Steam instalează
     runtime-urile în timp ce rulează.
   - Atingere: tap = clic, glisare = rotiță (derulare), apăsare lungă = tragere, două degete = clic dreapta.
-  - Mesaje clare la descărcare fără internet / fără spațiu.
+  - Mesaje clare la descărcare fără internet / fără spațiu (🟨 compilat, netestat pe telefon).
+  Măsurat: mediul jocurilor se construiește în 5–14 s (8203 fișiere, 1538 legături, 31 de biblioteci înlocuite).
+- ✅ `fxwmfit` maximizează ferestrele care ocupă deja ≥60% din lățime și ≥80% din înălțime: pe 1600×720 Steam
+  (1280×800 cerut) rămânea cu o bandă neagră în dreapta.
 - De făcut: Big Picture (`-gamepadui`) ca interfață pentru jucători; test pe Samsung DeX (S26 Ultra + monitor);
-  `steamsysinfo` nu poate crea instanța Vulkan (-9), de investigat.
+  `steamsysinfo` nu poate crea instanța Vulkan (-9), de investigat; dialogul „Processing Vulkan shaders” trebuie
+  sărit cu Skip (de oprit implicit shader pre-caching); butonul de meniu al aplicației stă peste butoanele
+  ferestrei Steam.
+
+## N-030 · Dota 2 pornit din Steam, online, pe telefon  ✅ (Realme GT, 2026-09-27)
+Steam › Library › Dota 2 › Play ajunge la meniul principal, logat (prieteni, chat, magazin). Doar cu APK-ul:
+Steam pornește în ~100 s, Dota ajunge la meniu în ~2,5 min de la Play. ~190% CPU, 3,5–4 GB RAM, baterie 42 °C.
+Eroarea de pe drum: „FATAL: It appears <joc> was not launched within the Steam for Linux sniper runtime
+environment”. `dota.sh` verifică `/etc/os-release` (VERSION_CODENAME=sniper). Două cauze:
+- **`/etc` în mediul jocurilor:** runtime-ul își ține `/etc` sub `/usr` (`files/etc` în depozit), iar în container e
+  `/etc`. Cu un symlink `etc -> usr/etc`, legătura relativă `os-release -> ../usr/lib/os-release` ducea la
+  `usr/usr/lib/os-release`. Acum intrările `etc/*` din mtree se scriu în `<root>/etc`, director real
+  (`GameRootfs.kt`, FORMAT=2, reconstruire automată).
+- **FEXServer hotăra RootFS-ul:** clientul FEX cere calea RootFS de la FEXServer-ul sesiunii
+  (`RequestRootFSPath`) și o pune peste `FEX_ROOTFS` din mediu, deci jocul rula tot în rootfs-ul lui Steam. Un al
+  doilea FEXServer nu e o soluție: `$HOME/.fex-emu` are prioritate față de `FEX_APP_DATA_LOCATION`, deci ajunge la
+  același `Server.lock`. Patch 0002 (`FEXServerClient.cpp`): dacă RootFS-ul configurat e un director existent, nu se
+  mai întreabă serverul. Serverul e folosit în continuare pentru rootfs-uri imagine (squashfs/erofs), pe care nu
+  le folosim. FEX se re-execută din `/proc/self/exe`, deci un FEX înlocuit se vede abia după repornirea sesiunii.
+**Cadre pe secundă:** contorul din meniu număra copierile spre ecran (mereu 30). Puntea numără acum cadrele al
+căror conținut s-a schimbat (sumă pe tot cadrul, în bucla de copiere) și scrie în logcat la 10 s
+(`fexdroid-display: last 300 frames copied: N had new content`). Meniul principal Dota, 1600×720: **16–18 cadre/s**.
+Limita de sus a măsurătorii e rata de copiere (Setări › cadre/s).
+Următorii pași: un meci cu boți; de unde vine limita (CPU prin FEX sau prezentarea prin Xvfb, D3).
+Unde se duce timpul (meniu, o singură măsurătoare): firul principal al jocului ~54% dintr-un nucleu, 7 fire
+`GlobPool` la 8–19%, `VKRenderThread` 4%, Xvfb 4,6%; nucleele la 1,0–1,6 GHz; RAM 11 GB plin, 5,4 GB în swap.
+Nu e un nucleu blocat la 100%, deci limita nu e doar CPU-ul prin FEX: de măsurat prezentarea și memoria.
+**Oprirea sesiunii închidea aplicația:** firele care citesc ieșirea proceselor primeau
+`InterruptedIOException: read interrupted` când procesul era oprit. `Process.forEachOutputLine` tratează asta ca
+sfârșit de ieșire. ✅ Verificat: după „Oprește” procesele dispar, aplicația rămâne deschisă.
+**Big Picture** ✅: comutatorul din Setări pornește Steam cu `-gamepadui`; pe 1600×720 ocupă tot ecranul, merge la
+atingere (tap pe joc › Play › OK la sfatul cu tastatura › Skip la shadere). Dota pornit de aici: 19 cadre/s în meniu.
+E pornit implicit, dar `-gamepadui` se dă doar după prima autentificare (există `Steam/userdata/<id>`), fiindcă
+descărcarea clientului și loginul sunt verificate doar în interfața clasică. Unele nume de prieteni cu caractere
+speciale apar ca pătrățele (lipsesc fonturi în rootfs-ul x86).

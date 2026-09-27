@@ -772,6 +772,33 @@
        break;
      }
      case OP_RECVMMSG: {
+--- a/Source/Common/FEXServerClient.cpp
++++ b/Source/Common/FEXServerClient.cpp
+@@ -21,6 +21,7 @@
+ #include <sys/prctl.h>
+ #include <signal.h>
+ #include <sys/socket.h>
++#include <sys/stat.h> // fexdroid
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <sys/un.h>
+@@ -243,7 +244,15 @@
+ 
+   // If we were started in a container then we want to use the rootfs that they provided.
+   // In the pressure-vessel case this is a combination of our rootfs and the steam soldier runtime.
+-  if (FEXCore::Config::FindContainer() != "pressure-vessel") {
++  // fexdroid: a RootFS that is a directory needs no mounting by the server, so keep the
++  // one this process was configured with. Games started by Steam get FEX_ROOTFS pointed at
++  // their runtime (tools/steam/_v2-entry-point) while the one FEXServer of the session
++  // still serves Steam's own RootFS; its answer would undo that.
++  FEX_CONFIG_OPT(ConfiguredRootFS, ROOTFS);
++  struct stat RootFSStat {};
++  const bool HasDirectoryRootFS =
++    !ConfiguredRootFS().empty() && stat(ConfiguredRootFS().c_str(), &RootFSStat) == 0 && S_ISDIR(RootFSStat.st_mode);
++  if (!HasDirectoryRootFS && FEXCore::Config::FindContainer() != "pressure-vessel") {
+     fextl::string RootFSPath = FEXServerClient::RequestRootFSPath(ServerFD);
+ 
+     //// If everything has passed then we can now update the rootfs path
 --- /dev/null
 +++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/AndroidSeccomp.h
 @@ -0,0 +1,136 @@

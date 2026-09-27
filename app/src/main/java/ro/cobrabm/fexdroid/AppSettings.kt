@@ -56,7 +56,7 @@ object AppSettings {
     /** Home screen: Dota 2 direct start (no Steam client) as the main action. */
     var gameWithoutSteam by mutableStateOf(false); private set
     /** Steam starts in Big Picture (-gamepadui): full screen, made for touch and controllers. */
-    var steamBigPicture by mutableStateOf(false); private set
+    var steamBigPicture by mutableStateOf(true); private set
     /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
     var fexProfile by mutableStateOf(FexProfile.BALANCED); private set
     /**
@@ -78,7 +78,7 @@ object AppSettings {
         dynamicColor = prefs.getBoolean("dynamic_color", true)
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null) ?: "DARK") }.getOrDefault(ThemeMode.DARK)
         gameWithoutSteam = prefs.getBoolean("game_without_steam", false)
-        steamBigPicture = prefs.getBoolean("steam_big_picture", false)
+        steamBigPicture = prefs.getBoolean("steam_big_picture", true)
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)
         fexDiskCache = prefs.getBoolean("fex_disk_cache_v2", false)

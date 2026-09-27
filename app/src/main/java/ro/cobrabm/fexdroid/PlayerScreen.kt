@@ -215,10 +215,10 @@ private fun GameMenu(
     onKeyboard: () -> Unit, onMouse: () -> Unit, onLog: () -> Unit,
     onMinimize: () -> Unit, onStop: () -> Unit, onClose: () -> Unit,
 ) {
-    var frames by remember { mutableLongStateOf(DisplayBridge.frames()) }
+    var frames by remember { mutableLongStateOf(DisplayBridge.changedFrames()) }
     var fps by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
-        while (true) { delay(1000); val f = DisplayBridge.frames(); fps = f - frames; frames = f }
+        while (true) { delay(1000); val f = DisplayBridge.changedFrames(); fps = f - frames; frames = f }
     }
     Card(
         Modifier.padding(12.dp).widthIn(max = 300.dp).fillMaxWidth(),

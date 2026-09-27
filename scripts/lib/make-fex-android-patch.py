@@ -18,6 +18,7 @@ allowlist. FEX forwards many guest syscalls to the host verbatim; this patch:
     implementation (patches/fex/src/AndroidOpenat2.h);
   * bind/connect: AF_UNIX paths under guest-only dirs (/tmp) map into the RootFS;
   * TCP connect/bind/accept are recorded for tools/lsof (patches/fex/src/AndroidTcpRegistry.h);
+  * a process configured with a directory RootFS keeps it instead of the FEXServer's;
   * hides host paths apps cannot read (/proc/bus/pci) from guests: ENOENT, and shows
     /sys/bus/pci as an empty tree (libpci exit()s without a working access method).
 Raw ::syscall() sites are covered by our glibc's syscall() wrapper (glibc 0003).
@@ -464,6 +465,37 @@ def x32semaphore(text):
         sys.exit("x32/Semaphore.cpp: semctl anchor not found")
     return text.replace(a, b)
 
+def serverclient(text):
+    a = """  if (FEXCore::Config::FindContainer() != "pressure-vessel") {
+    fextl::string RootFSPath = FEXServerClient::RequestRootFSPath(ServerFD);
+
+    //// If everything has passed then we can now update the rootfs path
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_ROOTFS, RootFSPath);
+  }
+"""
+    b = """  // fexdroid: a RootFS that is a directory needs no mounting by the server, so keep the
+  // one this process was configured with. Games started by Steam get FEX_ROOTFS pointed at
+  // their runtime (tools/steam/_v2-entry-point) while the one FEXServer of the session
+  // still serves Steam's own RootFS; its answer would undo that.
+  FEX_CONFIG_OPT(ConfiguredRootFS, ROOTFS);
+  struct stat RootFSStat {};
+  const bool HasDirectoryRootFS =
+    !ConfiguredRootFS().empty() && stat(ConfiguredRootFS().c_str(), &RootFSStat) == 0 && S_ISDIR(RootFSStat.st_mode);
+  if (!HasDirectoryRootFS && FEXCore::Config::FindContainer() != "pressure-vessel") {
+    fextl::string RootFSPath = FEXServerClient::RequestRootFSPath(ServerFD);
+
+    //// If everything has passed then we can now update the rootfs path
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_ROOTFS, RootFSPath);
+  }
+"""
+    if text.count(a) != 1:
+        sys.exit("FEXServerClient.cpp: SetupClient anchor not found")
+    text = text.replace(a, b)
+    inc = "#include <sys/socket.h>\n"
+    if text.count(inc) != 1:
+        sys.exit("FEXServerClient.cpp: include anchor not found")
+    return text.replace(inc, inc + "#include <sys/stat.h> // fexdroid\n")
+
 def fmheader(text):
     a = "  uint64_t FAccessat2(int dirfd, const char* pathname, int mode, int flags);\n"
     b = "  EmulatedFDPathResult GetEmulatedFDPath(int dirfd, const char* pathname, bool FollowSymlink, FDPathTmpData& TmpFilename) const;\n"
@@ -481,7 +513,8 @@ def fmheader(text):
 files = []
 for rel, fn in ((LS + "Syscalls/Passthrough.cpp", passthrough), (LS + "FileManagement.cpp", filemanagement),
                 (LS + "FileManagement.h", fmheader), (LS + "Syscalls/FS.cpp", fs),
-                (LS + "x32/Semaphore.cpp", x32semaphore), (LS + "x32/Socket.cpp", x32socket)):
+                (LS + "x32/Semaphore.cpp", x32semaphore), (LS + "x32/Socket.cpp", x32socket),
+                ("Source/Common/FEXServerClient.cpp", serverclient)):
     old = (src / rel).read_text()
     files.append((rel, old, fn(old)))
 files.append((LS + "AndroidSeccomp.h", "", table))

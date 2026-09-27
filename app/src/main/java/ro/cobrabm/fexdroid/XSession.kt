@@ -53,7 +53,7 @@ class XSession(
         xvfb = p
         val ready = Object()
         thread(name = "xvfb-log", isDaemon = true) {
-            p.inputStream.bufferedReader().forEachLine { line ->
+            p.forEachOutputLine { line ->
                 log("[Xvfb] $line")
                 Regex("screen 0 shmid (\\d+)").find(line)?.let {
                     shmid = it.groupValues[1].toInt()
@@ -95,7 +95,7 @@ class XSession(
         val p = pb.start()
         pulse = p
         thread(name = "pulse-log", isDaemon = true) {
-            p.inputStream.bufferedReader().forEachLine { log("[pulse] $it") }
+            p.forEachOutputLine { log("[pulse] $it") }
             log("[pulse] exit ${p.waitFor()}")
         }
         for (i in 0 until 50) { if (File(pulseSocket).exists()) return true; Thread.sleep(100) }
@@ -109,7 +109,7 @@ class XSession(
         val p = pb.start()
         synchronized(procLock) { clients += p }
         thread(name = title, isDaemon = true) {
-            p.inputStream.bufferedReader().forEachLine { log("[$title] $it") }
+            p.forEachOutputLine { log("[$title] $it") }
             log("[$title] exit ${p.waitFor()}")
         }
         return p
@@ -133,5 +133,17 @@ class XSession(
         }
         val orphans = ProcessTree.orphansUnder(env.files.path, keep = listOf("fxshmd"))
         ProcessTree.killTrees(procs, orphans, log = log)
+    }
+}
+
+/**
+ * Calls [onLine] for every line the process prints, until it closes its output. Stopping the
+ * process closes the stream under the reader (InterruptedIOException "read interrupted"): that
+ * is the end of the output, not an error, and must not take the app down with it.
+ */
+fun Process.forEachOutputLine(onLine: (String) -> Unit) {
+    try {
+        inputStream.bufferedReader().forEachLine(onLine)
+    } catch (_: java.io.IOException) {
     }
 }
