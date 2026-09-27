@@ -669,3 +669,9 @@ Măsurat cu `strace -T` pe firul `VKRenderThread` (strace din rootfs, pornit cu 
   (Steam ține ~2 GB cu Big Picture); prezentare directă pe GPU (D3); test pe un telefon mai rece/mai nou.
   Atenție la automatizări prin `adb shell input tap`: după ce jocul se închide, Steam poate fi pe alt ecran
   (o secvență oarbă a deschis dialogul de instalare pentru alt joc; anulat, nimic instalat).
+- **„Processing Vulkan shaders” (shader pre-caching al lui Steam)** lăsat să ruleze 3,5 minute: a rămas la 0%.
+  `fossilize_replay` pornește un proces principal și 6 lucrători, fiecare ~80% dintr-un nucleu și ~420 MB. La 3:26
+  de la pornire lucrătorii aveau doar 4–10 s vechime și existau deja 31 de fișiere `replay_cache.*.N.foz`
+  (500 KB în total), deci lucrătorii sunt reporniți des; cauza nu e cunoscută. Pe telefon e de sărit (Skip) sau
+  de oprit din Steam › Settings › Downloads. Shaderele compilate în timpul jocului rămân oricum în cache-ul Mesa
+  (`shadercache/570/mesa_shader_cache_sf`).

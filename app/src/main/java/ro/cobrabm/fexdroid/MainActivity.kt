@@ -93,10 +93,10 @@ class MainActivity : ComponentActivity() {
     /** Output file, readable over adb without root: /sdcard/Android/data/<pkg>/files/recon.txt */
     fun reportFile(): File = File(getExternalFilesDir(null), "recon.txt")
 
-    fun share(text: String) {
+    fun share(text: String, subject: String = "fexdroid recon") {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "fexdroid recon")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(send, "Trimite raportul"))
