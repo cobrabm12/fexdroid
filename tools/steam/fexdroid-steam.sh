@@ -28,7 +28,9 @@ if [ ! -x "$STEAMROOT/steam.sh" ]; then
     tar -C "$tmp" -xzf "$tmp/steam.tar.gz"
     boot=$(find "$tmp" -name 'bootstraplinux_ubuntu12_32.tar.xz' | head -n1)
     [ -n "$boot" ] || { log "bootstrap archive not found in download"; exit 1; }
-    "$FEX" "$FEX_ROOTFS/usr/bin/tar" -C "$STEAMROOT" -xJf "$boot"
+    # The x86 tar execs xz through PATH: give it the guest prefixes (FEX maps them into
+    # the x86 rootfs), not the arm64 PATH this script runs with up to here.
+    PATH=/usr/bin:/bin "$FEX" "$FEX_ROOTFS/usr/bin/tar" -C "$STEAMROOT" -xJf "$boot"
     rm -rf "$tmp"
 fi
 
@@ -78,7 +80,14 @@ log "starting Steam (FEX) with root $STEAMROOT"
 cd "$STEAMROOT"
 # Debugging: files/strace-steam.txt holds strace options (e.g. "-e trace=bind,connect");
 # the trace of every process goes to files/steam.strace.
-set -- -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing -noverifyfiles "$@"
+set -- -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing "$@"
+# -noverifyfiles skips the slow file check under FEX, but on a fresh bootstrap it also skips
+# the download of the client itself ("Verification skipped", then steamui.so is missing).
+if [ -f "$STEAMROOT/ubuntu12_32/steamui.so" ]; then
+  set -- -noverifyfiles "$@"
+else
+  log "first start: Steam downloads its client now (about 1.5 GB, slow under FEX)"
+fi
 # Extra Steam options, one line (e.g. "-cef-enable-debugging"), like dota-launch-options.txt.
 if [ -f "$FXD_FILES/steam-launch-options.txt" ]; then
   # shellcheck disable=SC2046
