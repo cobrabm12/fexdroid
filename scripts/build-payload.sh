@@ -103,6 +103,10 @@ mkdir -p "$A/usr/lib/fexdroid"
 clang --target=aarch64-linux-gnu --sysroot=build/rootfs/sysroot-arm64 -fuse-ld=lld -O2 -Wall \
   -shared -fPIC -o "$A/usr/lib/fexdroid/libfxpath.so" tools/fxpath/fxpath.c -ldl
 
+# fxwmfit: keeps top-level windows inside the virtual screen (no window manager on the phone).
+clang --target=aarch64-linux-gnu --sysroot=build/rootfs/sysroot-arm64 -fuse-ld=lld \
+  -Wl,--dynamic-linker="$FXD_LDSO" -O2 -Wall -o "$A/usr/bin/fxwmfit" tools/fxwmfit/fxwmfit.c -lX11
+
 # Phase 5: Steam launcher and container stand-in (tools/steam).
 install -D -m 0755 tools/steam/fexdroid-steam.sh "$A/usr/lib/fexdroid/steam/fexdroid-steam.sh"
 install -D -m 0755 tools/steam/_v2-entry-point "$A/usr/lib/fexdroid/steam/_v2-entry-point"
