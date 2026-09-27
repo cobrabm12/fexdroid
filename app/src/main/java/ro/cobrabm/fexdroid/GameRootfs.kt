@@ -24,7 +24,7 @@ import java.util.zip.GZIPInputStream
 object GameRootfs {
     private const val TOOL = "steamapps/common/SteamLinuxRuntime_sniper"
     private const val TOOL_APPID = 1628350
-    private const val FORMAT = 1
+    private const val FORMAT = 2
     // Kotlin has no octal literals.
     private val MODE_755 = "755".toInt(8)
     private val MODE_644 = "644".toInt(8)
@@ -80,7 +80,10 @@ object GameRootfs {
                 val path = unescape(tok[0])
                 if (path == ".") continue
                 val attr = tok.drop(1).mapNotNull { t -> t.indexOf('=').takeIf { it > 0 }?.let { t.substring(0, it) to t.substring(it + 1) } }.toMap()
-                val dest = inside(usr, path.removePrefix("./"))
+                // The runtime keeps /etc under its /usr (files/etc), but it is /etc in the container,
+                // and its relative symlinks (os-release -> ../usr/lib/os-release) count on that.
+                val rel = path.removePrefix("./")
+                val dest = if (rel == "etc" || rel.startsWith("etc/")) inside(tmp, rel) else inside(usr, rel)
                 when (attr["type"]) {
                     "dir" -> dest.mkdirs()
                     "link" -> {
@@ -103,11 +106,11 @@ object GameRootfs {
             }
         }
         // The usual merged-/usr layout around it, plus the places programs write to.
-        for (d in listOf("bin", "sbin", "lib", "lib32", "lib64", "libx32", "etc")) {
+        for (d in listOf("bin", "sbin", "lib", "lib32", "lib64", "libx32")) {
             if (File(usr, d).exists()) Os.symlink("usr/$d", File(tmp, d).path)
         }
         for (d in listOf("tmp", "var/tmp", "dev/shm")) File(tmp, d).apply { mkdirs(); chmod(this, MODE_1777) }
-        for (d in listOf("run/pressure-vessel", "home", "root", "var/lib", "var/cache")) File(tmp, d).mkdirs()
+        for (d in listOf("etc", "run/pressure-vessel", "home", "root", "var/lib", "var/cache")) File(tmp, d).mkdirs()
 
         val replaced = overrideCoreLibraries(env.x86Root, usr)
         File(usr, "lib/fexdroid-overrides.txt").writeText(
