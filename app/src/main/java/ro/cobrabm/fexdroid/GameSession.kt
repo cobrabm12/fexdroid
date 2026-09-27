@@ -42,6 +42,7 @@ data class InstallStatus(
     val steamRootfs: Boolean,
     val steamClient: Boolean,
     val dota: Boolean,
+    val gameRootfs: Boolean,
 ) {
     companion object {
         /** Does file I/O: call off the main thread. */
@@ -51,6 +52,7 @@ data class InstallStatus(
             steamRootfs = File(env.x86Steam, ".complete").exists(),
             steamClient = File(env.home, ".local/share/Steam/steam.sh").exists(),
             dota = File(env.steamLibrary, "steamapps/common/dota 2 beta/game/dota.sh").exists(),
+            gameRootfs = GameRootfs.ready(env) && !GameRootfs.needsBuild(env),
         )
     }
 }
@@ -140,6 +142,10 @@ object GameSession {
                     return@thread fail("Dota 2 nu este instalat pe telefon. Vezi Setări › Instalare jocuri.")
                 if (!env.ensureInstalled(::append))
                     return@thread fail(env.pathProblem() ?: "Mediul Linux nu a putut fi instalat.")
+                // Steam updated (or just downloaded) its runtime: the games' root filesystem follows.
+                if (GameRootfs.needsBuild(env)) {
+                    runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Mediul jocului: eroare: $it") }
+                }
                 runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache) }
                     .onSuccess { append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}") }
                     .onFailure { append("FEX: nu pot scrie Config.json: $it") }
@@ -155,6 +161,19 @@ object GameSession {
                 val p = xs.launch(game.tag, game.argv(env))
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())
+                // A game started in the session that installed it: the entry point asks for
+                // the rootfs (tools/steam/_v2-entry-point) and waits until the request is gone.
+                thread(name = "game-rootfs", isDaemon = true) {
+                    val request = GameRootfs.request(env)
+                    request.delete()
+                    while (current() && p.isAlive) {
+                        if (request.exists()) {
+                            runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Mediul jocului: eroare: $it") }
+                            request.delete()
+                        }
+                        Thread.sleep(1000)
+                    }
+                }
                 val code = p.waitFor()
                 if (current() && state is SessionState.Running) state = SessionState.Exited(game, code)
             } catch (t: Throwable) {

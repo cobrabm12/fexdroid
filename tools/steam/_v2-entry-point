@@ -9,9 +9,10 @@
 # When this copy sits in a game runtime (e.g. SteamLinuxRuntime_sniper), the game
 # should see that runtime as its root filesystem, as it would inside the container
 # (dota.sh even checks /etc/os-release for "sniper"). FEX re-reads FEX_ROOTFS at
-# every execve, so pointing it at $FXD_FILES/sniper-rootfs (Valve's public sniper
-# platform image, scripts/build-game-rootfs.sh) is enough. Steam's own deployed
-# tree (var/tmp-*) is not usable: it links glibc/drivers from /run/host.
+# every execve, so pointing it at $FXD_FILES/sniper-rootfs is enough. The app builds
+# that tree from the platform Steam downloads (GameRootfs.kt); scripts/build-game-rootfs.sh
+# makes one on the PC from Valve's public image. pressure-vessel's own deployed tree
+# (var/tmp-*) is not usable: it links glibc/drivers from /run/host.
 # Set FXD_GAME_ROOTFS=0 to keep the Steam rootfs instead.
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -26,9 +27,24 @@ here="$(cd "${0%/*}" && pwd)"
 case "$here" in
     */SteamLinuxRuntime_*)
         tree="${FXD_FILES:-}/sniper-rootfs"
-        if [ "${FXD_GAME_ROOTFS:-1}" = 1 ] && [ -f "$tree/.complete" ]; then
-            export FEX_ROOTFS="$tree"
-            echo "fexdroid entry point: game rootfs $tree" >&2
+        if [ "${FXD_GAME_ROOTFS:-1}" = 1 ] && [ -n "${FXD_FILES:-}" ]; then
+            if [ ! -f "$tree/.complete" ]; then
+                # Steam installed the runtime in this session: the app builds the rootfs from
+                # it (GameRootfs.kt) and removes the request when it is done or has failed.
+                echo "fexdroid entry point: asking the app for the game rootfs" >&2
+                : > "$FXD_FILES/game-rootfs.request"
+                i=0
+                while [ -e "$FXD_FILES/game-rootfs.request" ] && [ "$i" -lt 900 ]; do
+                    sleep 1
+                    i=$((i + 1))
+                done
+            fi
+            if [ -f "$tree/.complete" ]; then
+                export FEX_ROOTFS="$tree"
+                echo "fexdroid entry point: game rootfs $tree" >&2
+            else
+                echo "fexdroid entry point: no game rootfs, continuing with the Steam rootfs" >&2
+            fi
         fi
         ;;
 esac

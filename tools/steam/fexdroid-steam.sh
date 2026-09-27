@@ -45,17 +45,22 @@ fi
 ln -sfn "$STEAMROOT" "$HOME/.steam/root"
 ln -sfn "$STEAMROOT" "$HOME/.steam/steam"
 
-# 3) No containers: games' runtimes get the pass-through entry point too.
-for rt in "$LIB"/steamapps/common/SteamLinuxRuntime*; do
-    [ -d "$rt" ] || continue
-    ep="$rt/_v2-entry-point"
-    if [ -f "$ep" ] && ! cmp -s "$ep" "$SHIM_DIR/_v2-entry-point"; then
-        [ -f "$ep.valve" ] || mv "$ep" "$ep.valve"
-        cp "$SHIM_DIR/_v2-entry-point" "$ep"
-        chmod 755 "$ep"
-        log "container entry point replaced in $(basename "$rt")"
-    fi
-done
+# 3) No containers: games' runtimes get the pass-through entry point too. Steam installs
+# and updates these runtimes while it runs, so keep checking in the background.
+replace_entry_points() {
+    for rt in "$LIB"/steamapps/common/SteamLinuxRuntime*; do
+        [ -d "$rt" ] || continue
+        ep="$rt/_v2-entry-point"
+        if [ -f "$ep" ] && ! cmp -s "$ep" "$SHIM_DIR/_v2-entry-point"; then
+            [ -f "$ep.valve" ] || mv "$ep" "$ep.valve"
+            cp "$SHIM_DIR/_v2-entry-point" "$ep"
+            chmod 755 "$ep"
+            log "container entry point replaced in $(basename "$rt")"
+        fi
+    done
+}
+replace_entry_points
+( while sleep 5; do replace_entry_points; done ) &
 
 # 3b) Paths Steam creates under /tmp with absolute names. FEX overlays the x86
 # RootFS only for paths that already exist there, so pre-create them (Steam aborts
