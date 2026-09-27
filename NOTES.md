@@ -760,3 +760,8 @@ porniri: patru lente (11–15), trei rapide (25–27), fără legătură cu regl
 - Raportul din aplicație are acum un instantaneu de performanță (cadre, procese, fire, GPU, frecvențe,
   temperaturi, memorie, focus) și ultimele rânduri din `content_log.txt`. `_v2-entry-point` citește
   `files/session-env.txt` la fiecare program pornit, deci un reglaj se poate schimba fără repornirea lui Steam.
+- **Verificat după reparație:** cu build-ul nou, trei porniri din trei au dat 26–27 de cadre/s, cu focusul pe joc.
+- **FSR (FidelityFX Super Resolution):** testerul de pe S26 Ultra (Adreno 840) a raportat un crash Vulkan la
+  activare. Pe Realme GT (Adreno 660) nu se reproduce: cu `setting.r_dota_fsr_upsample 1` și
+  `setting.mat_viewportscale 0.7` în `video.txt` jocul pornește și rulează, tot la 26 de cadre/s. Că rezoluția de
+  randare mai mică nu aduce cadre confirmă că limita e procesorul. Pentru S26 e nevoie de raportul de după crash.
