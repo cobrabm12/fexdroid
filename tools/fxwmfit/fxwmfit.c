@@ -16,6 +16,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
 
@@ -104,6 +105,57 @@ static void refocus(Display* d, Window root) {
   fprintf(stderr, "fxwmfit: focus 0x%lx -> 0x%lx\n", holder, want);
 }
 
+// A program that covers the whole screen (a game) leaves nothing of the windows below to
+// see, but they keep drawing: Steam's interface is rendered on the CPU and took 40% of a
+// core under a running game. They are unmapped, as a window manager does when it minimizes,
+// and mapped again when the window above them is gone. Windows of the same client as the
+// one on top stay (a game and its own windows).
+#define MAX_HIDDEN 16
+static Window hidden[MAX_HIDDEN];
+static int nhidden;
+static Window hidden_for; // The full-screen window they were hidden for.
+static int hide_covered = 1;
+
+static int same_client(Window a, Window b) {
+  return (a & ~0x1fffffUL) == (b & ~0x1fffffUL); // Resource ids: client base above 21 bits.
+}
+
+static int viewable(Display* d, Window w, XWindowAttributes* a) {
+  return XGetWindowAttributes(d, w, a) && a->map_state == IsViewable;
+}
+
+static void hide_under(Display* d, Window root, int sw, int sh) {
+  XWindowAttributes a;
+  if (nhidden > 0) {
+    if (viewable(d, hidden_for, &a)) return; // Still there: nothing to do.
+    for (int i = 0; i < nhidden; i++) XMapWindow(d, hidden[i]);
+    fprintf(stderr, "fxwmfit: 0x%lx is gone, %d window(s) shown again\n", hidden_for, nhidden);
+    nhidden = 0;
+    hidden_for = None;
+    return;
+  }
+  Window r, p, *kids = NULL;
+  unsigned n = 0;
+  if (!hide_covered || !XQueryTree(d, root, &r, &p, &kids, &n)) return;
+  Window top = None;
+  for (unsigned i = n; i-- > 0 && top == None;) {
+    if (takes_focus(d, kids[i])) top = kids[i];
+  }
+  if (top != None && XGetWindowAttributes(d, top, &a) && a.x <= 0 && a.y <= 0 && a.x + a.width >= sw &&
+      a.y + a.height >= sh) {
+    for (unsigned i = 0; i < n && nhidden < MAX_HIDDEN; i++) {
+      if (kids[i] == top || same_client(kids[i], top) || !takes_focus(d, kids[i])) continue;
+      XUnmapWindow(d, kids[i]);
+      hidden[nhidden++] = kids[i];
+    }
+    if (nhidden > 0) {
+      hidden_for = top;
+      fprintf(stderr, "fxwmfit: 0x%lx covers the screen, %d window(s) below hidden\n", top, nhidden);
+    }
+  }
+  if (kids) XFree(kids);
+}
+
 static void fit_all(Display* d, Window root, int sw, int sh) {
   Window r, p, *kids = NULL;
   unsigned n = 0;
@@ -138,6 +190,8 @@ int main(int argc, char** argv) {
     return 0;
   }
   verbose = argc > 1 && strcmp(argv[1], "--verbose") == 0;
+  const char* keep = getenv("FXD_KEEP_COVERED_WINDOWS"); // =1: leave covered windows mapped.
+  hide_covered = !(keep && keep[0] == '1');
   if (argc > 1 && strcmp(argv[1], "--once") == 0) {
     return 0;
   }
@@ -152,6 +206,7 @@ int main(int argc, char** argv) {
         fit(d, e.xconfigure.window, sw, sh);
       }
     }
+    hide_under(d, root, sw, sh);
     refocus(d, root);
     XFlush(d);
     // Windows open, close and restack without an event we could rely on: look once a second.

@@ -50,6 +50,9 @@ SOCKADDR_IMPL = """  // fexdroid: AF_UNIX paths under guest-only directories map
       addr = reinterpret_cast<const struct sockaddr*>(&Un);
       addrlen = UnLen;
     }}
+    if (FEXDroid::IsUeventStandInBind(sockfd, addr, addrlen)) {{
+      return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
+    }}
     uint64_t Result = ::{name}(sockfd, addr, addrlen);
     if (FEXDroid::IsInetAddr(addr) && (Result == 0 || errno == EINPROGRESS)) {{
       FEXDroid::RecordTcpSocket(sockfd, addr, addrlen); // fexdroid: lsof for Steam (AndroidTcpRegistry.h)
@@ -84,6 +87,9 @@ def x32socket(text):
         Addr = reinterpret_cast<const struct sockaddr*>(&Un);
         AddrLen = UnLen;
       }}
+      if (FEXDroid::IsUeventStandInBind(Arguments[0], Addr, AddrLen)) {{
+        return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
+      }}
       Result = ::{name}(Arguments[0], Addr, AddrLen);
       if (FEXDroid::IsInetAddr(Addr) && (Result == 0 || errno == EINPROGRESS)) {{
         FEXDroid::RecordTcpSocket(Arguments[0], Addr, AddrLen);
@@ -94,6 +100,11 @@ def x32socket(text):
             sys.exit(f"x32/Socket.cpp: {op} anchor not found")
         text = text.replace(a, b)
     reps = [
+        ("""      Result = ::socket(Arguments[0], Arguments[1], Arguments[2]);
+      break;""",
+         """      Result = ::socket(Arguments[0], Arguments[1], Arguments[2]);
+      Result = FEXDroid::UeventStandIn(Arguments[0], Arguments[1], Arguments[2], Result); // fexdroid
+      break;"""),
         ("""      Result = ::accept(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]));
       break;""",
          """      Result = ::accept(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]));
@@ -126,6 +137,12 @@ def passthrough(text):
     text = arm64 + sep + rest
     reps = [
         ("  REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);\n", SOCKADDR_IMPL.format(name="connect")),
+        ("  REGISTER_SYSCALL_IMPL(socket, SyscallPassthrough3<SYSCALL_DEF(socket)>);\n",
+         "  // fexdroid: a stand-in for udev's uevent socket, which Android denies (AndroidTcpRegistry.h).\n"
+         "  REGISTER_SYSCALL_IMPL(socket, [](FEXCore::Core::CpuStateFrame* Frame, int domain, int type, int protocol) -> uint64_t {\n"
+         "    uint64_t Result = FEXDroid::UeventStandIn(domain, type, protocol, ::socket(domain, type, protocol));\n"
+         "    SYSCALL_ERRNO();\n"
+         "  });\n"),
         ("  REGISTER_SYSCALL_IMPL(bind, SyscallPassthrough3<SYSCALL_DEF(bind)>);\n", SOCKADDR_IMPL.format(name="bind")),
         ("  REGISTER_SYSCALL_IMPL(accept4, SyscallPassthrough4<SYSCALL_DEF(accept4)>);\n", ACCEPT4_IMPL),
         ('#include "LinuxSyscalls/x32/Syscalls.h"\n',

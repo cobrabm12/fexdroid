@@ -26,6 +26,29 @@
 
 namespace FEXDroid {
 
+// udev without uevents. An Android app may not open a NETLINK_KOBJECT_UEVENT socket (EACCES),
+// so libudev cannot create its monitor. SDL3 then gives up on udev, unloads the library and
+// tries again the next time it looks for controllers: Dota 2 did that 13 times a second on
+// its main thread, 300 system calls each time (NOTES N-034). The guest gets a socket on
+// which nothing ever arrives instead: hotplug events are missing, as they are anyway.
+inline int64_t UeventStandIn(int domain, int type, int protocol, int64_t Result) {
+  constexpr int NetlinkKobjectUevent = 15;
+  if (Result == -1 && errno == EACCES && domain == AF_NETLINK && protocol == NetlinkKobjectUevent) {
+    return ::socket(AF_UNIX, SOCK_DGRAM | (type & (SOCK_CLOEXEC | SOCK_NONBLOCK)), 0);
+  }
+  return Result;
+}
+
+// bind() of such a socket to a netlink address: nothing to do.
+inline bool IsUeventStandInBind(int fd, const sockaddr* addr, socklen_t addrlen) {
+  if (!addr || addrlen < sizeof(sa_family_t) || addr->sa_family != AF_NETLINK) {
+    return false;
+  }
+  int Domain = 0;
+  socklen_t Len = sizeof(Domain);
+  return ::getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &Domain, &Len) == 0 && Domain == AF_UNIX;
+}
+
 inline void FormatTcpAddr(const sockaddr_storage& ss, char* out, size_t len) {
   char ip[INET6_ADDRSTRLEN] = "?";
   unsigned port = 0;

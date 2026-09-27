@@ -99,7 +99,7 @@
    register uint64_t x0 asm("x0") = arg1;
    register uint64_t x1 asm("x1") = arg2;
    register uint64_t x2 asm("x2") = arg3;
-@@ -216,21 +257,58 @@
+@@ -216,21 +257,68 @@
    REGISTER_SYSCALL_IMPL(sched_yield, SyscallPassthrough0<SYSCALL_DEF(sched_yield)>);
    REGISTER_SYSCALL_IMPL(msync, SyscallPassthrough3<SYSCALL_DEF(msync)>);
    REGISTER_SYSCALL_IMPL(mincore, SyscallPassthrough3<SYSCALL_DEF(mincore)>);
@@ -115,8 +115,13 @@
 +    SYSCALL_ERRNO();
 +  });
    REGISTER_SYSCALL_IMPL(getpid, SyscallPassthrough0<SYSCALL_DEF(getpid)>);
-   REGISTER_SYSCALL_IMPL(socket, SyscallPassthrough3<SYSCALL_DEF(socket)>);
+-  REGISTER_SYSCALL_IMPL(socket, SyscallPassthrough3<SYSCALL_DEF(socket)>);
 -  REGISTER_SYSCALL_IMPL(connect, SyscallPassthrough3<SYSCALL_DEF(connect)>);
++  // fexdroid: a stand-in for udev's uevent socket, which Android denies (AndroidTcpRegistry.h).
++  REGISTER_SYSCALL_IMPL(socket, [](FEXCore::Core::CpuStateFrame* Frame, int domain, int type, int protocol) -> uint64_t {
++    uint64_t Result = FEXDroid::UeventStandIn(domain, type, protocol, ::socket(domain, type, protocol));
++    SYSCALL_ERRNO();
++  });
 +  // fexdroid: AF_UNIX paths under guest-only directories map into the RootFS (FileManager::RootFSSocketAddr).
 +  REGISTER_SYSCALL_IMPL(connect, [](FEXCore::Core::CpuStateFrame* Frame, int sockfd, const struct sockaddr* addr, socklen_t addrlen) -> uint64_t {
 +    struct sockaddr_un Un;
@@ -124,6 +129,9 @@
 +    if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(addr, addrlen, Un, UnLen)) {
 +      addr = reinterpret_cast<const struct sockaddr*>(&Un);
 +      addrlen = UnLen;
++    }
++    if (FEXDroid::IsUeventStandInBind(sockfd, addr, addrlen)) {
++      return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
 +    }
 +    uint64_t Result = ::connect(sockfd, addr, addrlen);
 +    if (FEXDroid::IsInetAddr(addr) && (Result == 0 || errno == EINPROGRESS)) {
@@ -142,6 +150,9 @@
 +    if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(addr, addrlen, Un, UnLen)) {
 +      addr = reinterpret_cast<const struct sockaddr*>(&Un);
 +      addrlen = UnLen;
++    }
++    if (FEXDroid::IsUeventStandInBind(sockfd, addr, addrlen)) {
++      return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
 +    }
 +    uint64_t Result = ::bind(sockfd, addr, addrlen);
 +    if (FEXDroid::IsInetAddr(addr) && (Result == 0 || errno == EINPROGRESS)) {
@@ -163,7 +174,7 @@
    REGISTER_SYSCALL_IMPL(msgget, SyscallPassthrough2<SYSCALL_DEF(msgget)>);
    REGISTER_SYSCALL_IMPL(msgsnd, SyscallPassthrough4<SYSCALL_DEF(msgsnd)>);
    REGISTER_SYSCALL_IMPL(msgrcv, SyscallPassthrough5<SYSCALL_DEF(msgrcv)>);
-@@ -315,10 +393,18 @@
+@@ -315,10 +403,18 @@
    REGISTER_SYSCALL_IMPL(inotify_add_watch, SyscallPassthrough3<SYSCALL_DEF(inotify_add_watch)>);
    REGISTER_SYSCALL_IMPL(inotify_rm_watch, SyscallPassthrough2<SYSCALL_DEF(inotify_rm_watch)>);
    REGISTER_SYSCALL_IMPL(migrate_pages, SyscallPassthrough4<SYSCALL_DEF(migrate_pages)>);
@@ -184,7 +195,7 @@
    REGISTER_SYSCALL_IMPL(renameat, SyscallPassthrough4<SYSCALL_DEF(renameat)>);
    REGISTER_SYSCALL_IMPL(linkat, SyscallPassthrough5<SYSCALL_DEF(linkat)>);
    REGISTER_SYSCALL_IMPL(symlinkat, SyscallPassthrough3<SYSCALL_DEF(symlinkat)>);
-@@ -328,7 +414,14 @@
+@@ -328,7 +424,14 @@
    REGISTER_SYSCALL_IMPL(tee, SyscallPassthrough4<SYSCALL_DEF(tee)>);
    REGISTER_SYSCALL_IMPL(move_pages, SyscallPassthrough6<SYSCALL_DEF(move_pages)>);
    REGISTER_SYSCALL_IMPL(timerfd_create, SyscallPassthrough2<SYSCALL_DEF(timerfd_create)>);
@@ -200,7 +211,7 @@
    REGISTER_SYSCALL_IMPL(eventfd2, SyscallPassthrough2<SYSCALL_DEF(eventfd2)>);
    REGISTER_SYSCALL_IMPL(epoll_create1, SyscallPassthrough1<SYSCALL_DEF(epoll_create1)>);
    REGISTER_SYSCALL_IMPL(inotify_init1, SyscallPassthrough1<SYSCALL_DEF(inotify_init1)>);
-@@ -426,13 +519,24 @@
+@@ -426,13 +529,24 @@
      REGISTER_SYSCALL_IMPL_X64(getitimer, SyscallPassthrough2<SYSCALL_DEF(getitimer)>);
      REGISTER_SYSCALL_IMPL_X64(setitimer, SyscallPassthrough3<SYSCALL_DEF(setitimer)>);
      REGISTER_SYSCALL_IMPL_X64(sendfile, SyscallPassthrough4<SYSCALL_DEF(sendfile)>);
@@ -227,7 +238,7 @@
      REGISTER_SYSCALL_IMPL_X64(getrlimit, SyscallPassthrough2<SYSCALL_DEF(getrlimit)>);
      REGISTER_SYSCALL_IMPL_X64(getrusage, SyscallPassthrough2<SYSCALL_DEF(getrusage)>);
      REGISTER_SYSCALL_IMPL_X64(sysinfo, SyscallPassthrough1<SYSCALL_DEF(sysinfo)>);
-@@ -448,7 +552,12 @@
+@@ -448,7 +562,12 @@
      REGISTER_SYSCALL_IMPL_X64(readahead, SyscallPassthrough3<SYSCALL_DEF(readahead)>);
      REGISTER_SYSCALL_IMPL_X64(futex, SyscallPassthrough6<SYSCALL_DEF(futex)>);
      REGISTER_SYSCALL_IMPL_X64(io_getevents, SyscallPassthrough5<SYSCALL_DEF(io_getevents)>);
@@ -241,7 +252,7 @@
      REGISTER_SYSCALL_IMPL_X64(timer_create, SyscallPassthrough3<SYSCALL_DEF(timer_create)>);
      REGISTER_SYSCALL_IMPL_X64(timer_settime, SyscallPassthrough4<SYSCALL_DEF(timer_settime)>);
      REGISTER_SYSCALL_IMPL_X64(timer_gettime, SyscallPassthrough2<SYSCALL_DEF(timer_gettime)>);
-@@ -464,8 +573,28 @@
+@@ -464,8 +583,28 @@
      REGISTER_SYSCALL_IMPL_X64(waitid, SyscallPassthrough5<SYSCALL_DEF(waitid)>);
      REGISTER_SYSCALL_IMPL_X64(pselect6, SyscallPassthrough6<SYSCALL_DEF(pselect6)>);
      REGISTER_SYSCALL_IMPL_X64(ppoll, SyscallPassthrough5<SYSCALL_DEF(ppoll)>);
@@ -272,7 +283,7 @@
      REGISTER_SYSCALL_IMPL_X64(sync_file_range, SyscallPassthrough4<SYSCALL_DEF(sync_file_range)>);
      REGISTER_SYSCALL_IMPL_X64(vmsplice, SyscallPassthrough4<SYSCALL_DEF(vmsplice)>);
      REGISTER_SYSCALL_IMPL_X64(utimensat, SyscallPassthrough4<SYSCALL_DEF(utimensat)>);
-@@ -534,7 +663,13 @@
+@@ -534,7 +673,13 @@
      REGISTER_SYSCALL_IMPL_X32(io_pgetevents_time64, SyscallPassthrough6<SYSCALL_DEF(io_pgetevents)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedsend_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedsend)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedreceive_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedreceive)>);
@@ -721,7 +732,11 @@
  
  #include <FEXCore/Utils/LogManager.h>
  #include <FEXCore/fextl/vector.h>
-@@ -659,11 +660,35 @@
+@@ -656,14 +657,45 @@
+     switch (call) {
+     case OP_SOCKET: {
+       Result = ::socket(Arguments[0], Arguments[1], Arguments[2]);
++      Result = FEXDroid::UeventStandIn(Arguments[0], Arguments[1], Arguments[2], Result); // fexdroid
        break;
      }
      case OP_BIND: {
@@ -734,6 +749,9 @@
 +      if (FEX::HLE::_SyscallHandler->FM.RootFSSocketAddr(Addr, AddrLen, Un, UnLen)) {
 +        Addr = reinterpret_cast<const struct sockaddr*>(&Un);
 +        AddrLen = UnLen;
++      }
++      if (FEXDroid::IsUeventStandInBind(Arguments[0], Addr, AddrLen)) {
++        return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
 +      }
 +      Result = ::bind(Arguments[0], Addr, AddrLen);
 +      if (FEXDroid::IsInetAddr(Addr) && (Result == 0 || errno == EINPROGRESS)) {
@@ -752,6 +770,9 @@
 +        Addr = reinterpret_cast<const struct sockaddr*>(&Un);
 +        AddrLen = UnLen;
 +      }
++      if (FEXDroid::IsUeventStandInBind(Arguments[0], Addr, AddrLen)) {
++        return 0; // fexdroid: udev's monitor socket (AndroidTcpRegistry.h)
++      }
 +      Result = ::connect(Arguments[0], Addr, AddrLen);
 +      if (FEXDroid::IsInetAddr(Addr) && (Result == 0 || errno == EINPROGRESS)) {
 +        FEXDroid::RecordTcpSocket(Arguments[0], Addr, AddrLen);
@@ -759,7 +780,7 @@
        break;
      }
      case OP_LISTEN: {
-@@ -672,6 +697,9 @@
+@@ -672,6 +704,9 @@
      }
      case OP_ACCEPT: {
        Result = ::accept(Arguments[0], reinterpret_cast<struct sockaddr*>(Arguments[1]), reinterpret_cast<socklen_t*>(Arguments[2]));
@@ -769,7 +790,7 @@
        break;
      }
      case OP_GETSOCKNAME: {
-@@ -726,7 +754,11 @@
+@@ -726,7 +761,11 @@
        break;
      }
      case OP_ACCEPT4: {
@@ -1110,7 +1131,7 @@
 +} // namespace FEXDroid
 --- /dev/null
 +++ b/Source/Tools/LinuxEmulation/LinuxSyscalls/AndroidTcpRegistry.h
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,115 @@
 +// SPDX-License-Identifier: MIT
 +// fexdroid (local, never upstreamed): record which process owns each guest TCP socket.
 +//
@@ -1138,6 +1159,29 @@
 +#include <unistd.h>
 +
 +namespace FEXDroid {
++
++// udev without uevents. An Android app may not open a NETLINK_KOBJECT_UEVENT socket (EACCES),
++// so libudev cannot create its monitor. SDL3 then gives up on udev, unloads the library and
++// tries again the next time it looks for controllers: Dota 2 did that 13 times a second on
++// its main thread, 300 system calls each time (NOTES N-034). The guest gets a socket on
++// which nothing ever arrives instead: hotplug events are missing, as they are anyway.
++inline int64_t UeventStandIn(int domain, int type, int protocol, int64_t Result) {
++  constexpr int NetlinkKobjectUevent = 15;
++  if (Result == -1 && errno == EACCES && domain == AF_NETLINK && protocol == NetlinkKobjectUevent) {
++    return ::socket(AF_UNIX, SOCK_DGRAM | (type & (SOCK_CLOEXEC | SOCK_NONBLOCK)), 0);
++  }
++  return Result;
++}
++
++// bind() of such a socket to a netlink address: nothing to do.
++inline bool IsUeventStandInBind(int fd, const sockaddr* addr, socklen_t addrlen) {
++  if (!addr || addrlen < sizeof(sa_family_t) || addr->sa_family != AF_NETLINK) {
++    return false;
++  }
++  int Domain = 0;
++  socklen_t Len = sizeof(Domain);
++  return ::getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &Domain, &Len) == 0 && Domain == AF_UNIX;
++}
 +
 +inline void FormatTcpAddr(const sockaddr_storage& ss, char* out, size_t len) {
 +  char ip[INET6_ADDRSTRLEN] = "?";
