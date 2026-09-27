@@ -154,7 +154,9 @@ fun PlayerScreen() {
             is SessionState.Starting -> StartupPanel(state, onLog = { logOpen = true }, onCancel = { GameSession.stop() })
             is SessionState.Exited -> EndPanel(
                 title = "${state.game.title} s-a închis",
-                message = if (state.code == 0) "Programul s-a încheiat normal." else "Programul s-a oprit cu codul ${state.code}.",
+                // Steam's start script ends with code 0 whatever happened to Steam itself.
+                message = if (state.code == 0) "Programul s-a închis singur. Dacă nu l-ai închis tu, apasă „Trimite jurnalul”."
+                    else "Programul s-a oprit cu codul ${state.code}. Apasă „Trimite jurnalul”.",
                 game = state.game, onLog = { logOpen = true },
             )
             is SessionState.Failed -> EndPanel("${state.game.title} nu a pornit", state.message, state.game, onLog = { logOpen = true })
@@ -360,7 +362,7 @@ private fun LogPanel(onClose: () -> Unit) {
  * The session log with what a developer needs to read it (app and payload version, device
  * checks), through Android's share sheet: testers are not next to a PC with adb.
  */
-private fun shareSessionReport(ctx: android.content.Context) {
+internal fun shareSessionReport(ctx: android.content.Context) {
     val activity = ctx as? MainActivity ?: return
     kotlin.concurrent.thread(name = "session-report") { // The device checks read files.
         val text = GameSession.report(ctx)

@@ -86,6 +86,8 @@ object GameSession {
     // string and recomposing on every line (which cost CPU the game needs).
     private const val LOG_MAX_CHARS = 40_000
     private const val STEAM_LOG_TAIL = 80
+    private const val SELF_TEST_SECONDS = 25L
+    private const val SELF_TEST_LINES = 25
     private const val LOG_PUBLISH_MS = 250L
     private val logLines = ArrayDeque<String>()
     private var logChars = 0
@@ -110,6 +112,7 @@ object GameSession {
         appendLine("screen: ${resolution.label}, state: $state")
         appendLine()
         appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
+        append(selfTests(env))
         appendLine("---- session log (last ${LOG_MAX_CHARS / 1000} KB) ----")
         appendLine(synchronized(logLines) { logLines.joinToString("\n") })
         // Steam's own logs: what its updater and client did (no passwords in them).
@@ -121,6 +124,55 @@ object GameSession {
             appendLine(runCatching { f.readLines().takeLast(STEAM_LOG_TAIL).joinToString("\n") }
                 .getOrElse { "cannot read: $it" })
         }
+    }
+
+    /**
+     * The smallest programs that show which layer fails on a phone nobody has debugged:
+     * the arm64 Linux environment, the emulator alone, Vulkan natively and through the emulator.
+     */
+    private fun selfTests(env: LinuxEnv): String = buildString {
+        appendLine("---- self-tests ----")
+        if (env.pathProblem() != null || env.needsInstall()) {
+            appendLine("skipped: the Linux environment is not installed")
+            return@buildString
+        }
+        val fex = "${env.root}/usr/bin/FEX"
+        val tests = listOf(
+            "arm64 sh" to listOf("${env.root}/bin/sh", "-c", "uname -a"),
+            "FEX hello (x86_64)" to listOf(fex, "${env.x86Root}/opt/fexdroid-tests/hello-dynamic"),
+            "vulkaninfo arm64" to listOf("${env.root}/usr/bin/vulkaninfo", "--summary"),
+            "vulkaninfo x86_64 through FEX" to listOf(fex, "${env.x86Root}/usr/bin/vulkaninfo", "--summary"),
+        )
+        for ((name, argv) in tests) {
+            val out = ArrayList<String>()
+            val started = System.currentTimeMillis()
+            val result = runCatching {
+                val pb = ProcessBuilder(argv).redirectErrorStream(true).directory(env.home.apply { mkdirs() })
+                pb.environment().apply { clear(); putAll(env.environment()) }
+                val p = pb.start()
+                p.outputStream.close()
+                val reader = kotlin.concurrent.thread(name = "self-test") {
+                    p.forEachOutputLine { synchronized(out) { out += it } }
+                }
+                if (p.waitFor(SELF_TEST_SECONDS, java.util.concurrent.TimeUnit.SECONDS)) {
+                    reader.join(1000)
+                    describeExit(p.exitValue())
+                } else {
+                    ProcessTree.killTrees(listOf(p), emptyList(), log = {})
+                    "no answer after $SELF_TEST_SECONDS s, stopped"
+                }
+            }.getOrElse { "cannot start: $it" }
+            appendLine("[$name] $result, ${System.currentTimeMillis() - started} ms")
+            synchronized(out) { out.takeLast(SELF_TEST_LINES) }.forEach { appendLine("  $it") }
+        }
+    }
+
+    /** Java reports a process killed by signal N as exit code 128 + N. */
+    private fun describeExit(code: Int): String {
+        val signals = mapOf(4 to "SIGILL", 6 to "SIGABRT", 7 to "SIGBUS", 9 to "SIGKILL", 11 to "SIGSEGV",
+            15 to "SIGTERM", 31 to "SIGSYS")
+        val sig = code - 128
+        return if (sig in 1..64) "killed by signal $sig (${signals[sig] ?: "?"})" else "exit $code"
     }
 
     private fun clearLog() {
