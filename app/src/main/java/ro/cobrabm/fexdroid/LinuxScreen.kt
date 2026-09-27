@@ -39,8 +39,12 @@ import java.io.File
 /** Test steps for phases 1 and 2, runnable from the UI or via `--es action <id>` over adb. */
 object LinuxSteps {
     fun phase1(env: LinuxEnv) = listOf("${env.root}/bin/sh", "-c", "uname -a; ls /; echo; echo \"rootfs:\"; ls \$FXD_ROOT")
-    fun fexStatic(env: LinuxEnv) = listOf("${env.root}/usr/bin/FEX", "${env.x86Root}/opt/fexdroid-tests/hello-static")
-    fun fexDynamic(env: LinuxEnv) = listOf("${env.root}/usr/bin/FEX", "${env.x86Root}/opt/fexdroid-tests/hello-dynamic")
+    // The test programs are in the base x86 tree only, not in Steam's (env.x86Root once Steam's
+    // libraries are installed): run them there.
+    private fun fexTest(env: LinuxEnv, name: String) = listOf("${env.root}/bin/sh", "-c",
+        "FEX_ROOTFS='${env.x86Base}' exec '${env.root}/usr/bin/FEX' '${env.x86Base}/opt/fexdroid-tests/$name'")
+    fun fexStatic(env: LinuxEnv) = fexTest(env, "hello-static")
+    fun fexDynamic(env: LinuxEnv) = fexTest(env, "hello-dynamic")
     // Phase 3, step 1: native arm64 vulkaninfo against Turnip.
     fun vulkaninfo(env: LinuxEnv) = listOf("${env.root}/usr/bin/vulkaninfo", "--summary")
     // Phase 3, step 1b: x86_64 vulkaninfo through FEX + Vulkan thunk.

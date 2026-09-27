@@ -137,22 +137,34 @@ object GameSession {
             return@buildString
         }
         val fex = "${env.root}/usr/bin/FEX"
-        val tests = listOf(
-            "arm64 sh" to listOf("${env.root}/bin/sh", "-c", "uname -a"),
-            "FEX hello (x86_64)" to listOf(fex, "${env.x86Root}/opt/fexdroid-tests/hello-dynamic"),
-            "vulkaninfo arm64" to listOf("${env.root}/usr/bin/vulkaninfo", "--summary"),
-            "vulkaninfo x86_64 through FEX" to listOf(fex, "${env.x86Root}/usr/bin/vulkaninfo", "--summary"),
+        val tests = "${env.x86Base}/opt/fexdroid-tests"
+        // name, program, the x86 tree FEX runs it in (null: the one games use).
+        val steps = listOf(
+            Triple("arm64 sh", listOf("${env.root}/bin/sh", "-c", "uname -a"), null),
+            // The test programs are in the base tree only; Steam's tree has the 32-bit libraries.
+            Triple("FEX hello (x86_64)", listOf(fex, "$tests/hello-dynamic"), env.x86Base),
+            Triple("FEX SysV semaphores (x86_64)", listOf(fex, "$tests/semtest"), env.x86Base),
+            Triple("FEX SysV semaphores (i386, as Steam's client)", listOf(fex, "$tests/semtest-i386"), env.x86Steam),
+            Triple("vulkaninfo arm64", listOf("${env.root}/usr/bin/vulkaninfo", "--summary"), null),
+            Triple("vulkaninfo x86_64 through FEX", listOf(fex, "${env.x86Root}/usr/bin/vulkaninfo", "--summary"), null),
         )
-        for ((name, argv) in tests) {
+        for ((name, argv, tree) in steps) {
+            if (tree != null && !tree.isDirectory) {
+                appendLine("[$name] skipped: ${tree.name} is not installed")
+                continue
+            }
             val out = ArrayList<String>()
             val started = System.currentTimeMillis()
             val result = runCatching {
                 val pb = ProcessBuilder(argv).redirectErrorStream(true).directory(env.home.apply { mkdirs() })
-                pb.environment().apply { clear(); putAll(env.environment()) }
+                pb.environment().apply {
+                    clear(); putAll(env.environment())
+                    if (tree != null) put("FEX_ROOTFS", tree.path)
+                }
                 val p = pb.start()
                 p.outputStream.close()
                 val reader = kotlin.concurrent.thread(name = "self-test") {
-                    p.forEachOutputLine { synchronized(out) { out += it } }
+                    p.forEachOutputLine { if (!it.startsWith("Linking address ")) synchronized(out) { out += it } }
                 }
                 if (p.waitFor(SELF_TEST_SECONDS, java.util.concurrent.TimeUnit.SECONDS)) {
                     reader.join(1000)
