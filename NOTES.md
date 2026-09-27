@@ -627,10 +627,15 @@ environment”. `dota.sh` verifică `/etc/os-release` (VERSION_CODENAME=sniper).
 căror conținut s-a schimbat (sumă pe tot cadrul, în bucla de copiere) și scrie în logcat la 10 s
 (`fexdroid-display: last 300 frames copied: N had new content`). Meniul principal Dota, 1600×720: **16–18 cadre/s**.
 Limita de sus a măsurătorii e rata de copiere (Setări › cadre/s).
-Următorii pași: un meci cu boți; de unde vine limita (CPU prin FEX sau prezentarea prin Xvfb, D3); Big Picture.
+Următorii pași: un meci cu boți; de unde vine limita (CPU prin FEX sau prezentarea prin Xvfb, D3).
 Unde se duce timpul (meniu, o singură măsurătoare): firul principal al jocului ~54% dintr-un nucleu, 7 fire
 `GlobPool` la 8–19%, `VKRenderThread` 4%, Xvfb 4,6%; nucleele la 1,0–1,6 GHz; RAM 11 GB plin, 5,4 GB în swap.
 Nu e un nucleu blocat la 100%, deci limita nu e doar CPU-ul prin FEX: de măsurat prezentarea și memoria.
 **Oprirea sesiunii închidea aplicația:** firele care citesc ieșirea proceselor primeau
 `InterruptedIOException: read interrupted` când procesul era oprit. `Process.forEachOutputLine` tratează asta ca
-sfârșit de ieșire (🟨 compilat, de verificat pe telefon).
+sfârșit de ieșire. ✅ Verificat: după „Oprește” procesele dispar, aplicația rămâne deschisă.
+**Big Picture** ✅: comutatorul din Setări pornește Steam cu `-gamepadui`; pe 1600×720 ocupă tot ecranul, merge la
+atingere (tap pe joc › Play › OK la sfatul cu tastatura › Skip la shadere). Dota pornit de aici: 19 cadre/s în meniu.
+E pornit implicit, dar `-gamepadui` se dă doar după prima autentificare (există `Steam/userdata/<id>`), fiindcă
+descărcarea clientului și loginul sunt verificate doar în interfața clasică. Unele nume de prieteni cu caractere
+speciale apar ca pătrățele (lipsesc fonturi în rootfs-ul x86).

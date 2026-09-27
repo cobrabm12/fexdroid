@@ -91,7 +91,7 @@ fun SettingsScreen() {
 
             Section("Joc") {
                 SwitchSetting("Steam în Big Picture",
-                    "Interfața pe tot ecranul, pentru atingere și controller. Experimental.",
+                    "Interfața pe tot ecranul, pentru atingere și controller. Prima autentificare se face în interfața clasică.",
                     AppSettings.steamBigPicture, AppSettings::updateSteamBigPicture)
                 SwitchSetting(
                     "Rulează jocul fără Steam",

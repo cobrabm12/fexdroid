@@ -158,7 +158,10 @@ object GameSession {
                 if (!xs.startAudio()) append("Sunetul nu a pornit; continui fără sunet.")
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.LAUNCH)
-                val extra = if (game == Game.STEAM && AppSettings.steamBigPicture) listOf("-gamepadui") else emptyList()
+                // Big Picture only once somebody has logged in: the first start (client download,
+                // login) is verified in the desktop interface only.
+                val loggedIn = File(env.home, ".local/share/Steam/userdata").listFiles()?.any { it.isDirectory } == true
+                val extra = if (game == Game.STEAM && AppSettings.steamBigPicture && loggedIn) listOf("-gamepadui") else emptyList()
                 val p = xs.launch(game.tag, game.argv(env) + extra)
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())
