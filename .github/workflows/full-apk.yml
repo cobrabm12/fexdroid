@@ -123,15 +123,30 @@ jobs:
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/seccomp-wrap" || true
           scripts/test-payload-qemu.sh "$FXD_ROOT/opt/fexdroid-tests/shmtest all" || true
 
-      # Same debug signing key on every run, so a new APK installs over the previous one
-      # (a fresh key would force an uninstall and wipe the installed Linux environment).
-      - uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: fexdroid-debug-keystore-v1
+      # The same signing key on every run, so a new APK installs over the previous one (another
+      # key forces an uninstall, which wipes the installed Linux environment and the games).
+      # Repository secrets; without them (a fork) the build uses the runner's debug key.
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.FEXDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FEXDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/fexdroid.jks"
+            echo "FEXDROID_KEYSTORE=$RUNNER_TEMP/fexdroid.jks" >> "$GITHUB_ENV"
+            echo "FEXDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "signing with the project's key"
+          else
+            echo "::warning::no signing key in the repository secrets: this APK will not install over a published one"
+          fi
 
       - name: Build APK
         run: ./gradlew --no-daemon --stacktrace assembleLegacyDebug
+
+      - name: Signing certificate
+        run: |
+          APKSIGNER=$(ls "$FEXDROID_SDK"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/legacy/debug/app-legacy-debug.apk | grep -E "SHA-256|DN:"
 
       - uses: actions/upload-artifact@v4
         with:

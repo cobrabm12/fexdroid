@@ -138,6 +138,11 @@ object Updater {
         state = when (status) {
             PackageInstaller.STATUS_SUCCESS -> State.UpToDate // Normally the app is restarted before this.
             PackageInstaller.STATUS_FAILURE_ABORTED -> if (info != null) State.Available(info) else State.Idle
+            // Builds before 2026-09-27 20:00 were signed with a different key on every run.
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE, PackageInstaller.STATUS_FAILURE_CONFLICT ->
+                State.Failed("Versiunea instalată e semnată cu altă cheie decât cea nouă, așa că Android nu o poate " +
+                    "înlocui. O singură dată: dezinstalează aplicația și instaleaz-o din nou de pe GitHub. " +
+                    "(${message ?: "cod $status"})", info)
             else -> State.Failed("Instalarea a eșuat: ${message ?: "cod $status"}", info)
         }
     }
