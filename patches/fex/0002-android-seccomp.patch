@@ -163,7 +163,7 @@
    REGISTER_SYSCALL_IMPL(msgget, SyscallPassthrough2<SYSCALL_DEF(msgget)>);
    REGISTER_SYSCALL_IMPL(msgsnd, SyscallPassthrough4<SYSCALL_DEF(msgsnd)>);
    REGISTER_SYSCALL_IMPL(msgrcv, SyscallPassthrough5<SYSCALL_DEF(msgrcv)>);
-@@ -315,7 +393,11 @@
+@@ -315,10 +393,18 @@
    REGISTER_SYSCALL_IMPL(inotify_add_watch, SyscallPassthrough3<SYSCALL_DEF(inotify_add_watch)>);
    REGISTER_SYSCALL_IMPL(inotify_rm_watch, SyscallPassthrough2<SYSCALL_DEF(inotify_rm_watch)>);
    REGISTER_SYSCALL_IMPL(migrate_pages, SyscallPassthrough4<SYSCALL_DEF(migrate_pages)>);
@@ -175,8 +175,16 @@
 +  });
    REGISTER_SYSCALL_IMPL(mknodat, SyscallPassthrough4<SYSCALL_DEF(mknodat)>);
    REGISTER_SYSCALL_IMPL(fchownat, SyscallPassthrough5<SYSCALL_DEF(fchownat)>);
-   REGISTER_SYSCALL_IMPL(unlinkat, SyscallPassthrough3<SYSCALL_DEF(unlinkat)>);
-@@ -328,7 +410,14 @@
+-  REGISTER_SYSCALL_IMPL(unlinkat, SyscallPassthrough3<SYSCALL_DEF(unlinkat)>);
++  // fexdroid: what Mkdirat/Open created inside the RootFS is removed there too (rm uses unlinkat).
++  REGISTER_SYSCALL_IMPL(unlinkat, [](FEXCore::Core::CpuStateFrame* Frame, int dirfd, const char* pathname, int flags) -> uint64_t {
++    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Unlinkat(dirfd, pathname, flags);
++    SYSCALL_ERRNO();
++  });
+   REGISTER_SYSCALL_IMPL(renameat, SyscallPassthrough4<SYSCALL_DEF(renameat)>);
+   REGISTER_SYSCALL_IMPL(linkat, SyscallPassthrough5<SYSCALL_DEF(linkat)>);
+   REGISTER_SYSCALL_IMPL(symlinkat, SyscallPassthrough3<SYSCALL_DEF(symlinkat)>);
+@@ -328,7 +414,14 @@
    REGISTER_SYSCALL_IMPL(tee, SyscallPassthrough4<SYSCALL_DEF(tee)>);
    REGISTER_SYSCALL_IMPL(move_pages, SyscallPassthrough6<SYSCALL_DEF(move_pages)>);
    REGISTER_SYSCALL_IMPL(timerfd_create, SyscallPassthrough2<SYSCALL_DEF(timerfd_create)>);
@@ -192,7 +200,7 @@
    REGISTER_SYSCALL_IMPL(eventfd2, SyscallPassthrough2<SYSCALL_DEF(eventfd2)>);
    REGISTER_SYSCALL_IMPL(epoll_create1, SyscallPassthrough1<SYSCALL_DEF(epoll_create1)>);
    REGISTER_SYSCALL_IMPL(inotify_init1, SyscallPassthrough1<SYSCALL_DEF(inotify_init1)>);
-@@ -426,13 +515,24 @@
+@@ -426,13 +519,24 @@
      REGISTER_SYSCALL_IMPL_X64(getitimer, SyscallPassthrough2<SYSCALL_DEF(getitimer)>);
      REGISTER_SYSCALL_IMPL_X64(setitimer, SyscallPassthrough3<SYSCALL_DEF(setitimer)>);
      REGISTER_SYSCALL_IMPL_X64(sendfile, SyscallPassthrough4<SYSCALL_DEF(sendfile)>);
@@ -219,7 +227,7 @@
      REGISTER_SYSCALL_IMPL_X64(getrlimit, SyscallPassthrough2<SYSCALL_DEF(getrlimit)>);
      REGISTER_SYSCALL_IMPL_X64(getrusage, SyscallPassthrough2<SYSCALL_DEF(getrusage)>);
      REGISTER_SYSCALL_IMPL_X64(sysinfo, SyscallPassthrough1<SYSCALL_DEF(sysinfo)>);
-@@ -448,7 +548,12 @@
+@@ -448,7 +552,12 @@
      REGISTER_SYSCALL_IMPL_X64(readahead, SyscallPassthrough3<SYSCALL_DEF(readahead)>);
      REGISTER_SYSCALL_IMPL_X64(futex, SyscallPassthrough6<SYSCALL_DEF(futex)>);
      REGISTER_SYSCALL_IMPL_X64(io_getevents, SyscallPassthrough5<SYSCALL_DEF(io_getevents)>);
@@ -233,7 +241,7 @@
      REGISTER_SYSCALL_IMPL_X64(timer_create, SyscallPassthrough3<SYSCALL_DEF(timer_create)>);
      REGISTER_SYSCALL_IMPL_X64(timer_settime, SyscallPassthrough4<SYSCALL_DEF(timer_settime)>);
      REGISTER_SYSCALL_IMPL_X64(timer_gettime, SyscallPassthrough2<SYSCALL_DEF(timer_gettime)>);
-@@ -464,8 +569,28 @@
+@@ -464,8 +573,28 @@
      REGISTER_SYSCALL_IMPL_X64(waitid, SyscallPassthrough5<SYSCALL_DEF(waitid)>);
      REGISTER_SYSCALL_IMPL_X64(pselect6, SyscallPassthrough6<SYSCALL_DEF(pselect6)>);
      REGISTER_SYSCALL_IMPL_X64(ppoll, SyscallPassthrough5<SYSCALL_DEF(ppoll)>);
@@ -264,7 +272,7 @@
      REGISTER_SYSCALL_IMPL_X64(sync_file_range, SyscallPassthrough4<SYSCALL_DEF(sync_file_range)>);
      REGISTER_SYSCALL_IMPL_X64(vmsplice, SyscallPassthrough4<SYSCALL_DEF(vmsplice)>);
      REGISTER_SYSCALL_IMPL_X64(utimensat, SyscallPassthrough4<SYSCALL_DEF(utimensat)>);
-@@ -534,7 +659,13 @@
+@@ -534,7 +663,13 @@
      REGISTER_SYSCALL_IMPL_X32(io_pgetevents_time64, SyscallPassthrough6<SYSCALL_DEF(io_pgetevents)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedsend_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedsend)>);
      REGISTER_SYSCALL_IMPL_X32(mq_timedreceive_time64, SyscallPassthrough5<SYSCALL_DEF(mq_timedreceive)>);
@@ -307,7 +315,7 @@
    return Pathname;
  }
  
-@@ -658,7 +670,122 @@
+@@ -658,7 +670,124 @@
    return true;
  }
  
@@ -324,10 +332,12 @@
 +  return strncmp(pathname, Pci, sizeof(Pci) - 1) == 0 && (pathname[sizeof(Pci) - 1] == '\0' || pathname[sizeof(Pci) - 1] == '/');
 +}
 +
-+// fexdroid: Android has no /tmp, /var/tmp, ... on the host. Files and directories
-+// that guests create under such paths would fail with ENOENT although the RootFS
-+// has them. For an absolute path whose parent is missing on the host but present
-+// in the RootFS, returns the RootFS fd and the relative path to create there.
++// fexdroid: most Android phones have no /tmp, /var/tmp, ... on the host, and where the
++// host has such a directory (/etc everywhere, /tmp on some Android 16 phones) an app
++// cannot write to it. Files and directories that guests create there would fail with
++// ENOENT or EACCES although the RootFS has the directory. For an absolute path whose
++// parent is missing on the host, or is there but not writable, and is present in the
++// RootFS, returns the RootFS fd and the relative path to create there.
 +FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* pathname, FDPathTmpData& Tmp, fextl::string& Rel) const {
 +  constexpr auto NoEntry = EmulatedFDPathResult {-1, nullptr};
 +  if (!pathname || pathname[0] != '/' || RootFSFD == AT_FDCWD) {
@@ -342,9 +352,8 @@
 +    return NoEntry;
 +  }
 +  const fextl::string Parent = Full.substr(0, Slash);
-+  struct stat st;
-+  if (::stat(Parent.c_str(), &st) == 0) {
-+    return NoEntry; // The host has the parent: normal behaviour.
++  if (::access(Parent.c_str(), W_OK | X_OK) == 0) {
++    return NoEntry; // The host has the parent and lets us create things in it: normal behaviour.
 +  }
 +  auto P = GetEmulatedFDPath(AT_FDCWD, Parent.c_str(), true, Tmp);
 +  if (P.FD == -1 || P.FD == AT_FDCWD) {
@@ -356,8 +365,9 @@
 +
 +// fexdroid: bind()/connect() pass AF_UNIX paths to the host verbatim, so a socket under
 +// a guest-only directory (/tmp on Android) fails with ENOENT. A path whose parent is missing
-+// on the host but present in the RootFS is rewritten to that RootFS directory, the same
-+// rule Open/Mkdirat use for files. Both ends of a socket go through here, so they agree.
++// on the host (or not writable there) but present in the RootFS is rewritten to that RootFS
++// directory, the same rule Open/Mkdirat use for files. Both ends of a socket go through
++// here, so they agree.
 +bool FileManager::RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const {
 +  constexpr auto PathOff = offsetof(struct sockaddr_un, sun_path);
 +  if (!Addr || Len <= PathOff || Len > sizeof(Out)) {
@@ -430,7 +440,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
    int fd = -1;
-@@ -672,7 +799,7 @@
+@@ -672,7 +801,7 @@
          .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this
          .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
        };
@@ -439,7 +449,7 @@
  
        if (fd == -1 && errno == EXDEV) {
          // This means a magic symlink (/proc/foo) was involved. In this case we
-@@ -688,7 +815,15 @@
+@@ -688,7 +817,15 @@
  
      ReplaceEmuFd(fd, flags, mode);
    } else {
@@ -456,7 +466,7 @@
    }
  
    return fd;
-@@ -720,6 +855,10 @@
+@@ -720,6 +857,10 @@
  }
  
  uint64_t FileManager::Stat(const char* pathname, void* buf) {
@@ -467,7 +477,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -736,6 +875,10 @@
+@@ -736,6 +877,10 @@
  }
  
  uint64_t FileManager::Lstat(const char* pathname, void* buf) {
@@ -478,7 +488,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -753,6 +896,10 @@
+@@ -753,6 +898,10 @@
  }
  
  uint64_t FileManager::Access(const char* pathname, [[maybe_unused]] int mode) {
@@ -489,7 +499,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -769,6 +916,10 @@
+@@ -769,6 +918,10 @@
  }
  
  uint64_t FileManager::FAccessat(int dirfd, const char* pathname, int mode) {
@@ -500,7 +510,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -785,6 +936,10 @@
+@@ -785,6 +938,10 @@
  }
  
  uint64_t FileManager::FAccessat2(int dirfd, const char* pathname, int mode, int flags) {
@@ -511,7 +521,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -912,6 +1067,10 @@
+@@ -912,6 +1069,10 @@
  }
  
  uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char* pathname, int flags, uint32_t mode) {
@@ -522,7 +532,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -926,7 +1085,7 @@
+@@ -926,7 +1087,7 @@
          .mode = (flags & (O_CREAT | O_TMPFILE)) ? mode & 07777 : 0, // openat2() is stricter about this,
          .resolve = (Path.FD == AT_FDCWD) ? 0u : RESOLVE_IN_ROOT,    // AT_FDCWD means it's a thunk and not via RootFS
        };
@@ -531,7 +541,7 @@
        if (fd == -1 && errno == EXDEV) {
          // This means a magic symlink (/proc/foo) was involved. In this case we
          // just punt and do the access without RESOLVE_IN_ROOT.
-@@ -941,13 +1100,25 @@
+@@ -941,13 +1102,25 @@
  
      ReplaceEmuFd(fd, flags, mode);
    } else {
@@ -558,7 +568,7 @@
    auto NewPath = GetSelf(pathname);
    const char* SelfPath = NewPath ? NewPath->data() : nullptr;
  
-@@ -961,29 +1132,33 @@
+@@ -961,29 +1134,33 @@
        if (Path.FD != AT_FDCWD) {
          how->resolve |= RESOLVE_IN_ROOT;
        }
@@ -596,7 +606,7 @@
    if (IsSelfNoFollow(pathname, flags)) {
      // If we aren't following the symlink for self then we need to return data about the symlink itself.
      // Let's just /actually/ return FEX symlink information in this case.
-@@ -1031,6 +1206,10 @@
+@@ -1031,6 +1208,10 @@
  }
  
  uint64_t FileManager::NewFSStatAt(int dirfd, const char* pathname, struct stat* buf, int flag) {
@@ -607,7 +617,7 @@
    if (IsSelfNoFollow(pathname, flag)) {
      // See Statx
      return ::fstatat(dirfd, pathname, buf, flag);
-@@ -1051,6 +1230,10 @@
+@@ -1051,6 +1232,10 @@
  }
  
  uint64_t FileManager::NewFSStatAt64(int dirfd, const char* pathname, struct stat64* buf, int flag) {

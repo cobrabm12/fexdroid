@@ -66,6 +66,8 @@ replace_entry_points
 # RootFS only for paths that already exist there, so pre-create them (Steam aborts
 # if it cannot create /tmp/dumps).
 for d in dumps dumps01 dumps02 dumps03; do mkdir -p "$FEX_ROOTFS/tmp/$d"; done
+# Steam leaves one such socket behind per start; nothing else runs at this point.
+rm -f "$FEX_ROOTFS"/tmp/steam_chrome_shmem_uid* 2>/dev/null || true
 chmod 1777 "$FEX_ROOTFS/tmp" 2>/dev/null || true
 
 # 4) Environment for the Steam client.
