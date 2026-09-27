@@ -819,3 +819,13 @@ aceleași limite (`scaling_max_freq`), alternate.
   „Ping measurement completed in 3.4s. Relays: 25 valid”, `avail=OK config=OK anyrelay=OK`. Refuzul vine deci de la
   serverul Valve; dacă ține de clientul nostru sau de serviciul lor în acel moment nu se poate spune fără aceeași
   încercare pe un PC, cu același cont.
+- **„Watch” e la Valve:** aceeași eroare apare și pe PC, cu același cont (verificat de utilizator). Urmărirea
+  meciului unui prieten merge.
+- **Meci real (spectator, 10 eroi), Realme GT încins:** 12,3–13,5 cadre/s. Firul principal al jocului stă la
+  94–95% dintr-un nucleu (pe cpu7, nucleul X1), iar nucleele mari sunt limitate la 1,30–1,32 GHz din 2,42–2,84 GHz
+  (carcasa 52 °C); 7 fire `GlobPool` la ~29% fiecare, GPU ocupat 45%. Fără erori de pagină pe firul principal
+  (swap 166 pagini/s în tot sistemul, jocul are 3,5 GB în swap). Apelurile de sistem ale firului principal sunt
+  neglijabile. Deci limita e viteza unui singur nucleu frânat termic, prin emulator; Demo Hero (32–33 cadre/s) nu
+  e reprezentativ pentru un meci.
+- `taskset` pe procesele jocului din `run-as` e refuzat (Permission denied), deci afinitatea se poate încerca doar
+  din aplicație. Planificatorul ține oricum firul principal pe cpu7.
