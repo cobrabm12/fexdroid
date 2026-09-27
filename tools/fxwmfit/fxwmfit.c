@@ -3,7 +3,9 @@
 // phone, so a client that asks for more than the virtual screen (Steam: 1280x800 on a
 // 1280x720 display) is simply cut off. This is not a window manager: it takes no redirect,
 // draws no decorations and leaves override-redirect windows (menus, tooltips) alone. It only
-// moves/resizes normal top-level windows that do not fit.
+// moves/resizes normal top-level windows that do not fit, and gives the whole screen to
+// windows that already take most of it (a client's main window, a game in a window): the
+// virtual screen has the shape of the phone's screen, which clients do not expect.
 //
 // usage: fxwmfit [--once]      (DISPLAY from the environment)
 #include <X11/Xlib.h>
@@ -27,6 +29,11 @@ static void fit(Display* d, Window w, int sw, int sh) {
   int nw = a.width > sw ? sw : a.width;
   int nh = a.height > sh ? sh : a.height;
   int nx = a.x, ny = a.y;
+  if (nw * 10 >= sw * 6 && nh * 10 >= sh * 8) { // Main windows: maximize.
+    nw = sw;
+    nh = sh;
+    nx = ny = 0;
+  }
   if (nx + nw > sw) nx = sw - nw;
   if (ny + nh > sh) ny = sh - nh;
   if (nx < 0) nx = 0;
