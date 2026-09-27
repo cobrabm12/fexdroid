@@ -85,6 +85,7 @@ object GameSession {
     // the text to Compose at most every LOG_PUBLISH_MS, instead of rebuilding a 40 KB
     // string and recomposing on every line (which cost CPU the game needs).
     private const val LOG_MAX_CHARS = 40_000
+    private const val STEAM_LOG_TAIL = 80
     private const val LOG_PUBLISH_MS = 250L
     private val logLines = ArrayDeque<String>()
     private var logChars = 0
@@ -110,7 +111,16 @@ object GameSession {
         appendLine()
         appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
         appendLine("---- session log (last ${LOG_MAX_CHARS / 1000} KB) ----")
-        append(synchronized(logLines) { logLines.joinToString("\n") })
+        appendLine(synchronized(logLines) { logLines.joinToString("\n") })
+        // Steam's own logs: what its updater and client did (no passwords in them).
+        val steamLogs = File(env.home, ".local/share/Steam/logs")
+        for (name in listOf("bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
+            val f = File(steamLogs, name)
+            if (!f.isFile) continue
+            appendLine("---- Steam logs/$name (last $STEAM_LOG_TAIL lines) ----")
+            appendLine(runCatching { f.readLines().takeLast(STEAM_LOG_TAIL).joinToString("\n") }
+                .getOrElse { "cannot read: $it" })
+        }
     }
 
     private fun clearLog() {

@@ -83,6 +83,10 @@ export SDL_VIDEODRIVER=x11
 # Windows larger than the virtual screen would be cut off (tools/fxwmfit); arm64, ends with X.
 [ -x "$FXD_ROOT/usr/bin/fxwmfit" ] && LD_PRELOAD="$FXD_ROOT/usr/lib/fexdroid/libfxpath.so" "$FXD_ROOT/usr/bin/fxwmfit" 2>/dev/null &
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# steam.sh moves its output (and Steam's) to logs/console-linux.txt as soon as its runtime is
+# set up, so the app's log ended at "Steam runtime environment up-to-date!" and said nothing
+# about a Steam that exits right after. Keep it on stdout: the app shows and sends its log.
+export STEAM_RUNTIME_LOGGER=0
 log "starting Steam (FEX) with root $STEAMROOT"
 cd "$STEAMROOT"
 # Debugging: files/strace-steam.txt holds strace options (e.g. "-e trace=bind,connect");
