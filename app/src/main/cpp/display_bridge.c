@@ -43,7 +43,7 @@ struct bridge {
     atomic_bool running;
     int fps;
     atomic_long frames;
-    atomic_long changed;     // frames whose content differs from the one before
+    atomic_long changed;     // frames whose content differs from the one before (= frames shown)
 };
 
 static struct bridge g = { .sock = -1 };
@@ -98,38 +98,43 @@ static void *render_loop(void *arg) {
     const int target = g.fps > 0 ? g.fps : 30;
     const long frame_ns = 1000000000L / target;
     uint32_t last_sum = 0;
-    long logged = 0;
+    bool shown = false;
+    long looks = 0, logged = 0;
     while (atomic_load(&g.running)) {
         struct timespec t0;
         clock_gettime(CLOCK_MONOTONIC, &t0);
+        // Look first, copy only what is new: a game at 25 frames/s costs 25 copies a second
+        // whatever the rate here is, and a still screen costs none.
+        uint32_t sum = 0;
+        for (uint32_t y = 0; y < ht; y++) {
+            const uint32_t *src = (const uint32_t *)(g.seg + off + (size_t)y * stride);
+            uint32_t row = 0;
+            for (uint32_t x = 0; x < w; x++) row += src[x];
+            sum = sum * 31 + row;
+        }
         ANativeWindow_Buffer buf;
-        if (ANativeWindow_lock(g.win, &buf, NULL) == 0) {
+        if ((!shown || sum != last_sum) && ANativeWindow_lock(g.win, &buf, NULL) == 0) {
             uint32_t rows = (uint32_t)buf.height < ht ? (uint32_t)buf.height : ht;
             uint32_t cols = (uint32_t)buf.width < w ? (uint32_t)buf.width : w;
-            uint32_t sum = 0;
             for (uint32_t y = 0; y < rows; y++) {
                 const uint32_t *src = (const uint32_t *)(g.seg + off + (size_t)y * stride);
                 uint32_t *dst = (uint32_t *)buf.bits + (size_t)y * (size_t)buf.stride;
-                uint32_t row = 0;
                 // X server memory is B,G,R,X; the window wants R,G,B,X: swap R and B.
                 for (uint32_t x = 0; x < cols; x++) {
                     uint32_t p = src[x];
                     dst[x] = (p & 0xff00ff00u) | ((p & 0xffu) << 16) | ((p >> 16) & 0xffu) | 0xff000000u;
-                    row += p;
                 }
-                sum = sum * 31 + row;
             }
             ANativeWindow_unlockAndPost(g.win);
             atomic_fetch_add(&g.frames, 1);
-            // What the game really draws: the copy above runs at a fixed rate either way.
-            if (sum != last_sum) atomic_fetch_add(&g.changed, 1);
+            atomic_fetch_add(&g.changed, 1);
             last_sum = sum;
-            long n = atomic_load(&g.frames);
-            if (n % (10L * target) == 0) {
-                long c = atomic_load(&g.changed);
-                LOGI("last %ld frames copied: %ld had new content", 10L * target, c - logged);
-                logged = c;
-            }
+            shown = true;
+        }
+        if (++looks % (10L * target) == 0) {
+            long c = atomic_load(&g.changed);
+            LOGI("last %ld frames looked at: %ld had new content", 10L * target, c - logged);
+            logged = c;
         }
         struct timespec t1;
         clock_gettime(CLOCK_MONOTONIC, &t1);
