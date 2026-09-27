@@ -303,6 +303,7 @@ private fun EndPanel(title: String, message: String, game: Game, onLog: () -> Un
         }
         Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite jurnalul") }
             TextButton(onClick = onLog) { Text("Vezi jurnal") }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = { GameSession.stop() }) { Text("Închide") }
@@ -337,6 +338,7 @@ private fun PanelCard(content: @Composable () -> Unit) {
 
 @Composable
 private fun LogPanel(onClose: () -> Unit) {
+    val ctx = LocalContext.current
     val scroll = rememberScrollState()
     val log = GameSession.log
     LaunchedEffect(log) { scroll.scrollTo(scroll.maxValue) }
@@ -344,11 +346,24 @@ private fun LogPanel(onClose: () -> Unit) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Jurnal", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite") }
                 IconButton(onClick = onClose) { Icon(AppIcons.Close, "Închide") }
             }
             SelectionContainer(Modifier.fillMaxSize().verticalScroll(scroll).horizontalScroll(rememberScrollState())) {
                 Text(log.ifEmpty { "(gol)" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
             }
         }
+    }
+}
+
+/**
+ * The session log with what a developer needs to read it (app and payload version, device
+ * checks), through Android's share sheet: testers are not next to a PC with adb.
+ */
+private fun shareSessionReport(ctx: android.content.Context) {
+    val activity = ctx as? MainActivity ?: return
+    kotlin.concurrent.thread(name = "session-report") { // The device checks read files.
+        val text = GameSession.report(ctx)
+        activity.runOnUiThread { activity.share(text, "fexdroid: jurnal") }
     }
 }

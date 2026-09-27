@@ -97,6 +97,22 @@ object GameSession {
         }
     }
 
+    /** Everything a developer needs from a tester after a failed start, as text. */
+    fun report(ctx: Context): String = buildString {
+        val env = LinuxEnv(ctx)
+        val pkg = runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0) }.getOrNull()
+        appendLine("fexdroid ${pkg?.versionName} (${pkg?.longVersionCode})")
+        appendLine("payload: installed ${env.installedVersion()}, in APK ${env.payloadVersion()}")
+        val soc = if (android.os.Build.VERSION.SDK_INT >= 31) android.os.Build.SOC_MODEL else android.os.Build.HARDWARE
+        appendLine("device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, " +
+            "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}), $soc")
+        appendLine("screen: ${resolution.label}, state: $state")
+        appendLine()
+        appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
+        appendLine("---- session log (last ${LOG_MAX_CHARS / 1000} KB) ----")
+        append(synchronized(logLines) { logLines.joinToString("\n") })
+    }
+
     private fun clearLog() {
         synchronized(logLines) { logLines.clear(); logChars = 0 }
         log = ""
