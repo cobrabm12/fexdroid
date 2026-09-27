@@ -143,8 +143,8 @@ object GameSession {
             Triple("arm64 sh", listOf("${env.root}/bin/sh", "-c", "uname -a"), null),
             // The test programs are in the base tree only; Steam's tree has the 32-bit libraries.
             Triple("FEX hello (x86_64)", listOf(fex, "$tests/hello-dynamic"), env.x86Base),
-            Triple("FEX SysV semaphores (x86_64)", listOf(fex, "$tests/semtest"), env.x86Base),
-            Triple("FEX SysV semaphores (i386, as Steam's client)", listOf(fex, "$tests/semtest-i386"), env.x86Steam),
+            Triple("FEX SysV semaphores (x86_64)", listOf(fex, "$tests/semtest", "all"), env.x86Base),
+            Triple("FEX SysV semaphores (i386, as Steam's client)", listOf(fex, "$tests/semtest-i386", "all"), env.x86Steam),
             Triple("vulkaninfo arm64", listOf("${env.root}/usr/bin/vulkaninfo", "--summary"), null),
             Triple("vulkaninfo x86_64 through FEX", listOf(fex, "${env.x86Root}/usr/bin/vulkaninfo", "--summary"), null),
         )
