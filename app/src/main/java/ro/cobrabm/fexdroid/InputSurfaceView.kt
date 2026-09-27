@@ -15,13 +15,28 @@ import android.view.inputmethod.InputConnection
  * SurfaceView showing the X screen that also forwards input to it (PLAN.md phase 4):
  * - hardware keyboard -> X key events (evdev scancodes);
  * - mouse (Bluetooth / DeX): absolute hover + buttons + wheel, or relative when captured;
- * - touch: one finger = left button drag, two-finger tap = right click.
+ * - touch, as on any touchscreen: tap = left click, swipe = scroll (wheel), long press then
+ *   move = left button drag (selection boxes, sliders), two-finger tap = right click.
  * Ctrl+Alt releases a captured mouse.
  */
 class InputSurfaceView(context: Context, private val xWidth: Int, private val xHeight: Int) : SurfaceView(context) {
+    private companion object { const val WHEEL_STEP_X = 40f }
+
     var inputEnabled = false
-    private var touchLeftDown = false
-    private var twoFingerTap = false
+    private enum class Touch { NONE, PENDING, SCROLL, DRAG, RIGHT_CLICK }
+    private var touch = Touch.NONE
+    private var lastX = 0f
+    private var lastY = 0f
+    private var scrollX = 0f
+    private var scrollY = 0f
+    private val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+    private val longPress = Runnable {
+        if (touch == Touch.PENDING) {
+            touch = Touch.DRAG
+            XInput.button(1, true)
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        }
+    }
     private var ctrlDown = false
     private var altDown = false
 
@@ -48,9 +63,23 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
     private fun scroll(e: MotionEvent) {
         val v = e.getAxisValue(MotionEvent.AXIS_VSCROLL)
         val h = e.getAxisValue(MotionEvent.AXIS_HSCROLL)
-        fun click(b: Int) { XInput.button(b, true); XInput.button(b, false) }
         if (v > 0) click(4) else if (v < 0) click(5)
         if (h > 0) click(7) else if (h < 0) click(6)
+    }
+
+    private fun click(b: Int) { XInput.button(b, true); XInput.button(b, false) }
+
+    /** One wheel step per [WHEEL_STEP_X] X pixels of finger travel; content follows the finger. */
+    private fun touchScroll(e: MotionEvent) {
+        val stepX = WHEEL_STEP_X * width.coerceAtLeast(1) / xWidth.toFloat()
+        val stepY = WHEEL_STEP_X * height.coerceAtLeast(1) / xHeight.toFloat()
+        scrollX += e.x - lastX
+        scrollY += e.y - lastY
+        lastX = e.x; lastY = e.y
+        while (scrollY <= -stepY) { click(5); scrollY += stepY }
+        while (scrollY >= stepY) { click(4); scrollY -= stepY }
+        while (scrollX <= -stepX) { click(7); scrollX += stepX }
+        while (scrollX >= stepX) { click(6); scrollX -= stepX }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -60,28 +89,38 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
         requestFocus()
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                twoFingerTap = false
                 val (x, y) = toX(e.x, e.y)
-                XInput.moveTo(x, y)
-                XInput.button(1, true)
-                touchLeftDown = true
+                XInput.moveTo(x, y) // The wheel and the click go to what is under the finger.
+                touch = Touch.PENDING
+                lastX = e.x; lastY = e.y
+                scrollX = 0f; scrollY = 0f
+                postDelayed(longPress, android.view.ViewConfiguration.getLongPressTimeout().toLong())
             }
             MotionEvent.ACTION_POINTER_DOWN -> if (e.pointerCount == 2) {
-                // Second finger: turn the gesture into a right click.
-                if (touchLeftDown) { XInput.button(1, false); touchLeftDown = false }
-                twoFingerTap = true
+                removeCallbacks(longPress)
+                if (touch == Touch.DRAG) XInput.button(1, false)
+                touch = Touch.RIGHT_CLICK
             }
-            MotionEvent.ACTION_MOVE -> if (!twoFingerTap) {
-                val (x, y) = toX(e.x, e.y)
-                XInput.moveTo(x, y)
+            MotionEvent.ACTION_MOVE -> when (touch) {
+                Touch.PENDING -> if (kotlin.math.hypot(e.x - lastX, e.y - lastY) > slop) {
+                    removeCallbacks(longPress)
+                    touch = Touch.SCROLL
+                    touchScroll(e)
+                }
+                Touch.SCROLL -> touchScroll(e)
+                Touch.DRAG -> { val (x, y) = toX(e.x, e.y); XInput.moveTo(x, y) }
+                else -> {}
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (touchLeftDown) XInput.button(1, false)
-                if (twoFingerTap && e.actionMasked == MotionEvent.ACTION_UP) {
-                    XInput.button(3, true); XInput.button(3, false)
+                removeCallbacks(longPress)
+                val up = e.actionMasked == MotionEvent.ACTION_UP
+                when (touch) {
+                    Touch.PENDING -> if (up) click(1)
+                    Touch.DRAG -> XInput.button(1, false)
+                    Touch.RIGHT_CLICK -> if (up) click(3)
+                    else -> {}
                 }
-                touchLeftDown = false
-                twoFingerTap = false
+                touch = Touch.NONE
             }
         }
         return true
