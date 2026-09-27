@@ -799,3 +799,7 @@ aceleași limite (`scaling_max_freq`), alternate.
   din linia de comandă.
 - În timpul măsurătorilor Steam a instalat o actualizare Dota de 2,2 GB (descărcare 4 min, apoi „Validating”,
   ~10 min): jocul nu se poate porni până nu termină.
+- **Toate la un loc** (build-ul publicat): Demo Hero 31,8–33,3 cadre/s cu nucleele mari limitate la 1,3 GHz, față
+  de 26,3 la aceleași limite înainte (+23%) și 13–14 în pornirile fără focus. Meniul principal: 22 (era 17–18).
+  Sunet: 600 s redate, o pauză de ieșire, 11 găuri (în timpul încărcărilor); 90 s de meniu fără nicio gaură nouă,
+  deși `snd_mixahead` e tot 0.001. Nu am o măsurătoare „înainte” pentru sunet: contoarele sunt noi.
