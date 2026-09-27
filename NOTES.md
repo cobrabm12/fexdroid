@@ -730,3 +730,33 @@ Steam folosește doar un director de dump-uri creat de el; pe Realme GT aceeași
 - **Confirmat pe S26 Ultra (relatat de tester, 2026-09-27 ~20:00):** cu build-ul `e5d979c`, apoi cu `8afd73e`
   (reinstalat, cheia stabilă), Steam pornește, se autentifică și instalează Dota 2. Primul telefon cu Adreno 840 și
   Android 16 pe care rulează clientul Steam. Nemăsurat încă: pornirea jocului, cadre pe secundă, `vkcube` x86.
+
+## N-034 · Jocul fără focus se frânează singur: de la 13 la 26 de cadre/s  ✅ (Realme GT, 2026-09-27)
+Aceeași scenă (Dota 2, Demo Hero, 1600×720) dădea de la o pornire la alta fie ~13, fie ~26 de cadre/s. Șapte
+porniri: patru lente (11–15), trei rapide (25–27), fără legătură cu reglajele încercate.
+- **Cauza:** nu există manager de ferestre, deci nimeni nu dă focusul ferestrei care se deschide. În pornirile
+  rapide `XGetInputFocus` întoarce fereastra „Dota 2”; în cele lente întoarce fereastra rădăcină (0x21f). Fără
+  focus motorul Source 2 se frânează (la noi fără `sleep` vizibil în `strace`: firul principal rămâne la ~78%).
+- **Dovada:** într-o pornire lentă (14,1 cadre/s) am dat focusul ferestrei jocului, fără să repornesc nimic:
+  25,5–26,8 cadre/s, stabil.
+- **Reparația:** `fxwmfit` dă focusul ferestrei normale de deasupra (o dată pe secundă și la fiecare fereastră nouă),
+  dacă nu îl are deja ea sau o subfereastră a ei; scrie și `_NET_ACTIVE_WINDOW`. `fxwmfit --focus-info` doar citește.
+- **Am anunțat greșit un câștig:** prima pornire cu `TU_DEBUG=sysmem` a fost una rapidă (25–26) după una lentă (13–14)
+  și am pus diferența pe seama reglajului. Repetată, a dat 11–14. Un reglaj se judecă pe mai multe porniri.
+- **Ce limitează după reparație:** firul principal al jocului stă la 96–97% dintr-un nucleu, iar nucleele mari merg
+  la 0,85–1,3 GHz din 2,4–2,8 GHz (limitare termică; carcasa 52 °C). GPU ocupat 55%. Deci procesorul, prin
+  emulator, pe un telefon încins.
+- **Fără TSO (profilul „Rapid”) Dota rămâne blocat** la ecranul de încărcare, cu firele în așteptare (o încercare).
+- **Detectarea de controllere la fiecare al doilea cadru:** SDL3 din joc încarcă `libudev.so.1`, citește
+  `/proc/self/mountinfo` (34 KB pe Android), cere un socket `NETLINK_KOBJECT_UEVENT`, primește EACCES, descarcă
+  biblioteca și o ia de la capăt: ~300 de apeluri de sistem de fiecare dată, ~13 pe secundă. Nu o opresc
+  `SDL_JOYSTICK_DISABLE_UDEV=1`, `SDL_HIDAPI_UDEV=0` și nici `/run/host/container-manager` în mediul jocului.
+  De făcut: un socket uevent de formă în FEX, ca inițializarea să reușească o dată. Costul nu e măsurat.
+- `DisableL2Cache=0` + `DynamicL1Cache=0` (FEX): o singură pornire, lentă; neconcludent.
+- **Cum rulează Valve Half-Life: Alyx pe Steam Frame:** nu prin emulator. Actualizarea din 14 septembrie 2026 a adus
+  un build nativ ARM64, cu randare foveată și reproiecție. Jocurile x86 trec prin Proton + FEX, cu 10–20% cost
+  declarat; la jocurile Windows FEX poate folosi „volatile metadata” din fișierele PE ca să emuleze ordinea
+  memoriei x86 (TSO) doar unde trebuie. Dota 2 nu are build ARM64, iar build-ul lui de Linux nu are acele metadate.
+- Raportul din aplicație are acum un instantaneu de performanță (cadre, procese, fire, GPU, frecvențe,
+  temperaturi, memorie, focus) și ultimele rânduri din `content_log.txt`. `_v2-entry-point` citește
+  `files/session-env.txt` la fiecare program pornit, deci un reglaj se poate schimba fără repornirea lui Steam.
