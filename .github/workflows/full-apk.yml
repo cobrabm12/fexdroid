@@ -149,3 +149,8 @@ jobs:
             gh release create apk-latest --target "$GITHUB_SHA" --prerelease --title "fexdroid APK (latest build)" \
               --notes "Full APK with the Linux payload, built by the Full APK workflow. Install fexdroid-legacy.apk."
           gh release upload apk-latest --clobber fexdroid-legacy.apk
+          # For the in-app updater (Updater.kt): uploaded after the APK it describes.
+          printf '{"sha":"%s","built":"%s","size":%s,"sha256":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "$(stat -c %s fexdroid-legacy.apk)" "$(sha256sum fexdroid-legacy.apk | cut -d' ' -f1)" > fexdroid-legacy.json
+          cat fexdroid-legacy.json
+          gh release upload apk-latest --clobber fexdroid-legacy.json

@@ -7,6 +7,11 @@ plugins {
 // Kept outside the source tree; see PLAN.md.
 val payloadDir = rootProject.layout.projectDirectory.dir("build/payload")
 
+// The commit this APK is built from: the in-app updater compares it with the published build's.
+val gitSha: String = providers.environmentVariable("GITHUB_SHA").orElse(
+    providers.exec { commandLine("git", "rev-parse", "HEAD") }.standardOutput.asText.map { it.trim() }
+).get()
+
 android {
     namespace = "ro.cobrabm.fexdroid"
     compileSdk = 37
@@ -21,6 +26,7 @@ android {
         versionName = "0.2.0"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
     }
 
     // Two flavors so the recon screen can measure what each targetSdk allows (PLAN.md D2).
@@ -60,7 +66,7 @@ android {
     // Executables shipped as lib*.so must be extracted to nativeLibraryDir to be exec'able.
     packaging { jniLibs { useLegacyPackaging = true } }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

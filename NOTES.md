@@ -675,3 +675,27 @@ Măsurat cu `strace -T` pe firul `VKRenderThread` (strace din rootfs, pornit cu 
   (500 KB în total), deci lucrătorii sunt reporniți des; cauza nu e cunoscută. Pe telefon e de sărit (Skip) sau
   de oprit din Steam › Settings › Downloads. Shaderele compilate în timpul jocului rămân oricum în cache-ul Mesa
   (`shadercache/570/mesa_shader_cache_sf`).
+
+## N-032 · Teste la distanță: raport din aplicație, actualizare din aplicație  🟨 (2026-09-27)
+Un tester cu Galaxy S26 Ultra (SM-S948B, SM8850, Adreno 840, Android 16, kernel 6.12) nu are PC cu adb.
+- **Raport** („Trimite” pe Acasă, „Trimite jurnalul” pe ecranul de eroare și în jurnal): versiune + commit, telefon,
+  jurnalul sesiunii, ultimele rânduri din jurnalele lui Steam, șase teste automate (sh arm64, FEX hello, semafoare
+  SysV x86_64 și i386, vulkaninfo arm64 și prin FEX), verificările de compatibilitate. Se scrie și în
+  `<external files>/report.txt`. Partea utilă e la început: un raport a ajuns tăiat pe drum.
+- **`steam.sh` întoarce 0 orice ar păți Steam** (ultima comandă e testul de repornire), iar de la
+  „Steam runtime environment up-to-date!” își mută ieșirea în `logs/console-linux.txt` (srt-logger). De aceea
+  aplicația arăta „Programul s-a încheiat normal” și un jurnal fără nimic util. `STEAM_RUNTIME_LOGGER=0` ține
+  ieșirea în jurnalul aplicației.
+- **Testele „FEX static/dinamic” dădeau „command not found”** pe orice telefon cu bibliotecile Steam instalate:
+  programele de test sunt doar în arborele x86 de bază, iar FEX rula în arborele Steam.
+- **Actualizare din aplicație** (`Updater.kt`): release-ul `apk-latest` are lângă APK `fexdroid-legacy.json`
+  (commit, dată, mărime, SHA-256). Alt commit decât al aplicației = versiune nouă. APK-ul se descarcă direct
+  într-o sesiune `PackageInstaller`, se verifică SHA-256, Android cere confirmarea. `files/update-url.txt` schimbă
+  adresa (teste cu fișiere locale).
+- **S26 Ultra, ce știm:** FEX hello și `vulkaninfo` prin FEX merg, Turnip recunoaște Adreno 840; Steam se închide
+  imediat după pornire, `vkcube` x86 nu apare. Într-un raport testul de semafoare x86_64 a avut 5 eșecuri
+  (`semtimedop` întors după 35 ms cu EIDRM), cel i386 a trecut: posibil două rapoarte pornite deodată (acum
+  exclus), de reverificat. Cauza opririi lui Steam: necunoscută până la un raport complet.
+- Simularea procesorului pe PC (qemu-user, `-cpu max`: SVE, SME, PAC, BTI) nu a fost concludentă: FEX hello a
+  crăpat diferit de la o rulare la alta, iar un program i386 a rămas blocat minute întregi. Pe telefonul real FEX
+  hello merge, deci comportamentul ține de qemu.
