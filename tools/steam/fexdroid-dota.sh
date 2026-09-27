@@ -23,6 +23,8 @@ export SDL_VIDEODRIVER=x11
 # RootFS; the arm64 rootfs paths from the app environment would make `env`, `bash`
 # etc. resolve to native binaries, which FEX then runs natively (and their x86
 # children fail with "Exec format error").
+# Windows larger than the virtual screen would be cut off (tools/fxwmfit); arm64, ends with X.
+[ -x "$FXD_ROOT/usr/bin/fxwmfit" ] && LD_PRELOAD="$FXD_ROOT/usr/lib/fexdroid/libfxpath.so" "$FXD_ROOT/usr/bin/fxwmfit" 2>/dev/null &
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 echo "[fexdroid-dota] rootfs $tree"
 cd "$GAME"

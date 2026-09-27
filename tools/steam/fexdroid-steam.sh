@@ -28,7 +28,9 @@ if [ ! -x "$STEAMROOT/steam.sh" ]; then
     tar -C "$tmp" -xzf "$tmp/steam.tar.gz"
     boot=$(find "$tmp" -name 'bootstraplinux_ubuntu12_32.tar.xz' | head -n1)
     [ -n "$boot" ] || { log "bootstrap archive not found in download"; exit 1; }
-    "$FEX" "$FEX_ROOTFS/usr/bin/tar" -C "$STEAMROOT" -xJf "$boot"
+    # The x86 tar execs xz through PATH: give it the guest prefixes (FEX maps them into
+    # the x86 rootfs), not the arm64 PATH this script runs with up to here.
+    PATH=/usr/bin:/bin "$FEX" "$FEX_ROOTFS/usr/bin/tar" -C "$STEAMROOT" -xJf "$boot"
     rm -rf "$tmp"
 fi
 
@@ -43,17 +45,22 @@ fi
 ln -sfn "$STEAMROOT" "$HOME/.steam/root"
 ln -sfn "$STEAMROOT" "$HOME/.steam/steam"
 
-# 3) No containers: games' runtimes get the pass-through entry point too.
-for rt in "$LIB"/steamapps/common/SteamLinuxRuntime*; do
-    [ -d "$rt" ] || continue
-    ep="$rt/_v2-entry-point"
-    if [ -f "$ep" ] && ! cmp -s "$ep" "$SHIM_DIR/_v2-entry-point"; then
-        [ -f "$ep.valve" ] || mv "$ep" "$ep.valve"
-        cp "$SHIM_DIR/_v2-entry-point" "$ep"
-        chmod 755 "$ep"
-        log "container entry point replaced in $(basename "$rt")"
-    fi
-done
+# 3) No containers: games' runtimes get the pass-through entry point too. Steam installs
+# and updates these runtimes while it runs, so keep checking in the background.
+replace_entry_points() {
+    for rt in "$LIB"/steamapps/common/SteamLinuxRuntime*; do
+        [ -d "$rt" ] || continue
+        ep="$rt/_v2-entry-point"
+        if [ -f "$ep" ] && ! cmp -s "$ep" "$SHIM_DIR/_v2-entry-point"; then
+            [ -f "$ep.valve" ] || mv "$ep" "$ep.valve"
+            cp "$SHIM_DIR/_v2-entry-point" "$ep"
+            chmod 755 "$ep"
+            log "container entry point replaced in $(basename "$rt")"
+        fi
+    done
+}
+replace_entry_points
+( while sleep 5; do replace_entry_points; done ) &
 
 # 3b) Paths Steam creates under /tmp with absolute names. FEX overlays the x86
 # RootFS only for paths that already exist there, so pre-create them (Steam aborts
@@ -73,12 +80,21 @@ export SDL_VIDEODRIVER=x11
 # RootFS; the arm64 rootfs paths from the app environment would make `env`, `bash`
 # etc. resolve to native binaries, which FEX then runs natively (and their x86
 # children fail with "Exec format error").
+# Windows larger than the virtual screen would be cut off (tools/fxwmfit); arm64, ends with X.
+[ -x "$FXD_ROOT/usr/bin/fxwmfit" ] && LD_PRELOAD="$FXD_ROOT/usr/lib/fexdroid/libfxpath.so" "$FXD_ROOT/usr/bin/fxwmfit" 2>/dev/null &
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 log "starting Steam (FEX) with root $STEAMROOT"
 cd "$STEAMROOT"
 # Debugging: files/strace-steam.txt holds strace options (e.g. "-e trace=bind,connect");
 # the trace of every process goes to files/steam.strace.
-set -- -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing -noverifyfiles "$@"
+set -- -no-cef-sandbox -cef-disable-gpu -cef-disable-gpu-compositing "$@"
+# -noverifyfiles skips the slow file check under FEX, but on a fresh bootstrap it also skips
+# the download of the client itself ("Verification skipped", then steamui.so is missing).
+if [ -f "$STEAMROOT/ubuntu12_32/steamui.so" ]; then
+  set -- -noverifyfiles "$@"
+else
+  log "first start: Steam downloads its client now (about 1.5 GB, slow under FEX)"
+fi
 # Extra Steam options, one line (e.g. "-cef-enable-debugging"), like dota-launch-options.txt.
 if [ -f "$FXD_FILES/steam-launch-options.txt" ]; then
   # shellcheck disable=SC2046

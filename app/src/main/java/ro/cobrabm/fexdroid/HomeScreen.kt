@@ -174,8 +174,11 @@ private fun StatusCard(s: InstallStatus?, env: LinuxEnv) {
             StatusRow(if (s.steamClient) Level.OK else Level.INFO, "Client Steam",
                 if (s.steamClient) "Prezent" else "Se descarcă la prima pornire a Steam")
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+            StatusRow(if (s.gameRootfs) Level.OK else Level.INFO, "Mediul jocurilor",
+                if (s.gameRootfs) "Pregătit" else "Se pregătește singur după ce Steam descarcă runtime-ul")
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             StatusRow(if (s.dota) Level.OK else Level.INFO, "Dota 2",
-                if (s.dota) "Instalat" else "Neinstalat")
+                if (s.dota) "Instalat" else "Neinstalat — se instalează din Steam")
         }
     }
 }
