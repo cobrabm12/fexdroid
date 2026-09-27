@@ -59,4 +59,12 @@ case "$here" in
         fi
         ;;
 esac
+# Extra launch options for one game, like Steam's "Launch Options": one line in
+# files/launch-options-<app id>.txt (written by the app from its settings, or by hand).
+if [ -n "${SteamAppId:-}" ] && [ -n "${FXD_FILES:-}" ] && [ -f "$FXD_FILES/launch-options-$SteamAppId.txt" ]; then
+    case "$here" in
+        # shellcheck disable=SC2046
+        */SteamLinuxRuntime_*) set -- "$@" $(cat "$FXD_FILES/launch-options-$SteamAppId.txt") ;;
+    esac
+fi
 exec "$@"

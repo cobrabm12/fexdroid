@@ -35,6 +35,9 @@ class XSession(
         // waits for the third tick: 20 frames/s instead of 28. Relaxed FIFO shows a late frame
         // at once and still stops at 60.
         "MESA_VK_WSI_PRESENT_MODE" to "relaxed",
+        // Programs ask PulseAudio for buffers of a few milliseconds; under the emulator their
+        // sound threads are late more often than that. libpulse takes this over their request.
+        "PULSE_LATENCY_MSEC" to "60",
     ) + extraEnv()
 
     /** Optional KEY=VALUE lines in files/session-env.txt, for experiments (TU_DEBUG, ...). */
