@@ -86,12 +86,7 @@ class XSession(
             "-L", "module-pipe-sink file=$audioFifo sink_name=android format=s16le rate=48000 channels=2",
             "-L", "module-native-protocol-unix auth-anonymous=1 socket=$pulseSocket",
         ).redirectErrorStream(true)
-        pb.environment().apply {
-            clear(); putAll(env.environment()); put("LD_PRELOAD", preload)
-            // GLX: Xvfb dlopen()s swrast from its built-in /usr path, which ld.so opens
-            // directly (no fxpath). Only for Xvfb: x86 clients must keep their own Mesa.
-            put("LIBGL_DRIVERS_PATH", "${env.root}/usr/lib/aarch64-linux-gnu/dri")
-        }
+        pb.environment().apply { clear(); putAll(env.environment()); put("LD_PRELOAD", preload) }
         val p = pb.start()
         pulse = p
         thread(name = "pulse-log", isDaemon = true) {

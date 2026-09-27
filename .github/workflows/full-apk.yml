@@ -7,7 +7,7 @@ name: Full APK (with Linux payload)
 on:
   workflow_dispatch:
   push:
-    branches: ['claude/**']
+    branches: [main, 'claude/**']
     paths:
       - 'scripts/**'
       - 'patches/**'

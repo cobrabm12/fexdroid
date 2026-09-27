@@ -7,7 +7,7 @@ name: Steam rootfs release
 on:
   workflow_dispatch:
   push:
-    branches: ['claude/**']
+    branches: [main, 'claude/**']
     paths:
       - 'scripts/build-rootfs-steam.sh'
       - 'scripts/lib/relativize-symlinks.py'

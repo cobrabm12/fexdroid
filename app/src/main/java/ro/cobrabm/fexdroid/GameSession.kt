@@ -139,6 +139,9 @@ object GameSession {
                     return@thread fail("Dota 2 nu este instalat pe telefon. Vezi Setări › Instalare jocuri.")
                 if (!env.ensureInstalled(::append))
                     return@thread fail(env.pathProblem() ?: "Mediul Linux nu a putut fi instalat.")
+                // TCP owner records from the previous session (patches/fex AndroidTcpRegistry.h):
+                // fxlsof only prunes them when Steam asks, so they would pile up across sessions.
+                File(env.root, "usr/share/fex-emu/fexdroid-tcp").deleteRecursively()
                 runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache) }
                     .onSuccess { append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}") }
                     .onFailure { append("FEX: nu pot scrie Config.json: $it") }
