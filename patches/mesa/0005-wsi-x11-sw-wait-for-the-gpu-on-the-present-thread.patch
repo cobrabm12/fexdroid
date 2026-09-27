@@ -12,7 +12,7 @@ The X11 backend already has a present thread that can wait for fences (it
 does for MAILBOX). Let it do so for software presents and skip the wait in
 the caller.
 
-Local patch, not upstream (see NOTES.md N-031).
+Local patch, not upstream (NOTES.md N-031, N-035: +8% in Dota 2 on an Adreno 660).
 ---
 --- a/src/vulkan/wsi/wsi_common.c
 +++ b/src/vulkan/wsi/wsi_common.c

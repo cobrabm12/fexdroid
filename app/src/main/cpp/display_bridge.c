@@ -48,6 +48,8 @@ struct bridge {
 
 static struct bridge g = { .sock = -1 };
 
+#define LOOK_STEP 8
+
 static uint32_t be32(const uint8_t *p) {
     return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3];
 }
@@ -97,38 +99,51 @@ static void *render_loop(void *arg) {
     ANativeWindow_setBuffersGeometry(g.win, (int32_t)w, (int32_t)ht, AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM);
     const int target = g.fps > 0 ? g.fps : 30;
     const long frame_ns = 1000000000L / target;
-    uint32_t last_sum = 0;
+    uint32_t last_sum[LOOK_STEP] = {0};
+    uint32_t phase = 0;
     bool shown = false;
     long looks = 0, logged = 0;
     while (atomic_load(&g.running)) {
         struct timespec t0;
         clock_gettime(CLOCK_MONOTONIC, &t0);
         // Look first, copy only what is new: a game at 25 frames/s costs 25 copies a second
-        // whatever the rate here is, and a still screen costs none.
+        // whatever the rate here is, and a still screen costs none. Looking reads one row in
+        // LOOK_STEP, a different one every time, so a change anywhere is seen within
+        // LOOK_STEP looks; a game redraws most rows with every frame.
         uint32_t sum = 0;
-        for (uint32_t y = 0; y < ht; y++) {
+        for (uint32_t y = phase; y < ht; y += LOOK_STEP) {
             const uint32_t *src = (const uint32_t *)(g.seg + off + (size_t)y * stride);
             uint32_t row = 0;
             for (uint32_t x = 0; x < w; x++) row += src[x];
             sum = sum * 31 + row;
         }
+        const bool changed = !shown || sum != last_sum[phase];
+        phase = (phase + 1) % LOOK_STEP;
         ANativeWindow_Buffer buf;
-        if ((!shown || sum != last_sum) && ANativeWindow_lock(g.win, &buf, NULL) == 0) {
+        if (changed && ANativeWindow_lock(g.win, &buf, NULL) == 0) {
             uint32_t rows = (uint32_t)buf.height < ht ? (uint32_t)buf.height : ht;
             uint32_t cols = (uint32_t)buf.width < w ? (uint32_t)buf.width : w;
-            for (uint32_t y = 0; y < rows; y++) {
+            // The sums of what is copied, for every phase: the next looks compare with the
+            // frame on the screen, not with what was there LOOK_STEP looks ago.
+            memset(last_sum, 0, sizeof last_sum);
+            for (uint32_t y = 0; y < ht; y++) {
                 const uint32_t *src = (const uint32_t *)(g.seg + off + (size_t)y * stride);
-                uint32_t *dst = (uint32_t *)buf.bits + (size_t)y * (size_t)buf.stride;
-                // X server memory is B,G,R,X; the window wants R,G,B,X: swap R and B.
-                for (uint32_t x = 0; x < cols; x++) {
-                    uint32_t p = src[x];
-                    dst[x] = (p & 0xff00ff00u) | ((p & 0xffu) << 16) | ((p >> 16) & 0xffu) | 0xff000000u;
+                uint32_t row = 0, x = 0;
+                if (y < rows) {
+                    uint32_t *dst = (uint32_t *)buf.bits + (size_t)y * (size_t)buf.stride;
+                    // X server memory is B,G,R,X; the window wants R,G,B,X: swap R and B.
+                    for (; x < cols; x++) {
+                        uint32_t p = src[x];
+                        dst[x] = (p & 0xff00ff00u) | ((p & 0xffu) << 16) | ((p >> 16) & 0xffu) | 0xff000000u;
+                        row += p;
+                    }
                 }
+                for (; x < w; x++) row += src[x];
+                last_sum[y % LOOK_STEP] = last_sum[y % LOOK_STEP] * 31 + row;
             }
             ANativeWindow_unlockAndPost(g.win);
             atomic_fetch_add(&g.frames, 1);
             atomic_fetch_add(&g.changed, 1);
-            last_sum = sum;
             shown = true;
         }
         if (++looks % (10L * target) == 0) {

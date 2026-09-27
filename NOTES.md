@@ -760,3 +760,46 @@ porniri: patru lente (11–15), trei rapide (25–27), fără legătură cu regl
 - Raportul din aplicație are acum un instantaneu de performanță (cadre, procese, fire, GPU, frecvențe,
   temperaturi, memorie, focus) și ultimele rânduri din `content_log.txt`. `_v2-entry-point` citește
   `files/session-env.txt` la fiecare program pornit, deci un reglaj se poate schimba fără repornirea lui Steam.
+
+## N-035 · Optimizări măsurate: ce ajută și ce nu  🟨 (Realme GT, 2026-09-27/28)
+Scena de măsură: Dota 2 › Demo Hero, 1600×720, setările alese de joc. Cadrele vin din puntea de afișare
+(`fexdroid-display`), trei ferestre de câte 10 s. **Temperatura contează cel mai mult:** aceeași versiune dă
+31 de cadre/s cu nucleele mari limitate la 2,0–2,15 GHz și 26 cu ele la 1,3 GHz, deci se compară doar porniri cu
+aceleași limite (`scaling_max_freq`), alternate.
+
+| Schimbare | Rezultat | Stare |
+|---|---|---|
+| Focus pe fereastra jocului (N-034) | 13–14 → 26–27 cadre/s în pornirile afectate | în build |
+| Mesa: așteptarea fence-ului pe firul de prezentare (patch 0005) | 30,8 / 30,4 față de 28,3 / 28,0 (+8%) | în build |
+| FEX: socket uevent de formă (udev) | încercări udev 55 → 0 în 3 s; firul principal 74% → 64% | în build |
+| `fxwmfit`: ferestrele acoperite de un joc pe tot ecranul sunt ascunse | `steamwebhelper` dispare dintre procesele ocupate (era 30–40% dintr-un nucleu) | în build |
+| Puntea de afișare citește un rând din opt | aplicația 23% → 11% dintr-un nucleu | în build |
+| `-nojoy` | același efect ca socketul uevent; inutil cu el | nefolosit |
+| `DisableL2Cache=0`, `DynamicL1Cache=0` (FEX) | 28,6 față de 29,8 la aceleași limite: nimic | respins |
+| Setări video minime | 28,6 față de 26,3 (+9%) în scena goală | la alegerea jucătorului |
+| Randare la 70% + FSR | același număr de cadre | respins |
+| `TU_DEBUG=sysmem` | nimic (N-034) | respins |
+| TSO oprit | jocul rămâne blocat la încărcare | respins |
+
+- **Unde e limita acum:** firul de randare așteaptă GPU-ul ~22 ms pe cadru (`IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID`),
+  GPU ocupat 40–55%, firul principal 64–66%. Niciunul nu e saturat: se așteaptă unul pe altul, iar guvernorul ține
+  frecvențele jos. Ultimele trei schimbări din tabel scad căldura, nu cresc direct cadrele.
+- **`fxwmfit` și ferestrele ascunse:** se ascund doar ferestrele altui client decât cel de deasupra (id-urile X au
+  baza clientului peste 21 de biți) și se arată din nou când fereastra jocului dispare. `FXD_KEEP_COVERED_WINDOWS=1`
+  oprește comportamentul.
+- **Sunet:** fluxul AAudio era în mod „low latency”, cu tampon de 2–4 ms: orice întârziere a firului care citește
+  FIFO-ul era o pauză. Acum ține 80 ms, iar FIFO-ul e redus de la 64 KB (340 ms, mereu plin) la 16 KB, deci sunetul
+  nu întârzie mai mult ca înainte. Puntea numără pauzele de ieșire și „găurile” (tăceri de 3–150 ms între sunete,
+  puse de PulseAudio când programul întârzie). `PULSE_LATENCY_MSEC=60` pentru programele sesiunii.
+  În configurația contului de test `snd_mixahead` e 0.001 (1 ms), adusă din cloud de pe PC: candidat pentru sunetul
+  sacadat din meniu, de verificat cu `files/launch-options-570.txt`.
+- **Opțiuni de lansare pe joc:** `_v2-entry-point` adaugă la comanda jocului conținutul din
+  `files/launch-options-<app id>.txt`, ca „Launch Options” din Steam.
+- `map_enable_background_maps` nu mai există în Dota (scos de Valve), deci fundalul meniului nu se poate opri
+  din linia de comandă.
+- În timpul măsurătorilor Steam a instalat o actualizare Dota de 2,2 GB (descărcare 4 min, apoi „Validating”,
+  ~10 min): jocul nu se poate porni până nu termină.
+- **Toate la un loc** (build-ul publicat): Demo Hero 31,8–33,3 cadre/s cu nucleele mari limitate la 1,3 GHz, față
+  de 26,3 la aceleași limite înainte (+23%) și 13–14 în pornirile fără focus. Meniul principal: 22 (era 17–18).
+  Sunet: 600 s redate, o pauză de ieșire, 11 găuri (în timpul încărcărilor); 90 s de meniu fără nicio gaură nouă,
+  deși `snd_mixahead` e tot 0.001. Nu am o măsurătoare „înainte” pentru sunet: contoarele sunt noi.

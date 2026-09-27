@@ -53,4 +53,8 @@ object AudioBridge {
 
     @JvmStatic external fun start(fifo: String): String
     @JvmStatic external fun frames(): Long
+    /** Gaps in the sound (output underruns) since the stream was opened. */
+    @JvmStatic external fun gaps(): Int
+    /** Short silences inside the sound the programs delivered: they were late. */
+    @JvmStatic external fun holes(): Int
 }

@@ -54,6 +54,8 @@ object PerfSnapshot {
         val p0 = processes(dir)
         val shown0 = DisplayBridge.changedFrames()
         val looked0 = DisplayBridge.frames()
+        val gaps0 = AudioBridge.gaps()
+        val holes0 = AudioBridge.holes()
         val t0 = System.nanoTime()
         // The busiest process so far is the game (or Steam, before a game runs).
         val main = p0.filter { it.pid != Os.getpid() }.maxByOrNull { it.rssKb }
@@ -62,6 +64,7 @@ object PerfSnapshot {
         Thread.sleep(SAMPLE_MS)
         val gpu1 = gpuBusy()
         val seconds = (System.nanoTime() - t0) / 1e9
+        val gaps = AudioBridge.gaps() - gaps0
         val p1 = processes(dir).associateBy { it.pid }
         val th1 = main?.let { threads(it.pid) }.orEmpty().associateBy { it.tid }
         fun percent(d: Long) = "%.0f%%".format(d * 100.0 / hz / seconds)
@@ -69,6 +72,8 @@ object PerfSnapshot {
         appendLine("frames with new content: %.1f per second (the display looks %d times a second)"
             .format((DisplayBridge.changedFrames() - shown0) / seconds, AppSettings.fps))
         if (DisplayBridge.frames() == looked0) appendLine("(the display bridge is not running)")
+        appendLine("sound: in the sample $gaps output gaps and ${AudioBridge.holes() - holes0} holes from late programs; " +
+            "since the session started ${AudioBridge.gaps()} and ${AudioBridge.holes()}")
 
         appendLine("processes, % of one core:")
         p0.mapNotNull { a -> p1[a.pid]?.let { b -> Triple(a, b.ticks - a.ticks, b.rssKb) } }
