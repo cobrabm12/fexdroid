@@ -364,8 +364,9 @@ private fun LogPanel(onClose: () -> Unit) {
  */
 internal fun shareSessionReport(ctx: android.content.Context) {
     val activity = ctx as? MainActivity ?: return
-    kotlin.concurrent.thread(name = "session-report") { // The device checks read files.
-        val text = GameSession.report(ctx)
+    android.widget.Toast.makeText(ctx, "Pregătesc raportul (câteva secunde)…", android.widget.Toast.LENGTH_SHORT).show()
+    kotlin.concurrent.thread(name = "session-report") { // The self-tests and device checks take a few seconds.
+        val text = GameSession.reportOnce(ctx) ?: return@thread // Already preparing one.
         // Also readable over adb without root: /sdcard/Android/data/<pkg>/files/report.txt
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "report.txt").writeText(text) }
         activity.runOnUiThread { activity.share(text, "fexdroid: jurnal") }

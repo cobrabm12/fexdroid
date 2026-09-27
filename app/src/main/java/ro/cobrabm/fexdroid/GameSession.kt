@@ -85,9 +85,10 @@ object GameSession {
     // the text to Compose at most every LOG_PUBLISH_MS, instead of rebuilding a 40 KB
     // string and recomposing on every line (which cost CPU the game needs).
     private const val LOG_MAX_CHARS = 40_000
-    private const val STEAM_LOG_TAIL = 80
+    private const val STEAM_LOG_TAIL = 40
+    private const val REPORT_LOG_LINES = 60
     private const val SELF_TEST_SECONDS = 25L
-    private const val SELF_TEST_LINES = 25
+    private const val SELF_TEST_LINES = 8
     private const val LOG_PUBLISH_MS = 250L
     private val logLines = ArrayDeque<String>()
     private var logChars = 0
@@ -110,11 +111,9 @@ object GameSession {
         appendLine("device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, " +
             "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}), $soc")
         appendLine("screen: ${resolution.label}, state: $state")
-        appendLine()
-        appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
-        append(selfTests(env))
-        appendLine("---- session log (last ${LOG_MAX_CHARS / 1000} KB) ----")
-        appendLine(synchronized(logLines) { logLines.joinToString("\n") })
+        // Most useful first: messages get cut off on the way (chat apps, clipboards).
+        appendLine("---- session log (last $REPORT_LOG_LINES lines) ----")
+        appendLine(synchronized(logLines) { logLines.toList() }.takeLast(REPORT_LOG_LINES).joinToString("\n"))
         // Steam's own logs: what its updater and client did (no passwords in them).
         val steamLogs = File(env.home, ".local/share/Steam/logs")
         for (name in listOf("bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
@@ -124,6 +123,17 @@ object GameSession {
             appendLine(runCatching { f.readLines().takeLast(STEAM_LOG_TAIL).joinToString("\n") }
                 .getOrElse { "cannot read: $it" })
         }
+        append(selfTests(env))
+        appendLine("---- device checks ----")
+        appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
+    }
+
+    private val reporting = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** One report at a time: two runs of the self-tests at once disturb each other. */
+    fun reportOnce(ctx: Context): String? {
+        if (!reporting.compareAndSet(false, true)) return null
+        try { return report(ctx) } finally { reporting.set(false) }
     }
 
     /**
@@ -175,7 +185,10 @@ object GameSession {
                 }
             }.getOrElse { "cannot start: $it" }
             appendLine("[$name] $result, ${System.currentTimeMillis() - started} ms")
-            synchronized(out) { out.takeLast(SELF_TEST_LINES) }.forEach { appendLine("  $it") }
+            val lines = synchronized(out) { out.toList() }
+            val shown = if (result == "exit 0") lines.takeLast(1)
+                else (lines.filter { "FAIL" in it } + lines.takeLast(SELF_TEST_LINES)).distinct()
+            shown.forEach { appendLine("  $it") }
         }
     }
 
@@ -193,6 +206,9 @@ object GameSession {
     }
 
     private fun append(line: String) {
+        // FEX's Vulkan thunk prints one such line per function, hundreds per process: they
+        // pushed everything useful out of the log.
+        if ("] Linking address 0x" in line) return
         Log.i("fexdroid-game", line)
         synchronized(logLines) {
             logLines.addLast(line)
