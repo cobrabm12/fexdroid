@@ -70,6 +70,9 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
+            LaunchedEffect(Unit) { if (Updater.state == Updater.State.Idle) Updater.check(ctx, quiet = true) }
+            UpdateCard()
+
             if (GameSession.active) RunningCard()
 
             StatusCard(status, env)
@@ -108,6 +111,42 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
                     Icon(AppIcons.Info, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Cum instalez Steam și jocurile?")
+                }
+            }
+        }
+    }
+}
+
+/** Shown only when there is something to say: a newer build, its download, a failure. */
+@Composable
+private fun UpdateCard() {
+    val ctx = LocalContext.current
+    val st = Updater.state
+    val info = when (st) {
+        is Updater.State.Available -> st.info
+        is Updater.State.Downloading -> st.info
+        is Updater.State.Confirming -> st.info
+        is Updater.State.Failed -> st.info ?: return
+        else -> return
+    }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Versiune nouă disponibilă", style = MaterialTheme.typography.titleMedium)
+            Text("Construită la ${info.built.take(16).replace('T', ' ')} UTC · ${info.size shr 20} MB",
+                style = MaterialTheme.typography.bodySmall)
+            when (st) {
+                is Updater.State.Downloading -> {
+                    LinearProgressIndicator(progress = { st.doneBytes.toFloat() / info.size.coerceAtLeast(1) },
+                        modifier = Modifier.fillMaxWidth())
+                    Text("Descarc: ${st.doneBytes shr 20} / ${info.size shr 20} MB", style = MaterialTheme.typography.bodySmall)
+                }
+                is Updater.State.Confirming -> Text("Confirmă instalarea dacă Android întreabă. Aplicația se închide la " +
+                    "instalare: deschide-o din nou după aceea.", style = MaterialTheme.typography.bodySmall)
+                else -> {
+                    if (st is Updater.State.Failed) Text(st.message, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                    if (GameSession.active) Text("Oprește jocul înainte de actualizare.", style = MaterialTheme.typography.bodySmall)
+                    Button(enabled = !GameSession.active, onClick = { Updater.install(ctx, info) }) { Text("Actualizează") }
                 }
             }
         }

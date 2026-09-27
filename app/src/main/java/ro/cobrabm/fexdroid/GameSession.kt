@@ -105,7 +105,7 @@ object GameSession {
     fun report(ctx: Context): String = buildString {
         val env = LinuxEnv(ctx)
         val pkg = runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0) }.getOrNull()
-        appendLine("fexdroid ${pkg?.versionName} (${pkg?.longVersionCode})")
+        appendLine("fexdroid ${pkg?.versionName} (${pkg?.longVersionCode}), commit ${BuildConfig.GIT_SHA.take(7)}")
         appendLine("payload: installed ${env.installedVersion()}, in APK ${env.payloadVersion()}")
         val soc = if (android.os.Build.VERSION.SDK_INT >= 31) android.os.Build.SOC_MODEL else android.os.Build.HARDWARE
         appendLine("device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, " +
