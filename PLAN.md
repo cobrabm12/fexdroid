@@ -143,7 +143,7 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 
 ## Faze
 
-### Stare 2026-09-25 (telefonul nu e disponibil)
+### Stare 2026-09-27 (Realme GT, firmware oficial, fără root)
 | Fază | Stare | Dovadă |
 |---|---|---|
 | 0 | ✅ recunoaștere pe Realme GT (SD888) | `docs/recon/`, N-021 |
@@ -151,8 +151,8 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 | 2 | ✅ x86_64 dinamic prin FEX pe telefon; static încă crapă | N-021 |
 | 3 | ✅ `vkcube` arm64 și x86_64 (FEX + thunk) pe ecran, Turnip Adreno 660 | N-021 |
 | 4 | ✅ input XTEST (touch/tastatură verificate cu xev) și audio PulseAudio→AAudio (arm64 + x86 prin FEX); BT real netestat | N-022 |
-| 5 | 🟨 Steam pornește sub FEX fără containere (UI încă în lucru pe telefon); login QR în așteptare | N-023 |
-| 6 | 🟨 **Dota 2 ajunge la meniul principal pe Realme GT** (fără Steam); online + performanță urmează | N-024 |
+| 5 | ✅ clientul Steam se instalează singur din aplicație, login, bibliotecă, magazin, instalare de jocuri; Big Picture netestat | N-028, N-029 |
+| 6 | 🟨 **Dota 2 pornit din Steam ajunge la meniul principal, online** (~17 cadre/s în meniu); meci + performanță urmează | N-024, N-030 |
 
 ### Testare pe telefon (când e conectat)
 ```
