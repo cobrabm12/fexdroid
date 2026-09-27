@@ -175,6 +175,12 @@ def passthrough(text):
          "    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Mkdirat(dirfd, pathname, mode);\n"
          "    SYSCALL_ERRNO();\n"
          "  });\n"),
+        ("  REGISTER_SYSCALL_IMPL(unlinkat, SyscallPassthrough3<SYSCALL_DEF(unlinkat)>);\n",
+         "  // fexdroid: what Mkdirat/Open created inside the RootFS is removed there too (rm uses unlinkat).\n"
+         "  REGISTER_SYSCALL_IMPL(unlinkat, [](FEXCore::Core::CpuStateFrame* Frame, int dirfd, const char* pathname, int flags) -> uint64_t {\n"
+         "    uint64_t Result = FEX::HLE::_SyscallHandler->FM.Unlinkat(dirfd, pathname, flags);\n"
+         "    SYSCALL_ERRNO();\n"
+         "  });\n"),
         ("    REGISTER_SYSCALL_IMPL_X64(accept, SyscallPassthrough3<SYSCALL_DEF(accept)>);\n",
          "    // fexdroid: plain accept is trapped on Android (bionic only uses accept4).\n"
          "    REGISTER_SYSCALL_IMPL_X64(accept, [](FEXCore::Core::CpuStateFrame* Frame, int fd, struct sockaddr* addr, socklen_t* addrlen) -> uint64_t {\n"
@@ -228,10 +234,12 @@ static bool FEXDroidIsHiddenHostPath(const char* pathname) {
   return strncmp(pathname, Pci, sizeof(Pci) - 1) == 0 && (pathname[sizeof(Pci) - 1] == '\0' || pathname[sizeof(Pci) - 1] == '/');
 }
 
-// fexdroid: Android has no /tmp, /var/tmp, ... on the host. Files and directories
-// that guests create under such paths would fail with ENOENT although the RootFS
-// has them. For an absolute path whose parent is missing on the host but present
-// in the RootFS, returns the RootFS fd and the relative path to create there.
+// fexdroid: most Android phones have no /tmp, /var/tmp, ... on the host, and where the
+// host has such a directory (/etc everywhere, /tmp on some Android 16 phones) an app
+// cannot write to it. Files and directories that guests create there would fail with
+// ENOENT or EACCES although the RootFS has the directory. For an absolute path whose
+// parent is missing on the host, or is there but not writable, and is present in the
+// RootFS, returns the RootFS fd and the relative path to create there.
 FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* pathname, FDPathTmpData& Tmp, fextl::string& Rel) const {
   constexpr auto NoEntry = EmulatedFDPathResult {-1, nullptr};
   if (!pathname || pathname[0] != '/' || RootFSFD == AT_FDCWD) {
@@ -246,9 +254,8 @@ FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* p
     return NoEntry;
   }
   const fextl::string Parent = Full.substr(0, Slash);
-  struct stat st;
-  if (::stat(Parent.c_str(), &st) == 0) {
-    return NoEntry; // The host has the parent: normal behaviour.
+  if (::access(Parent.c_str(), W_OK | X_OK) == 0) {
+    return NoEntry; // The host has the parent and lets us create things in it: normal behaviour.
   }
   auto P = GetEmulatedFDPath(AT_FDCWD, Parent.c_str(), true, Tmp);
   if (P.FD == -1 || P.FD == AT_FDCWD) {
@@ -260,8 +267,9 @@ FileManager::EmulatedFDPathResult FileManager::GetRootFSCreatePath(const char* p
 
 // fexdroid: bind()/connect() pass AF_UNIX paths to the host verbatim, so a socket under
 // a guest-only directory (/tmp on Android) fails with ENOENT. A path whose parent is missing
-// on the host but present in the RootFS is rewritten to that RootFS directory, the same
-// rule Open/Mkdirat use for files. Both ends of a socket go through here, so they agree.
+// on the host (or not writable there) but present in the RootFS is rewritten to that RootFS
+// directory, the same rule Open/Mkdirat use for files. Both ends of a socket go through
+// here, so they agree.
 bool FileManager::RootFSSocketAddr(const void* Addr, uint32_t Len, struct sockaddr_un& Out, uint32_t& OutLen) const {
   constexpr auto PathOff = offsetof(struct sockaddr_un, sun_path);
   if (!Addr || Len <= PathOff || Len > sizeof(Out)) {

@@ -155,6 +155,13 @@ object GameSession {
             Triple("FEX hello (x86_64)", listOf(fex, "$tests/hello-dynamic"), env.x86Base),
             Triple("FEX SysV semaphores (x86_64)", listOf(fex, "$tests/semtest", "all"), env.x86Base),
             Triple("FEX SysV semaphores (i386, as Steam's client)", listOf(fex, "$tests/semtest-i386", "all"), env.x86Steam),
+            // Steam needs to create /tmp/dumps: fails where the phone has its own, read-only /tmp
+            // and FEX does not send the guest's /tmp to the RootFS (Galaxy S26 Ultra, N-033).
+            Triple("FEX: create and remove under /tmp (x86_64)", listOf("${env.root}/bin/sh", "-c",
+                "PATH=/usr/bin:/bin exec '$fex' '${env.x86Root}/bin/sh' -c " +
+                    "'mkdir /tmp/fxd-selftest && touch /tmp/fxd-selftest/a && rm -r /tmp/fxd-selftest && echo created and removed'"), null),
+            Triple("host directories", listOf("/system/bin/sh", "-c",
+                "for d in /tmp /var /run /usr /opt /etc; do /system/bin/ls -ld \$d 2>&1; done; exit 0"), null),
             Triple("vulkaninfo arm64", listOf("${env.root}/usr/bin/vulkaninfo", "--summary"), null),
             Triple("vulkaninfo x86_64 through FEX", listOf(fex, "${env.x86Root}/usr/bin/vulkaninfo", "--summary"), null),
         )
@@ -186,7 +193,8 @@ object GameSession {
             }.getOrElse { "cannot start: $it" }
             appendLine("[$name] $result, ${System.currentTimeMillis() - started} ms")
             val lines = synchronized(out) { out.toList() }
-            val shown = if (result == "exit 0") lines.takeLast(1)
+            val shown = if (name == "host directories") lines
+                else if (result == "exit 0") lines.takeLast(1)
                 else (lines.filter { "FAIL" in it } + lines.takeLast(SELF_TEST_LINES)).distinct()
             shown.forEach { appendLine("  $it") }
         }

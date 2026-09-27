@@ -699,3 +699,24 @@ Un tester cu Galaxy S26 Ultra (SM-S948B, SM8850, Adreno 840, Android 16, kernel 
 - Simularea procesorului pe PC (qemu-user, `-cpu max`: SVE, SME, PAC, BTI) nu a fost concludentă: FEX hello a
   crăpat diferit de la o rulare la alta, iar un program i386 a rămas blocat minute întregi. Pe telefonul real FEX
   hello merge, deci comportamentul ține de qemu.
+
+## N-033 · Galaxy S26 Ultra: Steam nu poate crea `/tmp/dumps`  🟨 (2026-09-27; reparat în FEX, verificat pe Realme pe un caz echivalent)
+Raportul de pe S26 Ultra (Android 16): `/tmp/dumps: insufficient permissions - delete and recreate`, apoi
+`/tmp/dumps: failed to create, skipping` pentru toate cele zece nume (`dumps` … `dumps09`) și
+`FATAL: Steam cannot run. Please delete some /tmp/dumps* directories or change their ownership to the local user.`
+Steam folosește doar un director de dump-uri creat de el; pe Realme GT aceeași verificare pică, dar refacerea reușește.
+- **Cauza în patch-ul nostru FEX:** `GetRootFSCreatePath` trimitea crearea în RootFS doar când părintele **lipsea**
+  pe telefon (`stat` eșuat). Dacă telefonul are un `/tmp` al lui, în care aplicațiile nu pot scrie, `mkdir` ajungea
+  acolo și era refuzat. Că S26 are un `/tmp` pe host nu e încă văzut direct (raportul următor listează directoarele
+  host); e singura cale din cod pe care `mkdir /tmp/dumps04` poate eșua, iar pe Android utilizatorii Termux
+  raportează „Permission denied” la `/tmp`.
+- **Reprodus pe Realme GT cu `/etc`** (există pe orice Android, legătură spre `/system/etc`, doar citire): din
+  guest, `mkdir /etc/x` → „Read-only file system”. După reparație merg `mkdir`, `touch`, `rmdir`, `rm -r` în `/etc`
+  și `/tmp`, create în RootFS.
+- **Reparația:** părintele contează ca „al host-ului” doar dacă putem crea în el (`access(W_OK | X_OK)`); altfel,
+  dacă RootFS-ul are directorul, se creează acolo. `unlinkat` trecea direct la kernel (doar `unlink`/`rmdir`
+  foloseau `FileManager::Unlinkat`), deci `rm` pe un fișier creat în RootFS pica: acum trece și el prin aceeași regulă.
+- Capcană la testare: într-un guest pornit cu PATH-ul arm64 al aplicației, `ls`, `mkdir` etc. sunt binarele arm64
+  native (FEX le rulează nativ), care văd căile telefonului, nu RootFS-ul. Testele folosesc `PATH=/usr/bin:/bin`.
+- `fexdroid-steam.sh` șterge la pornire `steam_chrome_shmem_uid*` rămase în `/tmp` (unul per pornire).
+- Rămâne de văzut pe S26: `vkcube` x86 nu apare (posibil aceeași cauză, prin socketul X din `/tmp`).
