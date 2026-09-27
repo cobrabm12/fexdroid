@@ -50,7 +50,7 @@ object AppSettings {
     var resolution by mutableStateOf(Resolution.DEFAULT); private set
     /** Virtual screen follows the shape of the phone's screen ([Resolution.fitted]). */
     var fitScreen by mutableStateOf(true); private set
-    var fps by mutableIntStateOf(30); private set
+    var fps by mutableIntStateOf(60); private set
     var dynamicColor by mutableStateOf(true); private set
     var theme by mutableStateOf(ThemeMode.DARK); private set
     /** Home screen: Dota 2 direct start (no Steam client) as the main action. */
@@ -74,7 +74,7 @@ object AppSettings {
             prefs.getInt("x_height", Resolution.DEFAULT.height),
         )
         fitScreen = prefs.getBoolean("fit_screen", true)
-        fps = prefs.getInt("fps", 30)
+        fps = prefs.getInt("fps", 60)
         dynamicColor = prefs.getBoolean("dynamic_color", true)
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null) ?: "DARK") }.getOrDefault(ThemeMode.DARK)
         gameWithoutSteam = prefs.getBoolean("game_without_steam", false)

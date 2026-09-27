@@ -152,7 +152,7 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 | 3 | ✅ `vkcube` arm64 și x86_64 (FEX + thunk) pe ecran, Turnip Adreno 660 | N-021 |
 | 4 | ✅ input XTEST (touch/tastatură verificate cu xev) și audio PulseAudio→AAudio (arm64 + x86 prin FEX); BT real netestat | N-022 |
 | 5 | ✅ clientul Steam se instalează singur din aplicație, login, bibliotecă, magazin, instalare de jocuri, Big Picture | N-028, N-029, N-030 |
-| 6 | 🟨 **Dota 2 pornit din Steam ajunge la meniul principal, online** (~17 cadre/s în meniu); meci + performanță urmează | N-024, N-030 |
+| 6 | 🟨 **Dota 2 pornit din Steam ajunge la meniul principal, online** (25–29 cadre/s în joc, Demo Hero); meci + performanță urmează | N-024, N-030, N-031 |
 
 ### Testare pe telefon (când e conectat)
 ```

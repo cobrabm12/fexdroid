@@ -31,7 +31,19 @@ class XSession(
         "PULSE_SERVER" to "unix:$pulseSocket",
         // Turnip on KGSL has no DRI3 path to Xvfb: present through the CPU (MIT-SHM).
         "MESA_VK_WSI_DEBUG" to "sw",
-    )
+        // Games ask for FIFO (vsync). Xvfb's clock ticks at 60 Hz, so a frame that takes 35 ms
+        // waits for the third tick: 20 frames/s instead of 28. Relaxed FIFO shows a late frame
+        // at once and still stops at 60.
+        "MESA_VK_WSI_PRESENT_MODE" to "relaxed",
+    ) + extraEnv()
+
+    /** Optional KEY=VALUE lines in files/session-env.txt, for experiments (TU_DEBUG, ...). */
+    private fun extraEnv(): Map<String, String> {
+        val f = java.io.File(env.files, "session-env.txt")
+        if (!f.isFile) return emptyMap()
+        return f.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") && '=' in it }
+            .associate { it.substringBefore('=') to it.substringAfter('=') }
+    }
 
     /** Starts Xvfb and blocks until it reports its framebuffer shmid (or fails). */
     @Synchronized

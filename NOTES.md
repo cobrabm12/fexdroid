@@ -343,7 +343,7 @@ status (📚 cunoscut din documentație · 🧪 reprodus pe telefon · ✅ rezol
 - Xvfb îl nu poate crea `/tmp/.X11-unix` (cere root), dar ascultă pe socketul abstract `@/tmp/.X11-unix/X0`,
   pe care libxcb îl încearcă primul. Pentru clienții x86 prin FEX, socketul abstract trece direct.
 - Framebuffer-ul `-shmem` e un segment SysV în memfd (fxshmd). Puntea din aplicație (`cpp/display_bridge.c`)
-  vorbește protocolul fxshmd, mapează segmentul și copiază cadrele (BGRX → RGBX) în `ANativeWindow`, la 30 fps.
+  vorbește protocolul fxshmd, mapează segmentul și copiază cadrele (BGRX → RGBX) în `ANativeWindow` (de la N-031: doar cadrele noi, căutate de 60 de ori pe secundă).
 - Vulkan pe X11: Turnip pe KGSL nu are DRI3 spre Xvfb, deci clienții rulează cu `MESA_VK_WSI_DEBUG=sw`
   (prezentare prin CPU, MIT-SHM). E mai lent, dar e cea mai simplă cale; optimizarea e layer-ul direct din D3.
 - Test pe PC: Xvfb pornește cu shim-ul, `xwd-peek` atașează segmentul prin fxshmd și citește 1280x720, 32 bpp,
@@ -639,3 +639,33 @@ atingere (tap pe joc › Play › OK la sfatul cu tastatura › Skip la shadere)
 E pornit implicit, dar `-gamepadui` se dă doar după prima autentificare (există `Steam/userdata/<id>`), fiindcă
 descărcarea clientului și loginul sunt verificate doar în interfața clasică. Unele nume de prieteni cu caractere
 speciale apar ca pătrățele (lipsesc fonturi în rootfs-ul x86).
+
+## N-031 · Performanță: unde se duce timpul unui cadru  🟨 (Realme GT, 2026-09-27)
+Măsurat cu `strace -T` pe firul `VKRenderThread` (strace din rootfs, pornit cu `run-as`), `top -H`, `gpubusy`.
+- **În joc e mai bine decât în meniu.** Demo Hero (hartă reală), 1600×720, setările alese de joc: **25–29 cadre/s**.
+  Meniul principal (trei eroi 3D): 17–22. Pagina Heroes (2D): peste 30.
+- **Limita e GPU-ul, nu procesorul.** În fiecare cadru firul de randare stă într-un singur
+  `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID`: ~45 ms în meniu, ~20 ms în joc, ~13 ms pe pagina 2D. Firele jocului
+  stau la 10–13% dintr-un nucleu (cel principal ~47% în meniu). Xvfb 5–7%.
+- **Drumul de afișare nu e frâna:** `vkcube` arm64 la 1600×720, prin același drum (`MESA_VK_WSI_DEBUG=sw`, MIT-SHM,
+  Xvfb), face 125–134 cadre/s, cu așteptări după GPU de 0,1 ms.
+- **Telefonul se sufocă termic:** carcasa 41–42 °C, nucleele 56–75 °C; nucleele mari sunt limitate la
+  1,3–1,55 GHz (din 2,42), cel rapid la 1,3–1,55 GHz (din 2,84). Frecvența GPU nu se poate citi fără root.
+  RAM 11 GB plin, ~2000 de pagini/s scrise în swap cu Steam + Dota pornite.
+- **Fără efect măsurabil (Dota):** `mat_viewportscale` 0.5 (meniul nu ține cont de el), `TU_DEBUG=sysmem`,
+  `MESA_VK_WSI_PRESENT_MODE=relaxed` (jocul avea deja vsync oprit). Ipoteza „fereastra nu are focus, deci
+  `engine_no_focus_sleep`” s-a dovedit falsă: SDL își ia singur focusul (`XGetInputFocus` = fereastra Dota).
+- **Procesor și GPU lucrează pe rând, nu în paralel.** Cu prezentare software, `wsi_common_queue_present` așteaptă
+  fence-ul cadrului în firul aplicației. Am mutat așteptarea pe firul de prezentare al backend-ului X11
+  (`docs/experiments/mesa-wsi-x11-sw-wait-on-present-thread.patch`, neaplicat la build). Rezultat: `vkcube` merge,
+  dar la Dota câștigul e neclar, pentru că motorul Source 2 așteaptă și el GPU-ul după fiecare present (aceeași
+  așteptare de 20 ms, doar că în alt loc): meniu 17 → 21 cadre/s, joc 28 → 24, măsurate în sesiuni diferite, cu
+  telefonul la temperaturi diferite. Fără o comparație A/B curată nu intră în build.
+- **Ce a intrat:** `MESA_VK_WSI_PRESENT_MODE=relaxed` (un cadru întârziat nu mai așteaptă următorul tact de 60 Hz al
+  lui Xvfb; limita rămâne 60); puntea caută o imagine nouă de 60 de ori pe secundă și copiază doar imaginile noi
+  (înainte: 30 de copieri pe secundă, mereu, deci maximum 30 de cadre afișate); `files/session-env.txt`
+  (linii `CHEIE=valoare`) pentru experimente fără APK nou.
+- **De făcut:** A/B curat pentru patch-ul Mesa; setări grafice recomandate pentru telefon; mai puțină memorie
+  (Steam ține ~2 GB cu Big Picture); prezentare directă pe GPU (D3); test pe un telefon mai rece/mai nou.
+  Atenție la automatizări prin `adb shell input tap`: după ce jocul se închide, Steam poate fi pe alt ecran
+  (o secvență oarbă a deschis dialogul de instalare pentru alt joc; anulat, nimic instalat).

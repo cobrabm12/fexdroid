@@ -63,7 +63,7 @@ fun SettingsScreen() {
                 SwitchSetting("Potrivește la ecranul telefonului",
                     "Lățimea ecranului virtual urmează forma ecranului, fără benzi negre. Oprit: 16:9.",
                     AppSettings.fitScreen, AppSettings::updateFitScreen)
-                Setting("Cadre pe secundă", "Cât de des se copiază imaginea pe ecranul telefonului.") {
+                Setting("Cadre pe secundă", "Cât de des se caută o imagine nouă de la joc. Se copiază pe ecran doar imaginile noi.") {
                     Choice(AppSettings.FPS_PRESETS, AppSettings.fps, { "$it" }, AppSettings::updateFps)
                 }
                 if (GameSession.active) Note("Un joc rulează acum: noile valori se aplică după repornire.")
