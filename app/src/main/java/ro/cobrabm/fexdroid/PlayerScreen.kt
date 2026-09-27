@@ -127,11 +127,16 @@ fun PlayerScreen() {
         else { v.requestFocus(); v.requestPointerCapture(); mouseCaptured = true }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center,
+    ) {
+        // The margin the session's resolution was computed for (AppSettings.screenMargin).
+        val margin = minOf(maxWidth, maxHeight) * (AppSettings.screenMargin / 100f)
         // Recreate the view when the X resolution changes (it maps touches to X coordinates).
         androidx.compose.runtime.key(res) {
             AndroidView(
-                modifier = Modifier.fillMaxHeight().aspectRatio(res.width.toFloat() / res.height, matchHeightConstraintsFirst = true),
+                modifier = Modifier.padding(margin).fillMaxHeight()
+                    .aspectRatio(res.width.toFloat() / res.height, matchHeightConstraintsFirst = true),
                 factory = { c ->
                     InputSurfaceView(c, res.width, res.height).apply {
                         view = this
@@ -165,7 +170,8 @@ fun PlayerScreen() {
         }
 
         if (state is SessionState.Running || state is SessionState.Starting) {
-            FloatingMenuButton(Modifier.align(Alignment.TopEnd).displayCutoutPadding()) { menuOpen = !menuOpen }
+            // Middle of the right edge: games keep their own buttons and figures in the corners.
+            FloatingMenuButton(Modifier.align(Alignment.CenterEnd).displayCutoutPadding()) { menuOpen = !menuOpen }
         }
 
         AnimatedVisibility(menuOpen, Modifier.align(Alignment.TopEnd).displayCutoutPadding(), enter = fadeIn(), exit = fadeOut()) {
@@ -199,15 +205,15 @@ private fun FloatingMenuButton(modifier: Modifier, onClick: () -> Unit) {
     var dy by remember { mutableFloatStateOf(0f) }
     Box(
         modifier
-            .offset { IntOffset(0, dy.roundToInt().coerceAtLeast(0)) }
-            .padding(12.dp)
-            .size(44.dp)
-            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-            .pointerInput(Unit) { detectDragGestures { change, drag -> change.consume(); dy = (dy + drag.y).coerceAtLeast(0f) } }
+            .offset { IntOffset(0, dy.roundToInt()) } // Can be dragged up and down.
+            .padding(4.dp)
+            .size(36.dp)
+            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+            .pointerInput(Unit) { detectDragGestures { change, drag -> change.consume(); dy += drag.y } }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(AppIcons.Menu, "Meniu", tint = Color.White.copy(alpha = 0.85f))
+        Icon(AppIcons.Menu, "Meniu", Modifier.size(20.dp), tint = Color.White.copy(alpha = 0.8f))
     }
 }
 

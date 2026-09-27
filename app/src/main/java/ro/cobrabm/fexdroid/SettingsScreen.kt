@@ -63,6 +63,11 @@ fun SettingsScreen() {
                 SwitchSetting("Potrivește la ecranul telefonului",
                     "Lățimea ecranului virtual urmează forma ecranului, fără benzi negre. Oprit: 16:9.",
                     AppSettings.fitScreen, AppSettings::updateFitScreen)
+                Setting("Margine", "Distanța imaginii față de marginile ecranului. Colțurile rotunjite și camera acoperă ce " +
+                    "desenează jocul acolo, iar atingerile de pe margine se pierd des.") {
+                    Choice(AppSettings.MARGIN_PRESETS, AppSettings.screenMargin, { if (it == 0) "Fără" else "$it%" },
+                        AppSettings::updateScreenMargin)
+                }
                 Setting("Cadre pe secundă", "Cât de des se caută o imagine nouă de la joc. Se copiază pe ecran doar imaginile noi.") {
                     Choice(AppSettings.FPS_PRESETS, AppSettings.fps, { "$it" }, AppSettings::updateFps)
                 }
