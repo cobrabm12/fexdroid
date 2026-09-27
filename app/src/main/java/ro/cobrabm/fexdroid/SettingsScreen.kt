@@ -90,6 +90,9 @@ fun SettingsScreen() {
             }
 
             Section("Joc") {
+                SwitchSetting("Steam în Big Picture",
+                    "Interfața pe tot ecranul, pentru atingere și controller. Experimental.",
+                    AppSettings.steamBigPicture, AppSettings::updateSteamBigPicture)
                 SwitchSetting(
                     "Rulează jocul fără Steam",
                     "Butonul principal de pe Acasă devine „Pornește Dota 2 (direct)”.",

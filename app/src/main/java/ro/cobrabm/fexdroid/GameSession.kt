@@ -158,7 +158,8 @@ object GameSession {
                 if (!xs.startAudio()) append("Sunetul nu a pornit; continui fără sunet.")
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.LAUNCH)
-                val p = xs.launch(game.tag, game.argv(env))
+                val extra = if (game == Game.STEAM && AppSettings.steamBigPicture) listOf("-gamepadui") else emptyList()
+                val p = xs.launch(game.tag, game.argv(env) + extra)
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())
                 // A game started in the session that installed it: the entry point asks for
