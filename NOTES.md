@@ -803,3 +803,19 @@ aceleași limite (`scaling_max_freq`), alternate.
   de 26,3 la aceleași limite înainte (+23%) și 13–14 în pornirile fără focus. Meniul principal: 22 (era 17–18).
   Sunet: 600 s redate, o pauză de ieșire, 11 găuri (în timpul încărcărilor); 90 s de meniu fără nicio gaură nouă,
   deși `snd_mixahead` e tot 0.001. Nu am o măsurătoare „înainte” pentru sunet: contoarele sunt noi.
+
+## N-036 · Marginea ecranului și „Watch” în Dota  🟨 (Realme GT, 2026-09-28)
+- **Margine:** imaginea jocului umplea tot ecranul telefonului. Colțurile rotunjite tăiau ce desenează Dota în colțuri
+  (datele de rețea „FPS / PING” din dreapta sus), atingerile de pe marginea ecranului se pierdeau (butoanele din
+  stânga sus ale jocului), iar butonul de meniu al aplicației stătea peste colțul din dreapta sus. Acum imaginea
+  stă la o margine de ecran (Setări › Ecran › Margine: fără, 3%, 5%, 8% din latura scurtă; implicit 3%), iar
+  lățimea ecranului virtual se calculează din spațiul rămas (Realme GT: 1656×720 la 3%). Butonul de meniu e la
+  mijlocul marginii din dreapta, mai mic, și se poate trage în sus sau în jos. ✅ văzut pe telefon în Steam și în
+  meniul Dota; atingerile de pe margine nu sunt verificate cu degetul (adb nu trece prin filtrul de margine).
+- **„Watch in-game” → „Could not watch this game at this time”:** reprodus. Din `console.log` (`-condebug` prin
+  `files/launch-options-570.txt`): clientul trimite `k_EMsgGCWatchGame`, coordonatorul răspunde `result 0` (în
+  așteptare) și după 60 s `result 3` (indisponibil). În tot acest timp jocul nu încearcă nicio conexiune spre un
+  server de joc (`strace -e trace=network`: niciun `sendto` cu adresă). Rețeaua de relee e în regulă la pornire:
+  „Ping measurement completed in 3.4s. Relays: 25 valid”, `avail=OK config=OK anyrelay=OK`. Refuzul vine deci de la
+  serverul Valve; dacă ține de clientul nostru sau de serviciul lor în acel moment nu se poate spune fără aceeași
+  încercare pe un PC, cu același cont.
