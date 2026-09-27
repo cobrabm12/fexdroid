@@ -119,7 +119,8 @@ object GameSession {
         appContext = ctx.applicationContext
         GameService.start(ctx.applicationContext, game.title)
         val env = LinuxEnv(ctx.applicationContext)
-        val res = AppSettings.sessionResolution(ctx.applicationContext)
+        // The caller's context (an Activity knows its display: phone screen, DeX monitor, ...).
+        val res = AppSettings.sessionResolution(ctx)
         val gen = synchronized(this) { ++generation }
         val xs = XSession(env, res.width, res.height, ::append)
         session = xs
