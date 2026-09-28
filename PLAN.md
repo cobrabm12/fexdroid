@@ -161,7 +161,7 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 | versiune | ce înseamnă | condiții |
 |---|---|---|
 | 0.3 alpha (acum) | pentru testeri, cu raport și actualizare din aplicație | — |
-| 0.5 beta | oricine o poate instala și juca fără ajutor | un meci Dota jucat întreg pe cel puțin trei telefoane diferite; prima pornire fără pași manuali; controale pe ecran sau gamepad; mesaje clare la erori |
+| 0.5 beta | oricine o poate instala și juca fără ajutor | un meci Dota jucat întreg pe cel puțin trei telefoane diferite; prima pornire fără pași manuali; controale pe ecran (✅ taste pe ecran, N-045) sau gamepad; mesaje clare la erori |
 | 1.0 | publicul larg | interfață de tip Big Picture; al doilea joc verificat; prezentare directă pe GPU (D3); testat pe DeX; cheie de semnare păstrată în siguranță, în două locuri |
 
 ### Testare pe telefon (când e conectat)

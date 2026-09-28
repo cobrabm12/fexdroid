@@ -91,6 +91,12 @@
     <string name="install_failed">Instalarea a eșuat: %1$s</string>
     <string name="install_progress">Descarc și instalez: %1$d MB</string>
     <string name="install_progress_of">Descarc și instalez: %1$d / %2$d MB</string>
+    <string name="key_camera">cameră</string>
+    <string name="key_left">stânga</string>
+    <string name="key_right">dreapta</string>
+    <string name="key_swipe">glisare</string>
+    <string name="key_tap">atingere</string>
+    <string name="key_wheel">rotiță</string>
     <string name="nav_advanced">Avansat</string>
     <string name="nav_home">Acasă</string>
     <string name="nav_settings">Setări</string>
@@ -103,6 +109,9 @@
     <string name="player_closed_itself">Programul s-a închis singur. Dacă nu l-ai închis tu, apasă „Trimite jurnalul”.</string>
     <string name="player_hide_keyboard">Ascunde tastatura</string>
     <string name="player_keyboard">Tastatură</string>
+    <string name="player_keys_hide">Ascunde tastele de pe ecran</string>
+    <string name="player_keys_hint">Pe marginile imaginii, pentru joc prin atingere</string>
+    <string name="player_keys_show">Taste pe ecran</string>
     <string name="player_loading_hint">%1$s se încarcă. Prima pornire poate dura câteva minute. Meniul: butonul din dreapta.</string>
     <string name="player_log">Jurnal</string>
     <string name="player_log_empty">(gol)</string>
@@ -133,6 +142,7 @@
     <string name="settings_big_picture_about">Interfața pe tot ecranul, pentru atingere și controller. Mai grea decât cea clasică. Prima autentificare se face în interfața clasică.</string>
     <string name="settings_cache_size">Cache: %1$s</string>
     <string name="settings_clear_cache">Șterge cache-ul</string>
+    <string name="settings_controls">Joc prin atingere</string>
     <string name="settings_disk_cache">Cache de cod pe disc</string>
     <string name="settings_disk_cache_about">Experimental. Codul x86 tradus o dată e păstrat și refolosit, deci pornirile următoare sunt mai rapide. Cu FEX-2609 unele programe crapă (de ex. instalarea Steam), așa că e oprit implicit.</string>
     <string name="settings_dota_profile">Profil de performanță pentru Dota 2</string>
@@ -152,6 +162,13 @@
     <string name="settings_install_3">Steam îl descarcă de la Valve la prima pornire (~2 GB, câteva minute). Apoi te autentifici.</string>
     <string name="settings_install_4">În Steam: Store › Dota 2 › Play Game › Install. Cam 70 GB; descărcarea continuă cu aplicația în fundal.</string>
     <string name="settings_install_note">Totul se instalează pe telefon, fără PC. Aplicația nu conține nimic de la Valve: Steam și jocurile se descarcă de la Valve, cu contul tău. Folosește Wi-Fi și ține telefonul la încărcat.</string>
+    <string name="settings_keys">Taste pe ecran</string>
+    <string name="settings_keys_about">Taste în stânga și în dreapta imaginii, care se îngustează ca să le facă loc. Se pot arăta și ascunde și din meniul din joc.</string>
+    <string name="settings_keys_default">Înapoi la tastele pentru Dota 2</string>
+    <string name="settings_keys_help">Nume despărțite prin spații: litere, cifre, F1 până la F12, Esc, Tab, Space, Enter, Back, Del, Up, Down, Left, Right. Shift, Ctrl și Alt rămân apăsate până le atingi din nou. Mouse alege butonul apăsat de o atingere: stânga sau dreapta; atingerea cu două degete îl apasă pe celălalt. Swipe alege ce face glisarea: învârte rotița sau mută camera (tragere cu butonul din mijloc).</string>
+    <string name="settings_keys_left">Tastele din stânga</string>
+    <string name="settings_keys_right">Tastele din dreapta</string>
+    <string name="settings_keys_unknown">Nume neînțelese: %1$s</string>
     <string name="settings_language">Limbă</string>
     <string name="settings_language_system">Automat</string>
     <string name="settings_margin">Margine</string>

@@ -15,12 +15,12 @@ fexdroid is an Android app that starts the Linux version of **Steam**, and games
 | Steam client | Installs itself from Valve on first start; sign-in, library, store, downloads |
 | Installing games | From Steam, on the phone, over Wi-Fi |
 | Dota 2 | Starts from Steam, online; hero demo, watching live matches and replays |
-| Input | Touch, USB/Bluetooth mouse and keyboard |
+| Input | Touch, USB/Bluetooth mouse and keyboard, on-screen keys for playing by touch (new, Dota 2 layout, can be changed) |
 | Sound | Yes |
 | Updates | From inside the app |
 | Languages | English, Romanian |
 
-Not there yet: on-screen game controls and gamepads, a match played from start to finish on every tested phone, Samsung DeX.
+Not there yet: gamepads, a match played from start to finish on every tested phone, Samsung DeX.
 
 ## Tested phones
 

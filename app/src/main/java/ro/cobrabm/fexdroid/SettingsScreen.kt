@@ -20,6 +20,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -122,6 +123,23 @@ fun SettingsScreen() {
                 Note(str(R.string.settings_without_steam_note))
             }
 
+            Section(str(R.string.settings_controls)) {
+                SwitchSetting(str(R.string.settings_keys), str(R.string.settings_keys_about),
+                    AppSettings.onScreenKeys, AppSettings::updateOnScreenKeys)
+                if (AppSettings.onScreenKeys) {
+                    KeyLayout(str(R.string.settings_keys_left), AppSettings.keysLeft, AppSettings::updateKeysLeft)
+                    KeyLayout(str(R.string.settings_keys_right), AppSettings.keysRight, AppSettings::updateKeysRight)
+                    Note(str(R.string.settings_keys_help))
+                    if (AppSettings.keysLeft != OnScreenKeys.DEFAULT_LEFT || AppSettings.keysRight != OnScreenKeys.DEFAULT_RIGHT) {
+                        TextButton(onClick = {
+                            AppSettings.updateKeysLeft(OnScreenKeys.DEFAULT_LEFT)
+                            AppSettings.updateKeysRight(OnScreenKeys.DEFAULT_RIGHT)
+                        }) { Text(str(R.string.settings_keys_default)) }
+                    }
+                    if (GameSession.active) Note(str(R.string.settings_after_restart))
+                }
+            }
+
             Section(str(R.string.settings_appearance)) {
                 Setting(str(R.string.settings_language), null) {
                     Choice(Language.entries, AppSettings.language,
@@ -194,6 +212,18 @@ private fun SwitchSetting(title: String, subtitle: String?, checked: Boolean, on
         Spacer(Modifier.width(16.dp))
         Switch(checked, onChange)
     }
+}
+
+/** One side's keys, as the line of names OnScreenKeys reads. */
+@Composable
+private fun KeyLayout(title: String, value: String, onChange: (String) -> Unit) {
+    val unknown = remember(value) { OnScreenKeys.unknown(value) }
+    OutlinedTextField(
+        value = value, onValueChange = onChange, label = { Text(title) }, singleLine = true,
+        isError = unknown.isNotEmpty(),
+        supportingText = if (unknown.isEmpty()) null else { { Text(str(R.string.settings_keys_unknown, unknown.joinToString(" "))) } },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    )
 }
 
 @Composable

@@ -21,7 +21,7 @@ data class Resolution(val width: Int, val height: Int) {
          * picture fills it without black bars (20:9 phone: 1280x720 becomes 1600x720). The
          * height, which sets the rendering cost class, stays. Shapes are limited to 4:3..21:9.
          */
-        fun fitted(ctx: Context, base: Resolution, marginPercent: Int = 0, wideSides: Boolean = false): Resolution {
+        fun fitted(ctx: Context, base: Resolution, marginPercent: Int = 0, wideSides: Boolean = false, keysDp: Int = 0): Resolution {
             val wm = ctx.getSystemService(android.view.WindowManager::class.java) ?: return base
             val (a, b) = if (android.os.Build.VERSION.SDK_INT >= 30) {
                 wm.maximumWindowMetrics.bounds.let { it.width() to it.height() }
@@ -33,7 +33,9 @@ data class Resolution(val width: Int, val height: Int) {
             if (a <= 0 || b <= 0) return base
             // The picture is shown inside a margin on every side (AppSettings.screenMargin).
             val margin = 1.0 * minOf(a, b) * marginPercent / 100
-            val side = if (wideSides) maxOf(margin, AppSettings.WIDE_SIDE_DP * ctx.resources.displayMetrics.density.toDouble()) else margin
+            val density = ctx.resources.displayMetrics.density.toDouble()
+            // On-screen keys stand between the edge's free strip and the picture.
+            val side = (if (wideSides) maxOf(margin, AppSettings.WIDE_SIDE_DP * density) else margin) + keysDp * density
             val aspect = ((maxOf(a, b) - 2 * side) / (minOf(a, b) - 2 * margin)).coerceIn(4.0 / 3.0, 21.0 / 9.0)
             val width = (Math.round(base.height * aspect / 8.0) * 8).toInt()
             return Resolution(width, base.height)
@@ -90,6 +92,10 @@ object AppSettings {
     var limitVideoMemory by mutableStateOf(false); private set
     /** Source 2 games' own libraries run without TSO emulation (FexConfig.SOURCE2_WITHOUT_TSO). */
     var source2WithoutTso by mutableStateOf(false); private set
+    /** Keys at the sides of the picture (OnScreenKeys); the picture is narrower by their width. */
+    var onScreenKeys by mutableStateOf(false); private set
+    var keysLeft by mutableStateOf(OnScreenKeys.DEFAULT_LEFT); private set
+    var keysRight by mutableStateOf(OnScreenKeys.DEFAULT_RIGHT); private set
     /** Dota 2's video settings set to the cheapest values before a session starts (DotaProfile). */
     var dotaPerformance by mutableStateOf(false); private set
     /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
@@ -127,6 +133,9 @@ object AppSettings {
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)
         fexDiskCache = prefs.getBoolean("fex_disk_cache_v2", false)
+        onScreenKeys = prefs.getBoolean("on_screen_keys", false)
+        keysLeft = prefs.getString("keys_left", null) ?: OnScreenKeys.DEFAULT_LEFT
+        keysRight = prefs.getString("keys_right", null) ?: OnScreenKeys.DEFAULT_RIGHT
     }
 
     fun updateResolution(r: Resolution) {
@@ -139,7 +148,17 @@ object AppSettings {
     fun updateScreenMargin(v: Int) { screenMargin = v; prefs.edit().putInt("screen_margin", v).apply() }
     fun updateWideSides(v: Boolean) { wideSides = v; prefs.edit().putBoolean("wide_sides", v).apply() }
     fun sessionResolution(ctx: Context) =
-        if (fitScreen) Resolution.fitted(ctx, resolution, screenMargin, wideSides) else resolution
+        if (fitScreen) Resolution.fitted(ctx, resolution, screenMargin, wideSides, keysDp) else resolution
+
+    /** Width the keys take at each side of the picture. */
+    val keysDp get() = if (onScreenKeys) OnScreenKeys.SIDE_DP else 0
+    fun updateOnScreenKeys(v: Boolean) {
+        onScreenKeys = v
+        if (!v) OnScreenKeys.reset()
+        prefs.edit().putBoolean("on_screen_keys", v).apply()
+    }
+    fun updateKeysLeft(v: String) { keysLeft = v; prefs.edit().putString("keys_left", v).apply() }
+    fun updateKeysRight(v: String) { keysRight = v; prefs.edit().putString("keys_right", v).apply() }
 
     fun updateLanguage(v: Language) { language = v; prefs.edit().putString("language", v.name).apply() }
     fun updateFps(v: Int) { fps = v; prefs.edit().putInt("fps", v).apply() }
