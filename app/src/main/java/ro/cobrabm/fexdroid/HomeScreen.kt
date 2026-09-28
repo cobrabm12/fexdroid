@@ -131,7 +131,8 @@ private fun UpdateCard() {
     }
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Versiune nouă disponibilă", style = MaterialTheme.typography.titleMedium)
+            Text(if (info.version.isEmpty()) "Versiune nouă disponibilă" else "Versiunea ${info.version} este disponibilă",
+                style = MaterialTheme.typography.titleMedium)
             Text("Construită la ${info.built.take(16).replace('T', ' ')} UTC · ${info.size shr 20} MB",
                 style = MaterialTheme.typography.bodySmall)
             when (st) {

@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # The version number is the count of commits.
 
       - uses: actions/setup-java@v4
         with:

@@ -283,6 +283,7 @@ object GameSession {
                 val p = xs.launch(game.tag, game.argv(env) + extra)
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())
+                if (AppSettings.threadPlacement) ThreadTuner.start(env.files)
                 // A game started in the session that installed it: the entry point asks for
                 // the rootfs (tools/steam/_v2-entry-point) and waits until the request is gone.
                 thread(name = "game-rootfs", isDaemon = true) {
@@ -307,6 +308,7 @@ object GameSession {
     /** Stops the game, audio and X server; back to Idle. */
     fun stop() {
         synchronized(this) { generation++ }
+        ThreadTuner.stop()
         DisplayBridge.stop()
         bridgeOn = false
         inputReady = false
@@ -318,17 +320,26 @@ object GameSession {
         playerVisible = false
     }
 
-    fun attachSurface(s: Surface) {
-        surface = s
+    /**
+     * The surfaces that exist. There can be two for a moment (the player's view is created
+     * again when the screen's layout changes while it appears): the picture stays on the one
+     * it is on for as long as that one lives, then moves to another one.
+     */
+    private val surfaces = LinkedHashSet<Surface>()
+
+    fun attachSurface(s: Surface) = synchronized(this) {
+        surfaces += s
+        if (surface == null) surface = s
         attachBridge()
     }
 
-    fun detachSurface() {
-        synchronized(this) {
-            if (bridgeOn) DisplayBridge.stop()
-            bridgeOn = false
-            surface = null
-        }
+    fun detachSurface(s: Surface) = synchronized(this) {
+        surfaces -= s
+        if (surface !== s) return@synchronized
+        if (bridgeOn) DisplayBridge.stop()
+        bridgeOn = false
+        surface = surfaces.lastOrNull()
+        attachBridge()
     }
 
     /** Starts copying X frames to the surface once both exist. */

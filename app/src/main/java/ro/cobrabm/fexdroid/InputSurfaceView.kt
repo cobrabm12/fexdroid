@@ -24,6 +24,7 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
         private const val WHEEL_STEP_X = 40f
         /** The view on screen, for mouse events the activity hands over (MainActivity). */
         @Volatile var current: InputSurfaceView? = null
+        private val attached = ArrayList<InputSurfaceView>() // Main thread only.
         /** A menu, the log or a dialog of the app is over the picture: the mouse is theirs. */
         @Volatile var overlayOpen = false
     }
@@ -31,8 +32,13 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
     /** eventTime of the last mouse event handled here. */
     @Volatile var lastMouseEventTime = 0L; private set
 
-    override fun onAttachedToWindow() { super.onAttachedToWindow(); current = this }
-    override fun onDetachedFromWindow() { if (current === this) current = null; super.onDetachedFromWindow() }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); attached += this; current = this }
+    override fun onDetachedFromWindow() {
+        // Two views can exist for a moment, see GameSession.attachSurface.
+        attached -= this
+        if (current === this) current = attached.lastOrNull()
+        super.onDetachedFromWindow()
+    }
 
     var inputEnabled = false
     private enum class Touch { NONE, PENDING, SCROLL, DRAG, RIGHT_CLICK }
@@ -68,13 +74,18 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
         MotionEvent.BUTTON_BACK to 8, MotionEvent.BUTTON_FORWARD to 9,
     )
     private val pressed = HashSet<Int>()
+    private var lastButtonState = 0
+    /** Buttons held according to key events, see [mouseBackKey]. */
+    private var keyButtonState = 0
 
     /**
      * X buttons follow the event's button state. Every mouse event carries it, so it does not
      * matter which of DOWN/UP and BUTTON_PRESS/BUTTON_RELEASE arrive, or in what order: not all
      * of them get through a Compose hierarchy to a view inside it.
      */
-    private fun syncButtons(state: Int) {
+    private fun syncButtons(motionState: Int) {
+        lastButtonState = motionState
+        val state = motionState or keyButtonState
         for ((mask, b) in mouseButtons) {
             if (state and mask != 0) { if (pressed.add(b)) XInput.button(b, true) }
             else if (pressed.remove(b)) XInput.button(b, false)
@@ -95,6 +106,20 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
                 syncButtons(e.buttonState)
             MotionEvent.ACTION_SCROLL -> scroll(e)
         }
+        return true
+    }
+
+    /**
+     * Android turns a mouse's second button into the Back key (and may not report the button
+     * in the pointer events at all). In a session it is the second button again. The Back
+     * key of a mouse that has a Back button of its own (reported in the pointer events)
+     * only repeats that button.
+     */
+    fun mouseBackKey(down: Boolean): Boolean {
+        if (!inputEnabled) return false
+        if (lastButtonState and MotionEvent.BUTTON_BACK != 0 && keyButtonState == 0) return true
+        keyButtonState = if (down) MotionEvent.BUTTON_SECONDARY else 0
+        syncButtons(lastButtonState)
         return true
     }
 

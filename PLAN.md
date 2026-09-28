@@ -152,7 +152,17 @@ funcționând acolo (pe hardware ARM Linux cu driver normal, nu Android).
 | 3 | ✅ `vkcube` arm64 și x86_64 (FEX + thunk) pe ecran, Turnip Adreno 660 | N-021 |
 | 4 | ✅ input XTEST (touch/tastatură verificate cu xev) și audio PulseAudio→AAudio (arm64 + x86 prin FEX); BT real netestat | N-022 |
 | 5 | ✅ clientul Steam se instalează singur din aplicație, login, bibliotecă, magazin, instalare de jocuri, Big Picture; pornește și pe Galaxy S26 Ultra (Android 16) | N-028, N-029, N-030, N-033 |
-| 6 | 🟨 **Dota 2 pornit din Steam ajunge la meniul principal, online** (25–29 cadre/s în joc, Demo Hero); meci + performanță urmează | N-024, N-030, N-031 |
+| 6 | 🟨 **Dota 2 pornit din Steam, online, meci privit (Watch)**. Realme GT încins (nuclee la 1075 MHz): scena cu zece eroi 36–38 cadre/s, meci real 15–21 înainte de așezarea firelor pe nuclee; rece: 37–40 înainte de ea. Un meci jucat de la cap la coadă: urmează | N-024, N-030, N-031, N-034 … N-039 |
+
+### Versiuni
+`MAJOR.MINOR.<număr de commit-uri>-<etapă>`; al treilea număr crește singur la fiecare versiune publicată și e
+și `versionCode`. `MAJOR.MINOR` și etapa se schimbă de mână în `app/build.gradle.kts`.
+
+| versiune | ce înseamnă | condiții |
+|---|---|---|
+| 0.3 alpha (acum) | pentru testeri, cu raport și actualizare din aplicație | — |
+| 0.5 beta | oricine o poate instala și juca fără ajutor | un meci Dota jucat întreg pe cel puțin trei telefoane diferite; prima pornire fără pași manuali; controale pe ecran sau gamepad; mesaje clare la erori |
+| 1.0 | publicul larg | interfață de tip Big Picture; al doilea joc verificat; prezentare directă pe GPU (D3); testat pe DeX; cheie de semnare păstrată în siguranță, în două locuri |
 
 ### Testare pe telefon (când e conectat)
 ```

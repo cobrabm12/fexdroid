@@ -72,6 +72,7 @@ object PerfSnapshot {
         appendLine("frames with new content: %.1f per second (the display looks %d times a second)"
             .format((DisplayBridge.changedFrames() - shown0) / seconds, AppSettings.fps))
         if (DisplayBridge.frames() == looked0) appendLine("(the display bridge is not running)")
+        ThreadTuner.status.takeIf { it.isNotEmpty() }?.let { appendLine("thread placement: $it") }
         appendLine("sound: in the sample $gaps output gaps and ${AudioBridge.holes() - holes0} holes from late programs; " +
             "since the session started ${AudioBridge.gaps()} and ${AudioBridge.holes()}")
 

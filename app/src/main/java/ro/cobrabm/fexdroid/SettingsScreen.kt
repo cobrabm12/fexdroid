@@ -86,6 +86,10 @@ fun SettingsScreen() {
                     "Jocurile cer plăcii grafice frecvența cea mai mare cât desenează. Mai multe cadre, telefon mai cald. " +
                         "Doar pe telefoane cu Adreno.",
                     AppSettings.gpuMaxFrequency, AppSettings::updateGpuMaxFrequency)
+                SwitchSetting("Nucleul cel mai rapid pentru firul principal",
+                    "Firul cel mai ocupat al jocului primește singur nucleul cel mai rapid al telefonului; restul " +
+                        "sesiunii rulează pe celelalte nuclee.",
+                    AppSettings.threadPlacement, AppSettings::updateThreadPlacement)
                 SwitchSetting("Profil de performanță pentru Dota 2",
                     "Setările video ale jocului pe cele mai ieftine valori: fără umbre, efecte puține, texturi mai mici. " +
                         "Se aplică la pornirea lui Steam, după ce jocul a fost pornit o dată. Oprit: revin setările tale.",
