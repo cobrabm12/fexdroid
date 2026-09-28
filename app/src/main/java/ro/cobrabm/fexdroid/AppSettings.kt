@@ -87,7 +87,7 @@ object AppSettings {
     var language by mutableStateOf(Language.SYSTEM); private set
     var threadPlacement by mutableStateOf(true); private set
     /** Games are told of less video memory than Mesa would report (MemoryWatch.videoMemoryShare). */
-    var limitVideoMemory by mutableStateOf(true); private set
+    var limitVideoMemory by mutableStateOf(false); private set
     /** Source 2 games' own libraries run without TSO emulation (FexConfig.SOURCE2_WITHOUT_TSO). */
     var source2WithoutTso by mutableStateOf(false); private set
     /** Dota 2's video settings set to the cheapest values before a session starts (DotaProfile). */
@@ -121,7 +121,8 @@ object AppSettings {
         dotaPerformance = prefs.getBoolean("dota_performance", false)
         gpuMaxFrequency = prefs.getBoolean("gpu_max_frequency", true)
         threadPlacement = prefs.getBoolean("thread_placement", true)
-        limitVideoMemory = prefs.getBoolean("limit_video_memory", true)
+        // Off unless chosen: what it saves is small, and a game that needs more than the limit ends.
+        limitVideoMemory = prefs.getBoolean("limit_video_memory", false)
         source2WithoutTso = prefs.getBoolean("source2_without_tso", false)
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)

@@ -1056,19 +1056,23 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   8,6 GB pe un telefon de 12 GB, iar Source 2 își dimensionează texturile după ea. Opțiunea Mesa
   `heap_memory_percent` se poate da și ca variabilă de mediu.
 
-  | anunțat | folosit (`GPUTotalUsed`) | rezultat |
-  |---|---|---|
-  | 75% = 8,6 GB | 3,5–3,7 GB | merge |
-  | 40% = 4,6 GB | 2,8–2,9 GB | merge, swap liber 1,8 GB în loc de 1,0 |
-  | 20% = 2,4 GB | 2,33 GB | `VK_ERROR_OUT_OF_DEVICE_MEMORY` la încărcarea meciului, jocul se închide |
+  Măsurat în același replay, de la pornirea jocului (minute de la pornire → `GPUTotalUsed`):
+
+  | anunțat | 2½ min | 5 min | 8 min | 11 min | 16 min | rezultat |
+  |---|---|---|---|---|---|---|
+  | 75% = 8,6 GB | 2,78 | 3,24 | 3,63 | 3,82 | 4,29 și crește | merge |
+  | 40% = 4,6 GB | 2,81 | 3,24 | 3,71 | 4,06 | 4,05–4,11, se oprește | merge |
+  | 20% = 2,4 GB | — | — | — | — | — | `VK_ERROR_OUT_OF_DEVICE_MEMORY` la încărcarea meciului |
 
   Din raportul jocului la eroare: texturi 393 MB (bugetul de streaming 412 MB, ~17% din cât e anunțat),
   vertex buffers 172 MB, **26 de zone de transfer („Staging”) mapate permanent, 872 MB**, restul rezerve ale
-  alocatorului (VMA). Deci folosit ≈ 2,1 GB + 17% din cât e anunțat.
-- ✅ **Setare „Mai puțină memorie video pentru jocuri”**, pornită implicit: `heap_memory_percent` = 40% din
-  memoria telefonului, dar cel puțin 4 GB și cel mult 75% (`MemoryWatch.videoMemoryShare`). Verificat din
-  aplicație: jurnalul sesiunii spune „video memory 0.40”, `GPUTotalUsed` 2,84 GB în replay.
-  🟨 Neverificat într-o sesiune de ore și pe un telefon de 8 GB (acolo marginea e de ~0,5 GB).
+  alocatorului (VMA).
+- **Greșeala mea:** am anunțat întâi o economie de 0,7 GB (2,9 față de 3,6 GB), comparând o citire de la 3 minute
+  cu una de la 15. La același minut diferența e de 0,0–0,1 GB, iar la platou de 0,2–0,3 GB. Memoria video crește
+  un sfert de oră după pornirea meciului, deci se compară doar citiri de la același minut.
+- 🟨 **Setare „Mai puțină memorie video pentru jocuri”, oprită implicit** (0.3.85 a avut-o pornită):
+  `heap_memory_percent` = 40% din memoria telefonului, cel puțin 4 GB (`MemoryWatch.videoMemoryShare`).
+  Câștigul e mic, iar jocul a ajuns la 0,5 GB de plafon; un joc care îl depășește se închide.
 - ✅ **Avertisment de memorie** (`MemoryWatch`): când `MemAvailable` e sub 500 MB sau swap-ul liber sub 600 MB de
   trei ori la rând, ecranul de joc arată un mesaj, iar jurnalul notează valorile. Raportul are linia
   „memory watch”. 🟨 Pragurile vin din două sesiuni pe un singur telefon.

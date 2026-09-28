@@ -35,7 +35,7 @@ Cifrele sunt de pe telefoane, nu estimări. Cum au fost măsurate scrie în [NOT
 
 - Cip **Snapdragon** cu **Adreno 6xx, 7xx sau 8xx** (Snapdragon 845 sau mai nou). Cu alte plăci grafice desenul se face pe procesor, mult prea lent pentru jocuri 3D.
 - **Android 12 sau mai nou** (testat pe 14 și 16), pe 64 de biți, cu pagini de memorie de 4 KB (aplicația verifică).
-- **12 GB de RAM sau mai mult** pentru Dota 2. Sub emulator jocul ocupă 5–6 GB, plus cam 3 GB de memorie video, care pe telefon e aceeași memorie.
+- **12 GB de RAM sau mai mult** pentru Dota 2. Sub emulator jocul ocupă 5–6 GB, plus 3–4 GB de memorie video, care pe telefon e aceeași memorie.
 - **Spațiu liber**: cam 5 GB pentru Steam, plus cât cere jocul (Dota 2: cam 70 GB).
 
 Primul ecran al aplicației arată un verdict pentru telefonul tău.

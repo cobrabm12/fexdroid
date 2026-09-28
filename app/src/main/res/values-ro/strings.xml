@@ -22,7 +22,7 @@
     <string name="check_kernel_old">%1$s: mai vechi decât 5.4, netestat. FEX poate avea probleme (recomandă 5.15+).</string>
     <string name="check_memory">Memorie RAM</string>
     <string name="check_memory_low">%1$d GB: puțin pentru Steam și jocuri; merg doar programe mici.</string>
-    <string name="check_memory_tight">%1$d GB: Dota 2 ocupă aici 5–8 GB. În sesiuni lungi Android poate rămâne fără memorie și închide jocul: închide celelalte aplicații și repornește aplicația între meciuri.</string>
+    <string name="check_memory_tight">%1$d GB: Dota 2 ocupă aici 5–6 GB, plus 3–4 GB de memorie video. În sesiuni lungi Android poate rămâne fără memorie și închide jocul: închide celelalte aplicații și repornește aplicația între meciuri.</string>
     <string name="check_pages">Pagini de memorie</string>
     <string name="check_pages_bad">%1$d KB: FEX funcționează doar cu pagini de 4 KB.</string>
     <string name="check_phantom">Limita de procese copil</string>
@@ -172,7 +172,7 @@
     <string name="settings_thread_placement_about">Firul cel mai ocupat al jocului primește singur nucleul cel mai rapid al telefonului; celelalte fire ale jocului rulează pe restul nucleelor mari, iar Steam și restul pe cele mici.</string>
     <string name="settings_title">Setări</string>
     <string name="settings_video_memory">Mai puțină memorie video pentru jocuri</string>
-    <string name="settings_video_memory_about" formatted="false">Jocurilor li se anunță ca memorie video 40% din memoria telefonului (cel puțin 4 GB) în loc de 75%, așa că țin mai puține texturi încărcate. Pe telefon memoria video e memorie obișnuită: Dota 2 ocupă cu 0,7 GB mai puțin. Oprește dacă un joc se închide cu „out of video memory”.</string>
+    <string name="settings_video_memory_about" formatted="false">Jocurilor li se anunță ca memorie video 40% din memoria telefonului (cel puțin 4 GB) în loc de 75%, așa că țin mai puține texturi încărcate. Câștigul e mic: Dota 2 ocupă cu 0,2–0,3 GB mai puțin. Un joc care are nevoie de mai mult se închide cu „out of video memory”.</string>
     <string name="settings_wide_sides">Margini laterale late</string>
     <string name="settings_wide_sides_about">Imaginea stă mai departe de marginile din stânga și din dreapta. Pe realme, OPPO și OnePlus bara de jocuri a telefonului acoperă marginea stângă: butoanele jocului de acolo nu se pot atinge.</string>
     <string name="settings_without_steam">Rulează jocul fără Steam</string>

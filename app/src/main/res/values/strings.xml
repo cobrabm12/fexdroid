@@ -22,7 +22,7 @@
     <string name="check_kernel_old">%1$s: older than 5.4, not tested. FEX may have problems (it recommends 5.15+).</string>
     <string name="check_memory">Memory (RAM)</string>
     <string name="check_memory_low">%1$d GB: little for Steam and games; only small programs work.</string>
-    <string name="check_memory_tight">%1$d GB: Dota 2 holds 5 to 8 GB here. In long sessions Android can run out of memory and close the game: close other apps, and restart the app between matches.</string>
+    <string name="check_memory_tight">%1$d GB: Dota 2 holds 5 to 6 GB here, and 3 to 4 GB of video memory. In long sessions Android can run out of memory and close the game: close other apps, and restart the app between matches.</string>
     <string name="check_pages">Memory pages</string>
     <string name="check_pages_bad">%1$d KB: FEX works with 4 KB pages only.</string>
     <string name="check_phantom">Limit of child processes</string>
@@ -172,7 +172,7 @@
     <string name="settings_thread_placement_about">The busiest thread of the game gets the phone\'s fastest core for itself; the game\'s other threads run on the other big cores, Steam and the rest on the small ones.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_video_memory">Less video memory for games</string>
-    <string name="settings_video_memory_about" formatted="false">Games are told of 40% of the phone\'s memory as video memory (at least 4 GB) instead of 75%, so they keep fewer textures loaded. On a phone video memory is ordinary memory: Dota 2 holds 0.7 GB less. Off if a game ends with “out of video memory”.</string>
+    <string name="settings_video_memory_about" formatted="false">Games are told of 40% of the phone\'s memory as video memory (at least 4 GB) instead of 75%, so they keep fewer textures loaded. The gain is small: Dota 2 holds 0.2 to 0.3 GB less. A game that needs more than that ends with “out of video memory”.</string>
     <string name="settings_wide_sides">Wide left and right margins</string>
     <string name="settings_wide_sides_about">The picture stays further from the left and right edges. On realme, OPPO and OnePlus the phone\'s game bar covers the left edge: a game\'s buttons under it cannot be touched.</string>
     <string name="settings_without_steam">Run the game without Steam</string>

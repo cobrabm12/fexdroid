@@ -35,7 +35,7 @@ Numbers are from the phones themselves, not estimates. How they were measured is
 
 - A **Snapdragon** chip with an **Adreno 6xx, 7xx or 8xx** (Snapdragon 845 or newer). Other graphics processors fall back to drawing on the CPU, which is far too slow for 3D games.
 - **Android 12 or newer** (tested on 14 and 16), 64-bit, memory pages of 4 KB (the app checks).
-- **12 GB of RAM or more** for Dota 2. Under the emulator the game holds 5 to 6 GB, and about 3 GB of video memory, which on a phone is the same memory.
+- **12 GB of RAM or more** for Dota 2. Under the emulator the game holds 5 to 6 GB, and 3 to 4 GB of video memory, which on a phone is the same memory.
 - **Free space**: about 5 GB for Steam, and what the game needs on top (Dota 2: about 70 GB).
 
 The app's first screen shows a verdict for your phone.

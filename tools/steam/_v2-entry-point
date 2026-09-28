@@ -24,10 +24,12 @@ done
 
 # Experiments without restarting Steam: KEY=VALUE lines in files/session-env.txt (the app
 # gives them to Steam at its start, XSession.kt) are read again for every program started.
+# A line "!KEY" takes a variable away from the program, to compare with a setting of the app.
 if [ -n "${FXD_FILES:-}" ] && [ -f "$FXD_FILES/session-env.txt" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in
             ''|'#'*) ;;
+            '!'*) unset "${line#!}" ;;
             *=*) export "${line%%=*}=${line#*=}" ;;
         esac
     done < "$FXD_FILES/session-env.txt"
