@@ -34,13 +34,13 @@ object DeviceCheck {
     }
 
     private fun abi(): Item =
-        if ("arm64-v8a" in Build.SUPPORTED_ABIS) Item(Level.OK, "Procesor pe 64 de biți", "arm64-v8a")
-        else Item(Level.ERROR, "Procesor pe 64 de biți", "Lipsește arm64-v8a (${Build.SUPPORTED_ABIS.joinToString()}): FEX rulează doar pe ARM64.")
+        if ("arm64-v8a" in Build.SUPPORTED_ABIS) Item(Level.OK, str(R.string.check_abi), "arm64-v8a")
+        else Item(Level.ERROR, str(R.string.check_abi), str(R.string.check_abi_missing, Build.SUPPORTED_ABIS.joinToString()))
 
     private fun pageSize(): Item {
         val page = Os.sysconf(OsConstants._SC_PAGESIZE)
-        return if (page == 4096L) Item(Level.OK, "Pagini de memorie", "4 KB")
-        else Item(Level.ERROR, "Pagini de memorie", "${page / 1024} KB: FEX funcționează doar cu pagini de 4 KB (NOTES N-001).")
+        return if (page == 4096L) Item(Level.OK, str(R.string.check_pages), "4 KB")
+        else Item(Level.ERROR, str(R.string.check_pages), str(R.string.check_pages_bad, page / 1024))
     }
 
     /** FEX is built with -march=armv8.2-a (scripts/build-fex.sh): LSE atomics and FP16 must be present. */
@@ -49,14 +49,14 @@ object DeviceCheck {
             .firstOrNull { it.startsWith("Features") }?.substringAfter(':')?.trim()?.split(' ')?.toSet().orEmpty()
         val missing = listOf("atomics", "asimdhp", "fphp").filter { it !in features }
         return when {
-            features.isEmpty() -> Item(Level.INFO, "Procesor ARMv8.2", "Nu pot citi /proc/cpuinfo.")
-            missing.isEmpty() -> Item(Level.OK, "Procesor ARMv8.2", buildString {
+            features.isEmpty() -> Item(Level.INFO, str(R.string.check_cpu), str(R.string.check_cpu_unreadable))
+            missing.isEmpty() -> Item(Level.OK, str(R.string.check_cpu), buildString {
                 append("atomics, fp16")
                 if ("lrcpc" in features) append(", rcpc")
                 if ("uscat" in features) append(", lse2")
             })
-            else -> Item(Level.ERROR, "Procesor ARMv8.2",
-                "Lipsesc ${missing.joinToString()}: build-ul FEX actual cere ARMv8.2 (Snapdragon 845 sau mai nou).")
+            else -> Item(Level.ERROR, str(R.string.check_cpu),
+                str(R.string.check_cpu_missing, missing.joinToString()))
         }
     }
 
@@ -64,7 +64,7 @@ object DeviceCheck {
 
     /** Turnip (Mesa) drives Adreno 6xx/7xx/8xx through /dev/kgsl-3d0; nothing else has a Linux Vulkan driver here. */
     private fun gpu(): Item {
-        val title = "Placă video (Turnip)"
+        val title = str(R.string.check_gpu)
         val kgsl = File("/dev/kgsl-3d0").exists()
         val sysfs = Recon.readFile("/sys/class/kgsl/kgsl-3d0/gpu_model").trim()
         val egl = Recon.getprop("ro.hardware.egl")
@@ -76,19 +76,19 @@ object DeviceCheck {
                 Regex("mali", RegexOption.IGNORE_CASE).containsMatchIn(hint) -> "Mali (Exynos / Dimensity / Tensor)"
                 Regex("xclipse|samsung", RegexOption.IGNORE_CASE).containsMatchIn(hint) -> "Xclipse (Exynos)"
                 Regex("powervr|\\bimg\\b", RegexOption.IGNORE_CASE).containsMatchIn(hint) -> "PowerVR"
-                else -> "necunoscută (egl=$egl, vulkan=$vk)"
+                else -> str(R.string.check_gpu_unknown, egl, vk)
             }
             return Item(Level.INFO, title,
-                "GPU $what: fără Turnip (merge doar pe Adreno/Snapdragon). Grafica rulează pe procesor (lavapipe): " +
-                    "Steam și jocurile 2D/ușoare merg, jocurile 3D mari vor fi foarte lente.")
+                str(R.string.check_gpu_no_turnip, what))
         }
-        if (m == null) return Item(Level.INFO, title, "Adreno (model necunoscut: \"$sysfs\"). Rulează Avansat › Recunoaștere pentru detalii.")
+        if (m == null) return Item(Level.INFO, title, str(R.string.check_gpu_adreno_unknown, sysfs))
         val series = m.groupValues[1].toInt()
         val model = "${m.groupValues[1]}${m.groupValues[2]}"
         return when {
-            model == "660" -> Item(Level.OK, title, "Adreno $model — verificat (Realme GT, Dota 2 la meniu).")
-            series in 6..8 -> Item(Level.OK, title, "Adreno $model — suportat de Turnip; netestat încă în fexdroid.")
-            else -> Item(Level.ERROR, title, "Adreno $model: Turnip suportă doar seriile 6xx, 7xx și 8xx.")
+            model == "660" -> Item(Level.OK, title, str(R.string.check_gpu_verified_660, model))
+            model == "840" -> Item(Level.OK, title, str(R.string.check_gpu_verified_840, model))
+            series in 6..8 -> Item(Level.OK, title, str(R.string.check_gpu_supported, model))
+            else -> Item(Level.ERROR, title, str(R.string.check_gpu_unsupported, model))
         }
     }
 
@@ -99,20 +99,18 @@ object DeviceCheck {
         val v = major * 100 + minor
         return when {
             v >= 515 -> Item(Level.OK, "Kernel", release)
-            v >= 504 -> Item(Level.OK, "Kernel", "$release (FEX recomandă 5.15+; 5.4 e verificat pe Realme GT)")
-            else -> Item(Level.INFO, "Kernel", "$release: mai vechi decât 5.4, netestat. FEX poate avea probleme (recomandă 5.15+).")
+            v >= 504 -> Item(Level.OK, "Kernel", str(R.string.check_kernel_54, release))
+            else -> Item(Level.INFO, "Kernel", str(R.string.check_kernel_old, release))
         }
     }
 
     private fun android(ctx: Context): Item {
         val target = ctx.applicationInfo.targetSdkVersion
         return when {
-            target > 28 -> Item(Level.ERROR, "Varianta aplicației",
-                "Varianta „modern” (targetSdk $target) nu poate executa programe din datele aplicației (NOTES N-010). Instalează varianta „legacy”.")
+            target > 28 -> Item(Level.ERROR, str(R.string.check_variant),
+                str(R.string.check_variant_modern, target))
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S -> Item(Level.INFO, "Android",
-                "${Build.VERSION.RELEASE}: mai vechi decât Android 12, netestat.")
-            Build.MANUFACTURER.equals("samsung", ignoreCase = true) -> Item(Level.INFO, "Android",
-                "${Build.VERSION.RELEASE} (Samsung): politica seccomp poate diferi de AOSP; netestat încă.")
+                str(R.string.check_android_old, Build.VERSION.RELEASE))
             else -> Item(Level.OK, "Android", Build.VERSION.RELEASE)
         }
     }
@@ -122,26 +120,26 @@ object DeviceCheck {
         (ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(mi)
         val gib = (mi.totalMem + (1L shl 29)) shr 30
         return when {
-            gib >= 8 -> Item(Level.OK, "Memorie RAM", "$gib GB")
-            gib >= 6 -> Item(Level.INFO, "Memorie RAM", "$gib GB: jocurile mari (Dota 2 folosește 2–4 GB) pot fi închise de Android.")
-            else -> Item(Level.INFO, "Memorie RAM", "$gib GB: puțin pentru Steam și jocuri; merg doar programe mici.")
+            // Dota 2 under the emulator: 4.5 GB at its main menu, 7-8 GB after a few matches (NOTES N-042).
+            gib >= 15 -> Item(Level.OK, str(R.string.check_memory), "$gib GB")
+            gib >= 7 -> Item(Level.INFO, str(R.string.check_memory), str(R.string.check_memory_tight, gib))
+            else -> Item(Level.INFO, str(R.string.check_memory), str(R.string.check_memory_low, gib))
         }
     }
 
     private fun storage(ctx: Context): Item {
         val free = StatFs(ctx.filesDir.path).availableBytes shr 30
-        return if (free >= 20) Item(Level.OK, "Spațiu liber", "$free GB")
-        else Item(Level.INFO, "Spațiu liber", "$free GB: mediul Linux și Steam au nevoie de ~5 GB, jocurile de zeci de GB.")
+        return if (free >= 20) Item(Level.OK, str(R.string.check_storage), "$free GB")
+        else Item(Level.INFO, str(R.string.check_storage), str(R.string.check_storage_low, free))
     }
 
     /** Android 12+ kills "phantom" child processes beyond a limit (32); Steam starts many. */
     private fun phantomProcesses(): Item {
-        val title = "Limita de procese copil"
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return Item(Level.OK, title, "Nu există înainte de Android 12.")
+        val title = str(R.string.check_phantom)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return Item(Level.OK, title, str(R.string.check_phantom_none))
         val max = Recon.runCmd("/system/bin/device_config", "get", "activity_manager", "max_phantom_processes").trim().toIntOrNull()
-        return if (max != null && max >= 1024) Item(Level.OK, title, "Dezactivată ($max)")
+        return if (max != null && max >= 1024) Item(Level.OK, title, str(R.string.check_phantom_off, max))
         else Item(Level.INFO, title,
-            "Android poate opri Steam (limită ${max ?: 32}). Din Opțiuni dezvoltator › „Dezactivează restricțiile pentru procesele copil” " +
-                "sau pe PC: adb shell device_config put activity_manager max_phantom_processes 2147483647")
+            str(R.string.check_phantom_on, max ?: 32))
     }
 }

@@ -7,10 +7,9 @@ import java.io.File
  * FEX speed/accuracy trade-offs the user picks in Setări › Performanță.
  * Option names and defaults are from FEX-2609 FEXCore/Source/Interface/Config/Config.json.in.
  */
-enum class FexProfile(val label: String, val description: String, val options: Map<String, String>) {
+enum class FexProfile(val label: Int, val description: Int, val options: Map<String, String>) {
     /** Strictest x86 memory ordering: for games that crash or glitch with the default. */
-    COMPATIBLE("Compatibil",
-        "Ordine a memoriei x86 completă, și pentru vectori și memcpy. Cel mai lent; pentru jocuri care crapă.",
+    COMPATIBLE(R.string.fex_compatible, R.string.fex_compatible_about,
         mapOf("TSOEnabled" to "1", "VectorTSOEnabled" to "1", "MemcpySetTSOEnabled" to "1",
             "HalfBarrierTSOEnabled" to "1", "X87ReducedPrecision" to "0")),
     /**
@@ -18,13 +17,11 @@ enum class FexProfile(val label: String, val description: String, val options: M
      * (Source/Steam/ConfigTemplate.json): 80-bit x87 is emulated in software, one call per
      * operation (Dota 2 in a match: 50,000 a second on its main thread).
      */
-    BALANCED("Echilibrat",
-        "Setările implicite FEX, cu x87 pe 64 de biți ca în configurația FEX pentru Steam. Recomandat.",
+    BALANCED(R.string.fex_balanced, R.string.fex_balanced_about,
         mapOf("TSOEnabled" to "1", "VectorTSOEnabled" to "0", "MemcpySetTSOEnabled" to "0",
             "HalfBarrierTSOEnabled" to "1", "X87ReducedPrecision" to "1")),
     /** No TSO emulation: much faster, but multithreaded games may crash or hang. */
-    FAST("Rapid",
-        "Fără emularea ordinii memoriei x86 și cu x87 pe 64 de biți. Mult mai rapid, dar unele jocuri pot crăpa sau îngheța.",
+    FAST(R.string.fex_fast, R.string.fex_fast_about,
         mapOf("TSOEnabled" to "0", "VectorTSOEnabled" to "0", "MemcpySetTSOEnabled" to "0",
             "HalfBarrierTSOEnabled" to "0", "X87ReducedPrecision" to "1")),
 }

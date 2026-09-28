@@ -68,8 +68,8 @@ fun LinuxScreen(autoAction: String?, autoCmd: String? = null) {
     }
 
     fun status(): String = env.pathProblem()
-        ?: if (env.needsInstall()) "Payload neinstalat (versiune ${env.payloadVersion()})."
-        else "Payload instalat: ${env.installedVersion()} în ${env.root}"
+        ?: if (env.needsInstall()) "Payload not installed (version ${env.payloadVersion()})."
+        else "Payload installed: ${env.installedVersion()} in ${env.root}"
 
     fun job(title: String, body: suspend () -> Unit) {
         if (busy) return
@@ -98,11 +98,11 @@ fun LinuxScreen(autoAction: String?, autoCmd: String? = null) {
         when (autoAction) {
             // adb debugging: `--es action cmd --es cmd '<shell command>'`, run inside the app sandbox.
             "cmd" -> autoCmd?.let { c -> runArgv(c) { listOf("${env.root}/bin/sh", "-c", c) } }
-            "phase1" -> runArgv("faza 1: sh -c 'uname -a; ls /'") { LinuxSteps.phase1(env) }
-            "fex-static" -> runArgv("faza 2: FEX hello-static") { LinuxSteps.fexStatic(env) }
-            "fex-dynamic" -> runArgv("faza 2: FEX hello-dynamic") { LinuxSteps.fexDynamic(env) }
-            "vulkaninfo" -> runArgv("faza 3: vulkaninfo arm64 (Turnip)") { LinuxSteps.vulkaninfo(env) }
-            "fex-vulkaninfo" -> runArgv("faza 3: vulkaninfo x86_64 prin FEX") { LinuxSteps.fexVulkaninfo(env) }
+            "phase1" -> runArgv("phase 1: sh -c 'uname -a; ls /'") { LinuxSteps.phase1(env) }
+            "fex-static" -> runArgv("phase 2: FEX hello-static") { LinuxSteps.fexStatic(env) }
+            "fex-dynamic" -> runArgv("phase 2: FEX hello-dynamic") { LinuxSteps.fexDynamic(env) }
+            "vulkaninfo" -> runArgv("phase 3: vulkaninfo arm64 (Turnip)") { LinuxSteps.vulkaninfo(env) }
+            "fex-vulkaninfo" -> runArgv("phase 3: vulkaninfo x86_64 through FEX") { LinuxSteps.fexVulkaninfo(env) }
         }
     }
 
@@ -111,29 +111,29 @@ fun LinuxScreen(autoAction: String?, autoCmd: String? = null) {
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
             OutlinedButton(enabled = !busy, onClick = {
-                job("instalare payload") { withContext(Dispatchers.IO) { env.pathProblem()?.let(::append) ?: env.install(::append) } }
-            }) { Text("Reinstalează rootfs") }
-            Button(enabled = !busy, onClick = { runArgv("faza 1: sh -c 'uname -a; ls /'") { LinuxSteps.phase1(env) } }) {
-                Text("Faza 1: uname + ls")
+                job("install the payload") { withContext(Dispatchers.IO) { env.pathProblem()?.let(::append) ?: env.install(::append) } }
+            }) { Text("Reinstall the rootfs") }
+            Button(enabled = !busy, onClick = { runArgv("phase 1: sh -c 'uname -a; ls /'") { LinuxSteps.phase1(env) } }) {
+                Text("Phase 1: uname + ls")
             }
-            Button(enabled = !busy, onClick = { runArgv("faza 2: FEX hello-static") { LinuxSteps.fexStatic(env) } }) {
+            Button(enabled = !busy, onClick = { runArgv("phase 2: FEX hello-static") { LinuxSteps.fexStatic(env) } }) {
                 Text("FEX static")
             }
-            Button(enabled = !busy, onClick = { runArgv("faza 2: FEX hello-dynamic") { LinuxSteps.fexDynamic(env) } }) {
-                Text("FEX dinamic")
+            Button(enabled = !busy, onClick = { runArgv("phase 2: FEX hello-dynamic") { LinuxSteps.fexDynamic(env) } }) {
+                Text("FEX dynamic")
             }
-            Button(enabled = !busy, onClick = { runArgv("faza 3: vulkaninfo arm64 (Turnip)") { LinuxSteps.vulkaninfo(env) } }) {
+            Button(enabled = !busy, onClick = { runArgv("phase 3: vulkaninfo arm64 (Turnip)") { LinuxSteps.vulkaninfo(env) } }) {
                 Text("vulkaninfo (Turnip)")
             }
-            Button(enabled = !busy, onClick = { runArgv("faza 3: vulkaninfo x86_64 prin FEX") { LinuxSteps.fexVulkaninfo(env) } }) {
+            Button(enabled = !busy, onClick = { runArgv("phase 3: vulkaninfo x86_64 through FEX") { LinuxSteps.fexVulkaninfo(env) } }) {
                 Text("vulkaninfo x86 (FEX)")
             }
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             OutlinedTextField(command, { command = it }, Modifier.weight(1f), singleLine = true,
-                label = { Text("comandă sh") })
+                label = { Text("sh command") })
             Button(enabled = !busy, modifier = Modifier.padding(start = 8.dp),
-                onClick = { val c = command; runArgv(c) { listOf("${env.root}/bin/sh", "-c", c) } }) { Text("Rulează") }
+                onClick = { val c = command; runArgv(c) { listOf("${env.root}/bin/sh", "-c", c) } }) { Text("Run") }
         }
         SelectionContainer(Modifier.fillMaxSize().padding(top = 6.dp).verticalScroll(rememberScrollState())
             .horizontalScroll(rememberScrollState())) {

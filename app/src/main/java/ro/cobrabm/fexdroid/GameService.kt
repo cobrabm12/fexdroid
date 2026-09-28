@@ -34,7 +34,7 @@ class GameService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Joc pornit", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, str(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW))
         // Launcher intent: brings the existing task back instead of stacking a second activity.
         val launch = packageManager.getLaunchIntentForPackage(packageName)
             ?: Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -45,8 +45,8 @@ class GameService : Service() {
         val title = intent?.getStringExtra("title") ?: "fexdroid"
         val n = Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("$title rulează")
-            .setContentText("Atinge pentru a reveni la joc")
+            .setContentTitle(str(R.string.session_running, title))
+            .setContentText(str(R.string.notification_text))
             .setContentIntent(open)
             .setOngoing(true)
             .build()

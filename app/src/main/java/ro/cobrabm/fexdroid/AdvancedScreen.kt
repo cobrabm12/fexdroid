@@ -55,9 +55,9 @@ fun AdvancedScreen(initialTab: Int, autorun: Boolean, action: String?, cmd: Stri
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     Column(Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = tab) {
-            Tab(tab == 0, { tab = 0 }, text = { Text("Recunoaștere") })
-            Tab(tab == 1, { tab = 1 }, text = { Text("Linux · Faza 1–3") })
-            Tab(tab == 2, { tab = 2 }, text = { Text("Ecran X11") })
+            Tab(tab == 0, { tab = 0 }, text = { Text("Recon") })
+            Tab(tab == 1, { tab = 1 }, text = { Text("Linux · phases 1–3") })
+            Tab(tab == 2, { tab = 2 }, text = { Text("X11 screen") })
         }
         when (tab) {
             0 -> ReconScreen(autorun)
@@ -76,11 +76,11 @@ private fun SessionBusy() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(AppIcons.Info, null)
                 Spacer(Modifier.width(12.dp))
-                Text("Un joc rulează", style = MaterialTheme.typography.titleMedium)
+                Text(str(R.string.advanced_game_running), style = MaterialTheme.typography.titleMedium)
             }
-            Text("Ecranul de test X11 folosește același ecran virtual. Oprește jocul ca să-l deschizi.",
+            Text(str(R.string.advanced_game_running_about),
                 style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = { GameSession.stop() }) { Text("Oprește jocul") }
+            Button(onClick = { GameSession.stop() }) { Text(str(R.string.advanced_stop_game)) }
         }
     }
 }
@@ -90,7 +90,7 @@ fun ReconScreen(autorun: Boolean) {
     val activity = androidx.compose.ui.platform.LocalContext.current as MainActivity
     val scope = rememberCoroutineScope()
     var report by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Apasă „Rulează” pentru recunoașterea telefonului.") }
+    var status by remember { mutableStateOf("Press “Run” to collect what this phone allows.") }
     var running by remember { mutableStateOf(false) }
 
     fun run() {
@@ -101,7 +101,7 @@ fun ReconScreen(autorun: Boolean) {
             val sb = StringBuilder(recon.header())
             report = sb.toString()
             for ((name, probe) in recon.sections()) {
-                status = "Rulez: $name…"
+                status = "Running: $name…"
                 val text = withContext(Dispatchers.IO) {
                     runCatching(probe).getOrElse { "EXCEPTION: $it" }
                 }
@@ -113,7 +113,7 @@ fun ReconScreen(autorun: Boolean) {
                 file.writeText(report)
                 report.lines().forEach { Log.i("fexdroid-recon", it) }
             }
-            status = "Gata. Salvat în ${file.absolutePath}"
+            status = "Done. Saved to ${file.absolutePath}"
             running = false
         }
     }
@@ -121,13 +121,13 @@ fun ReconScreen(autorun: Boolean) {
     LaunchedEffect(Unit) { if (autorun) run() }
 
     Column(Modifier.fillMaxSize().padding(12.dp)) {
-        Text("fexdroid · Faza 0: recunoaștere", style = MaterialTheme.typography.titleLarge)
+        Text("fexdroid · phase 0: recon", style = MaterialTheme.typography.titleLarge)
         Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 6.dp))
         if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
-            Button(onClick = ::run, enabled = !running) { Text("Rulează") }
+            Button(onClick = ::run, enabled = !running) { Text("Run") }
             OutlinedButton(onClick = { activity.share(report) }, enabled = !running && report.isNotEmpty()) {
-                Text("Trimite raportul")
+                Text(str(R.string.home_send))
             }
         }
         SelectionContainer(Modifier.fillMaxSize().verticalScroll(rememberScrollState())

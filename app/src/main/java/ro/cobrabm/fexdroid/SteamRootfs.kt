@@ -33,12 +33,12 @@ object SteamRootfs {
     /** What went wrong, in words a player can act on. */
     private fun explain(t: Throwable, env: LinuxEnv): String = when (t) {
         is java.net.UnknownHostException, is java.net.ConnectException, is java.net.NoRouteToHostException ->
-            "Nu există conexiune la internet. Pornește Wi-Fi sau datele mobile și încearcă din nou."
+            str(R.string.error_no_internet_long)
         is java.net.SocketTimeoutException, is javax.net.ssl.SSLException ->
-            "Conexiunea s-a întrerupt în timpul descărcării. Încearcă din nou."
+            str(R.string.error_connection_lost_download)
         is java.io.IOException ->
-            if (env.files.usableSpace < (700L shl 20)) "Nu mai este loc pe telefon: sunt necesari cam 700 MB liberi."
-            else "Descărcarea a eșuat: ${t.message ?: t}"
+            if (env.files.usableSpace < (700L shl 20)) str(R.string.error_no_space)
+            else str(R.string.error_download_failed, (t.message ?: t).toString())
         else -> t.message ?: t.toString()
     }
 
@@ -74,7 +74,7 @@ object SteamRootfs {
                 conn.disconnect()
                 File(tmp, ".complete").writeText("$URL\n")
                 env.x86Steam.deleteRecursively()
-                if (!tmp.renameTo(env.x86Steam)) throw RuntimeException("nu pot redenumi ${tmp.path}")
+                if (!tmp.renameTo(env.x86Steam)) throw RuntimeException("cannot rename ${tmp.path}")
                 state = State.Done
             } catch (t: Throwable) {
                 tmp.deleteRecursively()

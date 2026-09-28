@@ -53,8 +53,8 @@ fun DisplayScreen(autoAction: String?) {
 
     fun startX() = thread(name = "start-x") {
         if (!env.ensureInstalled(::append)) return@thread
-        if (!session.startX()) { append("Xvfb nu a raportat un framebuffer (vezi log)."); return@thread }
-        val h = holder ?: run { append("Suprafața nu e gata."); return@thread }
+        if (!session.startX()) { append("Xvfb did not report a framebuffer (see the log)."); return@thread }
+        val h = holder ?: run { append("The surface is not ready."); return@thread }
         append(DisplayBridge.start(h.surface, session.fxshmSocket, session.shmid, AppSettings.fps))
         append(XInput.connect(0))
         view?.post { view?.inputEnabled = true; view?.requestFocus() }
@@ -121,9 +121,9 @@ fun DisplayScreen(autoAction: String?) {
                 }
             },
         )
-        Text("cadre afișate: $frames · audio: ${audioFrames / 48000} s redate", style = MaterialTheme.typography.bodySmall)
+        Text("frames shown: $frames · sound: ${audioFrames / 48000} s played", style = MaterialTheme.typography.bodySmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { startX() }) { Text("Pornește X") }
+            Button(onClick = { startX() }) { Text("Start X") }
             Button(onClick = { thread { startSteam() } }) { Text("Steam") }
             Button(onClick = { thread { startDota() } }) { Text("Dota 2 (direct)") }
             Button(onClick = { thread { startX().join(); session.launch("vkcube", listOf("${env.root}/usr/bin/vkcube")) } }) {
@@ -135,20 +135,20 @@ fun DisplayScreen(autoAction: String?) {
                     session.launch("vkcube-x86", listOf("${env.root}/usr/bin/FEX", "${env.x86Root}/usr/bin/vkcube"))
                 }
             }) { Text("vkcube x86 (FEX)") }
-            OutlinedButton(onClick = { view?.requestPointerCapture() }) { Text("Captează mouse (Ctrl+Alt eliberează)") }
+            OutlinedButton(onClick = { view?.requestPointerCapture() }) { Text("Capture the mouse (Ctrl+Alt releases)") }
             OutlinedButton(onClick = {
                 view?.let { v ->
                     v.requestFocus()
                     ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
                         .showSoftInput(v, 0)
                 }
-            }) { Text("Tastatură") }
-            Button(onClick = { sh("tone", "${env.root}/opt/fexdroid-tests/tone 3 | pacat $toneRaw") }) { Text("Test sunet") }
+            }) { Text("Keyboard") }
+            Button(onClick = { sh("tone", "${env.root}/opt/fexdroid-tests/tone 3 | pacat $toneRaw") }) { Text("Sound test") }
             Button(onClick = {
                 sh("tone-x86", "${env.root}/opt/fexdroid-tests/tone 3 | ${env.root}/usr/bin/FEX ${env.x86Root}/usr/bin/pacat $toneRaw")
-            }) { Text("Test sunet x86 (FEX)") }
+            }) { Text("Sound test x86 (FEX)") }
             Button(onClick = { thread { startX().join(); session.launch("xev", listOf("${env.root}/usr/bin/xev")) } }) { Text("xev") }
-            OutlinedButton(onClick = { DisplayBridge.stop(); thread(name = "x-stop") { session.stopAll() } }) { Text("Oprește tot") }
+            OutlinedButton(onClick = { DisplayBridge.stop(); thread(name = "x-stop") { session.stopAll() } }) { Text("Stop everything") }
         }
         Text(log, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
     }

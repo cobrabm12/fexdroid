@@ -22,7 +22,7 @@ class Recon(private val ctx: Context) {
 
     fun sections(): List<Pair<String, () -> String>> = listOf(
         "identity" to ::identity,
-        "compatibility (fexdroid)" to { DeviceCheck.report(DeviceCheck.run(ctx)) },
+        "compatibility (fexdroid)" to { Strings.inEnglish { DeviceCheck.report(DeviceCheck.run(ctx)) } },
         "memory / page size" to ::memory,
         "kernel" to { readFile("/proc/version") },
         "cpu" to ::cpu,

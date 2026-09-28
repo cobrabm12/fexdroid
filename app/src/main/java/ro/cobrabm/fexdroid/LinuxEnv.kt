@@ -42,11 +42,10 @@ class LinuxEnv(private val ctx: Context) {
 
     /** glibc has the rootfs path compiled in; this app's filesDir must match it. */
     fun pathProblem(): String? {
-        val want = expected?.optString("root") ?: return "APK fără payload (rulează scripts/build-payload.sh)"
+        val want = expected?.optString("root") ?: return str(R.string.payload_missing)
         val have = File("/data/data/${ctx.packageName}/files/rootfs")
         return if (have.path != want)
-            "Payload construit pentru $want, dar aplicația folosește ${have.path}. " +
-                "Faza 1 merge doar pe varianta legacy (sau reconstruiește cu FXD_PACKAGE=${ctx.packageName})."
+            str(R.string.payload_other_path, want, have.path)
         else null
     }
 
@@ -69,19 +68,19 @@ class LinuxEnv(private val ctx: Context) {
     private fun installLocked(log: (String) -> Unit) {
         versionFile.delete()
         for ((asset, dir) in listOf("rootfs-arm64.tar" to root, "rootfs-x86_64.tar" to x86Base)) {
-            log("Șterg $dir …")
+            log("Removing $dir …")
             dir.deleteRecursively()
             dir.mkdirs()
-            log("Extrag $asset …")
+            log("Extracting $asset …")
             val t0 = System.nanoTime()
             val tx = TarExtractor(dir) { bytes -> log("  $asset: ${bytes shr 20} MiB") }
             ctx.assets.open(asset).buffered(1 shl 16).use { tx.extract(it) }
-            log("  gata: ${tx.files} fișiere, ${tx.symlinks} symlink-uri, ${tx.hardlinks} hardlink-uri " +
-                "în ${(System.nanoTime() - t0) / 1_000_000} ms")
+            log("  done: ${tx.files} files, ${tx.symlinks} symlinks, ${tx.hardlinks} hard links " +
+                "in ${(System.nanoTime() - t0) / 1_000_000} ms")
         }
         writeIdentityFiles()
         versionFile.writeText(payloadVersion() ?: "")
-        log("Payload instalat.")
+        log("Payload installed.")
     }
 
     /** /etc files that depend on this device/user (glibc reads them from rootfs/etc). */

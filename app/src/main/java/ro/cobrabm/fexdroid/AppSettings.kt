@@ -84,6 +84,7 @@ object AppSettings {
      */
     var gpuMaxFrequency by mutableStateOf(true); private set
     /** The busiest thread of a game gets the fastest core for itself (ThreadTuner). */
+    var language by mutableStateOf(Language.SYSTEM); private set
     var threadPlacement by mutableStateOf(true); private set
     /** Source 2 games' own libraries run without TSO emulation (FexConfig.SOURCE2_WITHOUT_TSO). */
     var source2WithoutTso by mutableStateOf(false); private set
@@ -105,6 +106,7 @@ object AppSettings {
             prefs.getInt("x_width", Resolution.DEFAULT.width),
             prefs.getInt("x_height", Resolution.DEFAULT.height),
         )
+        language = runCatching { Language.valueOf(prefs.getString("language", null) ?: "SYSTEM") }.getOrDefault(Language.SYSTEM)
         fitScreen = prefs.getBoolean("fit_screen", true)
         screenMargin = prefs.getInt("screen_margin", 3)
         wideSides = prefs.getBoolean("wide_sides",
@@ -135,6 +137,7 @@ object AppSettings {
     fun sessionResolution(ctx: Context) =
         if (fitScreen) Resolution.fitted(ctx, resolution, screenMargin, wideSides) else resolution
 
+    fun updateLanguage(v: Language) { language = v; prefs.edit().putString("language", v.name).apply() }
     fun updateFps(v: Int) { fps = v; prefs.edit().putInt("fps", v).apply() }
     fun updateDynamicColor(v: Boolean) { dynamicColor = v; prefs.edit().putBoolean("dynamic_color", v).apply() }
     fun updateTheme(v: ThemeMode) { theme = v; prefs.edit().putString("theme", v.name).apply() }

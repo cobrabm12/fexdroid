@@ -163,8 +163,7 @@ jobs:
         run: |
           cp app/build/outputs/apk/legacy/debug/app-legacy-debug.apk fexdroid-legacy.apk
           gh release view apk-latest >/dev/null 2>&1 || \
-            gh release create apk-latest --target "$GITHUB_SHA" --prerelease --title "fexdroid APK (latest build)" \
-              --notes "Full APK with the Linux payload, built by the Full APK workflow. Install fexdroid-legacy.apk."
+            gh release create apk-latest --target "$GITHUB_SHA" --prerelease --title "fexdroid (latest build)" --notes "fexdroid"
           gh release upload apk-latest --clobber fexdroid-legacy.apk
           # For the in-app updater (Updater.kt): uploaded after the APK it describes.
           version=$(./gradlew -q :app:printVersion | tail -1)
@@ -173,3 +172,14 @@ jobs:
             "$(stat -c %s fexdroid-legacy.apk)" "$(sha256sum fexdroid-legacy.apk | cut -d' ' -f1)" > fexdroid-legacy.json
           cat fexdroid-legacy.json
           gh release upload apk-latest --clobber fexdroid-legacy.json
+          # What a visitor reads on the release's page.
+          {
+            echo "**Version $version** (alpha, for testers), built from \`${GITHUB_SHA:0:7}\` on $(date -u +%Y-%m-%d)."
+            echo
+            echo "Install **fexdroid-legacy.apk**. If the app is already installed, update from inside it (Home)."
+            echo
+            echo "What your phone needs, how to install Steam and a game, and the known limits: [README](https://github.com/$GITHUB_REPOSITORY#readme)."
+            echo
+            echo "SHA-256 of the APK: \`$(sha256sum fexdroid-legacy.apk | cut -d' ' -f1)\`"
+          } > release-notes.md
+          gh release edit apk-latest --title "fexdroid $version" --notes-file release-notes.md

@@ -20,11 +20,13 @@ enum class Game(val title: String, val tag: String, private val script: String) 
 }
 
 /** Startup steps shown in the progress panel, in order. */
-enum class StartStep(val label: String) {
-    PREPARE("Pregătesc mediul Linux"),
-    DISPLAY("Pornesc ecranul virtual"),
-    AUDIO("Pornesc sunetul"),
-    LAUNCH("Pornesc jocul"),
+enum class StartStep(private val text: Int) {
+    PREPARE(R.string.step_prepare),
+    DISPLAY(R.string.step_display),
+    AUDIO(R.string.step_audio),
+    LAUNCH(R.string.step_launch);
+
+    val label get() = str(text)
 }
 
 sealed interface SessionState {
@@ -127,7 +129,7 @@ object GameSession {
         }
         append(selfTests(env))
         appendLine("---- device checks ----")
-        appendLine(runCatching { DeviceCheck.report(DeviceCheck.run(ctx)) }.getOrElse { "device checks failed: $it" })
+        appendLine(runCatching { Strings.inEnglish { DeviceCheck.report(DeviceCheck.run(ctx)) } }.getOrElse { "device checks failed: $it" })
     }
 
     private val reporting = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -255,29 +257,29 @@ object GameSession {
             try {
                 previous?.join()
                 if (game == Game.DOTA && !File(env.steamLibrary, "steamapps/common/dota 2 beta/game/dota.sh").exists())
-                    return@thread fail("Dota 2 nu este instalat pe telefon. Vezi Setări › Instalare jocuri.")
+                    return@thread fail(str(R.string.fail_dota_missing))
                 if (!env.ensureInstalled(::append))
-                    return@thread fail(env.pathProblem() ?: "Mediul Linux nu a putut fi instalat.")
+                    return@thread fail(env.pathProblem() ?: str(R.string.fail_linux_env))
                 // Steam updated (or just downloaded) its runtime: the games' root filesystem follows.
                 if (GameRootfs.needsBuild(env)) {
-                    runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Mediul jocului: eroare: $it") }
+                    runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Game environment: error: $it") }
                 }
                 runCatching { DotaProfile.apply(env, AppSettings.dotaPerformance) }
-                    .onSuccess { it?.let(::append) }.onFailure { append("Profilul Dota 2 nu a putut fi aplicat: $it") }
+                    .onSuccess { it?.let(::append) }.onFailure { append("The Dota 2 profile could not be applied: $it") }
                 runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache, AppSettings.source2WithoutTso) }
                     .onSuccess {
-                        append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}" +
-                            ", memorie rapidă Source 2 ${if (AppSettings.source2WithoutTso) "pornită" else "oprită"}" +
-                            ", așezarea firelor ${if (AppSettings.threadPlacement) "pornită" else "oprită"}")
+                        append("FEX: profile ${AppSettings.fexProfile.name}, code cache ${if (AppSettings.fexDiskCache) "on" else "off"}" +
+                            ", Source 2 libraries without TSO ${if (AppSettings.source2WithoutTso) "on" else "off"}" +
+                            ", thread placement ${if (AppSettings.threadPlacement) "on" else "off"}")
                     }
-                    .onFailure { append("FEX: nu pot scrie Config.json: $it") }
+                    .onFailure { append("FEX: cannot write Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.DISPLAY)
-                if (!xs.startX()) return@thread fail("Ecranul virtual (Xvfb) nu a pornit.")
+                if (!xs.startX()) return@thread fail(str(R.string.fail_display))
                 if (!current()) return@thread xs.stopAll()
                 attachBridge()
                 step(StartStep.AUDIO)
-                if (!xs.startAudio()) append("Sunetul nu a pornit; continui fără sunet.")
+                if (!xs.startAudio()) append("Sound did not start; going on without it.")
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.LAUNCH)
                 // Big Picture only once somebody has logged in: the first start (client download,
@@ -295,7 +297,7 @@ object GameSession {
                     request.delete()
                     while (current() && p.isAlive) {
                         if (request.exists()) {
-                            runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Mediul jocului: eroare: $it") }
+                            runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Game environment: error: $it") }
                             request.delete()
                         }
                         Thread.sleep(1000)
@@ -304,7 +306,7 @@ object GameSession {
                 val code = p.waitFor()
                 if (current() && state is SessionState.Running) state = SessionState.Exited(game, code)
             } catch (t: Throwable) {
-                fail("Eroare: $t")
+                fail(str(R.string.fail_error, t.toString()))
             }
         }
     }
