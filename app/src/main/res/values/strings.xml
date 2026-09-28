@@ -183,6 +183,9 @@
     <string name="settings_screen">Screen</string>
     <string name="settings_source2_tso">Fast memory access for Dota 2 and CS2 (experimental)</string>
     <string name="settings_source2_tso_about">The game\'s own libraries run without the emulation of x86 memory ordering, the most expensive part of the translation. More frames. If the game hangs or closes, switch this off and send the log.</string>
+    <string name="settings_steam_arm64">Native Steam client (experiment)</string>
+    <string name="settings_steam_arm64_about">Valve\'s Steam made for ARM processors, not translated like the usual one. It is downloaded from Valve (about 1 GB), installs apart from the usual Steam and needs you to sign in again. It may not start at all.</string>
+    <string name="settings_steam_arm64_start">Start</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>

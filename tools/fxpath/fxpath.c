@@ -9,6 +9,7 @@
 //
 // Only libc entry points that take paths are wrapped; raw syscalls are not.
 #define _GNU_SOURCE
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -17,10 +18,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <spawn.h>
+#include <stdint.h>
+#include <sys/inotify.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
+#include <sys/statvfs.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <utime.h>
 
 static const char *const kPrefixes[] = { "/tmp", "/usr", "/etc", "/var", "/bin", "/sbin",
                                          "/lib", "/opt", "/run", "/root", "/home", "/srv" };
@@ -127,6 +135,98 @@ int chown(const char *p, uid_t u, gid_t g) {
     REAL(int, chown, const char *, uid_t, gid_t);
     char b[PATH_MAX];
     return real_chown(map(p, b), u, g);
+}
+
+// ---- what programs built against an older glibc call --------------------------------
+// Until glibc 2.33 stat() was an inline that called __xstat(version, ...); programs built
+// then (Valve's arm64 Steam client) still ask for those names.
+// glibc keeps the old names only for such programs (dlsym does not find them), so they
+// are answered with today's functions; on arm64 the structures are the same.
+int __xstat(int v, const char *p, struct stat *st) { (void)v; return stat(p, st); }
+int __lxstat(int v, const char *p, struct stat *st) { (void)v; return lstat(p, st); }
+int __xstat64(int v, const char *p, struct stat64 *st) { (void)v; return stat64(p, st); }
+int __lxstat64(int v, const char *p, struct stat64 *st) { (void)v; return lstat64(p, st); }
+int __fxstatat(int v, int d, const char *p, struct stat *st, int f) { (void)v; return fstatat(d, p, st, f); }
+int __fxstatat64(int v, int d, const char *p, struct stat64 *st, int f) { (void)v; return fstatat64(d, p, st, f); }
+
+// ---- more one-path functions -----------------------------------------------------------
+#define WRAP0(ret, name)                                         \
+    ret name(const char *p) {                                    \
+        REAL(ret, name, const char *);                           \
+        char b[PATH_MAX];                                        \
+        return real_##name(map(p, b));                           \
+    }
+WRAP0(DIR *, opendir)
+WRAP0(int, remove)
+WRAP1(int, creat, mode_t)
+WRAP1(int, creat64, mode_t)
+WRAP1(int, euidaccess, int)
+WRAP1(int, eaccess, int)
+WRAP1(int, mkfifo, mode_t)
+WRAP1(int, truncate64, off64_t)
+WRAP1(int, statfs, struct statfs *)
+WRAP1(int, statfs64, struct statfs64 *)
+WRAP1(int, statvfs, struct statvfs *)
+WRAP1(int, statvfs64, struct statvfs64 *)
+WRAP1(int, utime, const struct utimbuf *)
+WRAP1(int, utimes, const struct timeval *)
+WRAP1(long, pathconf, int)
+int lchown(const char *p, uid_t u, gid_t g) {
+    REAL(int, lchown, const char *, uid_t, gid_t);
+    char b[PATH_MAX];
+    return real_lchown(map(p, b), u, g);
+}
+FILE *freopen(const char *path, const char *m, FILE *f) {
+    REAL(FILE *, freopen, const char *, const char *, FILE *);
+    char b[PATH_MAX];
+    return real_freopen(map(path, b), m, f);
+}
+FILE *freopen64(const char *path, const char *m, FILE *f) {
+    REAL(FILE *, freopen64, const char *, const char *, FILE *);
+    char b[PATH_MAX];
+    return real_freopen64(map(path, b), m, f);
+}
+int scandir(const char *p, struct dirent ***l, int (*sel)(const struct dirent *),
+            int (*cmp)(const struct dirent **, const struct dirent **)) {
+    REAL(int, scandir, const char *, struct dirent ***, int (*)(const struct dirent *),
+         int (*)(const struct dirent **, const struct dirent **));
+    char b[PATH_MAX];
+    return real_scandir(map(p, b), l, sel, cmp);
+}
+int scandir64(const char *p, struct dirent64 ***l, int (*sel)(const struct dirent64 *),
+              int (*cmp)(const struct dirent64 **, const struct dirent64 **)) {
+    REAL(int, scandir64, const char *, struct dirent64 ***, int (*)(const struct dirent64 *),
+         int (*)(const struct dirent64 **, const struct dirent64 **));
+    char b[PATH_MAX];
+    return real_scandir64(map(p, b), l, sel, cmp);
+}
+int utimensat(int d, const char *p, const struct timespec t[2], int f) {
+    REAL(int, utimensat, int, const char *, const struct timespec *, int);
+    char b[PATH_MAX];
+    return real_utimensat(d, map(p, b), t, f);
+}
+int fchmodat(int d, const char *p, mode_t m, int f) {
+    REAL(int, fchmodat, int, const char *, mode_t, int);
+    char b[PATH_MAX];
+    return real_fchmodat(d, map(p, b), m, f);
+}
+int inotify_add_watch(int fd, const char *p, uint32_t mask) {
+    REAL(int, inotify_add_watch, int, const char *, uint32_t);
+    char b[PATH_MAX];
+    return real_inotify_add_watch(fd, map(p, b), mask);
+}
+// A library named with its whole path; names without "/" go through ld.so's own search.
+void *dlopen(const char *p, int flags) {
+    REAL(void *, dlopen, const char *, int);
+    char b[PATH_MAX];
+    return real_dlopen(map(p, b), flags);
+}
+int posix_spawn(pid_t *pid, const char *p, const posix_spawn_file_actions_t *fa, const posix_spawnattr_t *at,
+                char *const argv[], char *const envp[]) {
+    REAL(int, posix_spawn, pid_t *, const char *, const posix_spawn_file_actions_t *, const posix_spawnattr_t *,
+         char *const[], char *const[]);
+    char b[PATH_MAX];
+    return real_posix_spawn(pid, map(p, b), fa, at, argv, envp);
 }
 
 // ---- *at variants -------------------------------------------------------------------

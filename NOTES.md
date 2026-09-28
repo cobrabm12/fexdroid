@@ -1289,3 +1289,40 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   4. Aceleași opțiuni CEF ca la clientul x86 (`-no-cef-sandbox`, fără GPU).
 - **Ce s-ar câștiga:** pornire mai scurtă a lui Steam, mai puțină memorie și mai puțin procesor pentru
   interfață. Nu crește direct cadrele din joc. 🟨 Necuantificat până nu rulează pe telefon.
+
+## N-050 · Programe făcute pentru un Linux obișnuit pornesc în mediul nostru; clientul Steam ARM64 ca experiment  🧪 (PC emulat, 2026-09-29; telefon: netestat)
+- **Problema:** binarele ARM64 ale lui Valve cer interpretorul `/lib/ld-linux-aarch64.so.1` și scripturile lor
+  `#!/bin/bash`; pe Android nu există niciunul. Binarele din rootfs-ul nostru au interpretorul rescris la
+  construire, dar fișierele lui Valve nu le modificăm.
+- **Patch glibc `0004`** (`execve.c`, `fxd-exe.c`, `readlink.c`, `readlinkat.c` în
+  `sysdeps/unix/sysv/linux/aarch64/`): `execve` se uită la fișier înainte să ceară kernelului și pornește
+  - un program arm64 cu acel interpretor prin `ld.so`-ul din rootfs (`ld.so --argv0 nume program argumente`);
+  - un script `#!` cu interpretorul din rootfs;
+  - un program x86 prin FEX (ce face `binfmt_misc` pe un Linux cu FEX instalat);
+  - un program de sub `/bin`, `/sbin`, `/usr`, `/opt` din rootfs, dacă există acolo (`system()` pornește
+    `/bin/sh`, care pe Android e shell-ul Android).
+  Toate funcțiile din familia `exec` și `posix_spawn` ajung în `__execve`, deci sunt acoperite.
+- **`/proc/self/exe`:** pentru kernel un astfel de proces rulează `ld.so`. Chromium (deci `steamwebhelper`) își
+  pornește copiii prin această legătură și ar porni încărcătorul cu argumentele lui. `readlink` și `execve`
+  dau calea programului, citită din `/proc/self/cmdline` (încărcătorul dă programului principal un nume gol,
+  iar `argv[0]` poate fi altul). Semnul că procesul a fost pornit așa: `AT_BASE` e 0.
+- **`libfxpath`** acoperă acum și numele vechi (`__xstat`, `__lxstat`, `__fxstatat`, pe care le cer programele
+  construite cu glibc mai vechi de 2.33), `opendir`, `scandir`, `statfs`, `dlopen`, `posix_spawn` și altele.
+  Fără ele clientul nu își găsea certificatele și nu își putea folosi `/tmp/dumps`.
+- **Rootfs arm64:** +53 MB de biblioteci (GTK 2, NSS, PipeWire, OpenAL, libnm, IBus, certificate...);
+  arhiva din APK ajunge la 610 MB nedespachetată.
+- ✅ **Verificat pe PC**, în containerul gol, la căile de pe telefon (`build/fextest/native/selfexe.c`):
+  programul cu interpretor `/lib/...` pornește, își vede calea, se repornește prin `/proc/self/exe` cu `exec`
+  și cu `posix_spawn`; scriptul `#!/bin/bash` rulează cu bash-ul din rootfs; `system()` merge; `shmtest` trece.
+- 🧪 **Clientul Steam ARM64 în mediul nostru, sub qemu:** își descarcă lista de pachete (certificatele merg),
+  interogarea plăcii video reușește (lavapipe), `vgui` își găsește vizualul GLX, scriptul `steamwebhelper.sh`
+  pornește; apoi `steamwebhelper` și `steam` mor cu „Segmentation fault”. La fel se întâmplă într-un Debian
+  obișnuit sub qemu, deci e limita emulării de pe PC, nu se poate merge mai departe fără telefon.
+- **În aplicație:** Setări › Joc › „Clientul Steam nativ (experiment)”, sau
+  `am start ... --es action steam-arm64`. Scriptul `tools/steam/fexdroid-steam-arm64.sh` descarcă de la Valve
+  primul pachet (110 MB), îi verifică hash-ul din lista lui Valve, îl despachetează în `files/home-arm64` și
+  pornește clientul, care își descarcă singur restul (666 MB). Clientul x86 rămâne neatins, în `files/home`.
+- **Ce nu e făcut:** jocurile x86 pornite din clientul ARM64 (el folosește un „compat tool” al lui Valve pentru
+  FEX); biblioteca de jocuri comună cu clientul x86.
+- ⚠ **Netestat pe telefon.** Patch-ul glibc schimbă pornirea fiecărui program din sesiune, inclusiv a celor
+  de până acum; pe PC trec testele de mai sus, dar FEX nu poate fi rulat acolo.

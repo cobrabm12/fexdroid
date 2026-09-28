@@ -123,6 +123,12 @@ fun SettingsScreen() {
                     AppSettings.gameWithoutSteam, AppSettings::updateGameWithoutSteam,
                 )
                 Note(str(R.string.settings_without_steam_note))
+                // Experiment: Valve's own arm64 client instead of the translated one.
+                Setting(str(R.string.settings_steam_arm64), str(R.string.settings_steam_arm64_about)) {
+                    TextButton(enabled = !GameSession.active, onClick = { GameSession.start(ctx, Game.STEAM_ARM64) }) {
+                        Text(str(R.string.settings_steam_arm64_start))
+                    }
+                }
             }
 
             Section(str(R.string.settings_controls)) {

@@ -14,7 +14,9 @@ import kotlin.concurrent.thread
 /** What the user can start from the home screen (scripts from tools/steam, installed into the rootfs). */
 enum class Game(val title: String, val tag: String, private val script: String) {
     STEAM("Steam", "steam", "fexdroid-steam.sh"),
-    DOTA("Dota 2", "dota", "fexdroid-dota.sh");
+    DOTA("Dota 2", "dota", "fexdroid-dota.sh"),
+    /** Experiment: Valve's native arm64 client, in a home of its own (NOTES N-049, N-050). */
+    STEAM_ARM64("Steam ARM64", "steam-arm64", "fexdroid-steam-arm64.sh");
 
     fun argv(env: LinuxEnv) = listOf("${env.root}/bin/sh", "${env.root}/usr/lib/fexdroid/steam/$script")
 }

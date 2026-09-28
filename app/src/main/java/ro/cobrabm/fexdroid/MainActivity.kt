@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
 
     /** True when [action] is one that starts a game session (and starts it, unless one runs). */
     private fun startSession(action: String?): Boolean {
-        val game = when (action) { "steam" -> Game.STEAM; "dota" -> Game.DOTA; else -> return false }
+        val game = when (action) { "steam" -> Game.STEAM; "dota" -> Game.DOTA; "steam-arm64" -> Game.STEAM_ARM64; else -> return false }
         if (!GameSession.active) GameSession.start(this, game)
         return true
     }
