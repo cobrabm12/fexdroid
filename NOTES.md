@@ -1331,3 +1331,8 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   Android 16, 7 GB). Steam pornește și ajunge la interfață; auto-testele din raport trec toate (FEX x86_64 și
   i386, semafoare SysV, `/tmp`, `vulkaninfo` pe lavapipe). Deci patch-ul glibc `0004` nu strică pornirea
   programelor de până acum. Clientul ARM64 nu a fost încă pornit pe telefon: raportul e din sesiunea obișnuită.
+- ✅ **Clientul ARM64 rulează pe telefon** (același Xiaomi, 0.3.102): pachetul de început s-a descărcat și a
+  trecut verificarea, clientul a pornit prin `ld.so`-ul nostru, și-a descărcat și instalat actualizarea
+  („Update complete, launching...”) și s-a încheiat cu codul 42. Codul 42 înseamnă „pornește-mă din nou”;
+  `steam.sh` al lui Valve face asta într-o buclă, scriptul nostru pornea clientul o singură dată. Reparat: bucla
+  e acum și în `fexdroid-steam-arm64.sh`. Interfața: încă nevăzută.

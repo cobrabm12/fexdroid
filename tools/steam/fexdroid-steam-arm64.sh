@@ -80,4 +80,11 @@ if [ -f "$FXD_FILES/steam-launch-options.txt" ]; then
     # shellcheck disable=SC2046
     set -- "$@" $(cat "$FXD_FILES/steam-launch-options.txt")
 fi
-exec "$STEAMROOT/steamrtarm64/steam" "$@"
+# The client ends with code 42 when it wants to be started again, as after its own update
+# (Valve's steam.sh does the same for the x86 client).
+while :; do
+    rc=0
+    "$STEAMROOT/steamrtarm64/steam" "$@" || rc=$?
+    [ "$rc" = 42 ] || exit "$rc"
+    log "the client asked to be started again"
+done
