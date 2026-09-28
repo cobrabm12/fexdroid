@@ -1127,8 +1127,8 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   degete apasă celălalt buton. Tasta `Swipe` alege între rotiță și tragere cu butonul din mijloc, care în Dota
   mută camera. Apăsarea lungă urmată de mișcare rămâne tragere cu butonul stâng (selecție).
 - **Imaginea se îngustează** cu 56 dp pe fiecare parte cât timp tastele sunt pornite: pe Realme GT 1344x720 în
-  loc de 1584x720. Rezoluția se alege la pornirea sesiunii; tastele pornite din meniu în timpul jocului
-  micșorează imaginea până la următoarea pornire.
+  loc de 1584x720. Rezoluția se alege la pornirea sesiunii: tastele pornite din meniu în timpul jocului
+  stau peste marginile imaginii, transparente, până la următoarea pornire (verificat în Steam).
 - 🧪 **Compose nu poate împărți degetele între taste și imagine.** Cu un deget pe o tastă desenată în Compose,
   al doilea deget pus pe imagine (un `AndroidView`) nu ajunge deloc la ea: vederea primește `ACTION_POINTER_DOWN`
   fără un `ACTION_DOWN` înainte, iar `ViewGroup` îl oprește. Verificat pe telefon: cursorul nu s-a mișcat.
