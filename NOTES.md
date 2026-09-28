@@ -1200,3 +1200,39 @@ bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauz
   generatorul de cod al lui FEX, care nu sunt de o seară.
 - Unelte: `scripts/perf-by-block.py` (profil pe blocuri și pe biblioteci din `FEX_BLOCKJITNAMING=1`); locale,
   în `build/measure/`: `cyc.sh`, `threads.sh`, `dis.sh`, `procmem.py`.
+
+## N-047 · Generatorul de cod al lui FEX: banc de test, indicatori, AVX în biblioteca C  🧪 (Realme GT, 2026-09-29)
+- **Banc de test cu rezultate care se repetă** (`scripts/fex-bench-phone.sh`, `tools/fextest/bench.cpp`): un
+  program x86-64 mic, cu apeluri virtuale, containere, șiruri, calcule în virgulă mobilă și `shared_ptr`, rulat
+  pe telefon sub FEX-ul din `build/fex/install` (pus în `files/fextest`, fără să atingă FEX-ul aplicației),
+  cu `simpleperf stat` pe tot procesul. Două rulări la fel: 3,768 și 3,769 miliarde de instrucțiuni. O rulare
+  e o secundă pe un nucleu, cu ecranul stins. Rezultatul programului e identic cu cel de pe PC.
+- FEX nu pornește sub `qemu-user` pe PC (N-011), deci bancul e pe telefon.
+- **Ce fel de instrucțiuni consumă timpul în joc** (eșantioanele firului principal, puse peste codul tradus al
+  celor 60 de fragmente cele mai fierbinți, 25% din timpul petrecut în cod tradus): încărcări din memorie 19%,
+  comparații 20% (`cmp`/`subs`, de obicei imediat după o încărcare), virgulă mobilă 11%, scrieri 7%, salturi 6%,
+  construit constante 4,7%, `mrs`/`msr` pentru indicatori 1%. Jocul e limitat de accesul la memorie, nu de
+  instrucțiuni în plus puse de traducere. Se potrivește cu 0,97 instrucțiuni pe ciclu măsurate în N-039.
+- 🧪 **Indicatorii declarați morți la apel și la întoarcere** (patch local `0005`, opțiunea `ABILocalFlags`,
+  doar în modulele din `ExtendedVolatileMetadata`): 3,740 față de 3,768 miliarde de instrucțiuni (-0,75%),
+  ciclurile la fel (1,664 față de 1,662). Rezultat corect. Prea puțin ca să merite riscul; opțiunea rămâne
+  oprită și patch-ul nu intră în aplicație până nu arată ceva într-un joc.
+- 🧪 **Opțiunile FEX pe banc** (cicluri, mai puțin e mai bine): implicit (TSO peste tot) 1,691; TSO oprit în
+  codul programului 1,662; și în `libc`, `libstdc++`, `libm` 1,575; TSO oprit peste tot 1,580; fără
+  `Multiblock` 2,144; tabelele L1/L2 de blocuri fixe 1,680 (nimic).
+- ✅ **AVX în biblioteca C:** cu AVX ascuns (`FEX_HOSTFEATURES=disableavx`) 1,399 de cicluri față de 1,662
+  (-16%). Același câștig, 1,405, cu AVX lăsat programelor și doar biblioteca C oprită de la el:
+  `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX2_Usable,-AVX_Usable`. glibc își
+  alege la pornire variantele AVX2 pentru `memcpy`, `strlen`, `memcmp` și celelalte; FEX traduce fiecare
+  operație pe 256 de biți în două pe 128, fiindcă procesorul nu are SVE pe 256. Variantele SSE2 se traduc unu
+  la unu.
+- **Cât înseamnă în joc:** `libc` are 2,5% din firul principal și 2,9% din firele ajutătoare, deci câștigul
+  așteptat e de 1–2%. Programul de test folosește șiruri mult mai mult decât jocul. În Steam și la încărcarea
+  jocului (copieri multe) ar trebui să se vadă mai bine. 🟨 Nemăsurat în joc.
+- **De măsurat în joc când telefonul e pe încărcătorul de priză** (pe USB-ul PC-ului primește 68 mA): variabila
+  de mai sus, AVX ascuns (prima măsurătoare, în N-046, era în zgomot), patch-ul `0005`. Pentru diferențe de 1–3%
+  măsurătoarea din joc trebuie pornită de la un tick fix al replay-ului (`demo_gototick`), nu de la cursor.
+- **Armada OS** (găsit de Marius, `github.com/armada-os/armada`): aceeași bază FEX-2609, fără schimbări în
+  generatorul de cod; reglajele lui de kernel cer root. Folosește însă **clientul Steam nativ ARM64** al lui
+  Valve (`steam_client_steamdeck_publicbeta_linuxarm64` de pe `client-update.steamstatic.com`), pe care noi îl
+  rulăm tradus. De încercat: ar scurta pornirea lui Steam și i-ar reduce memoria și procesorul.
