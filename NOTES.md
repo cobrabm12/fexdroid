@@ -1200,3 +1200,27 @@ bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauz
   generatorul de cod al lui FEX, care nu sunt de o seară.
 - Unelte: `scripts/perf-by-block.py` (profil pe blocuri și pe biblioteci din `FEX_BLOCKJITNAMING=1`); locale,
   în `build/measure/`: `cyc.sh`, `threads.sh`, `dis.sh`, `procmem.py`.
+
+## N-048 · Cadrele jocului direct la aplicație, fără serverul X (fxpresent)  ✅ vkcube / 🟨 joc (Realme GT, 2026-09-29)
+- **Ce era:** fiecare cadru pleca din Mesa cu `PutImage` prin socketul X (4,6 MB la 1600×720), Xvfb îl copia în
+  framebufferul lui, iar puntea aplicației îl copia de acolo pe ecran, după ce se uita de 60 de ori pe secundă
+  dacă s-a schimbat ceva. Patru copii pe cadru și un plafon de 60 de cadre la măsurătoare.
+- **Ce e acum** (patch Mesa `0007`, `display_bridge.c`, protocolul în `tools/fxpresent/fxpresent-proto.h`):
+  aplicația ascultă pe un socket (`FEXDROID_PRESENT`, în `tmp/` din rootfs). Swapchain-ul X11 cu prezentare
+  software se conectează, trimite un `memfd` cu loc pentru trei cadre, copiază fiecare cadru într-un loc din
+  care aplicația nu citește, îl publică și anunță aplicația, care îl copiază pe ecran când sosește. Două copii
+  în loc de patru, nimic prin serverul X, fără așteptare de 1/60 s.
+- **Doar când fereastra acoperă tot ecranul X.** Altfel cadrele merg prin serverul X ca înainte (fereastra
+  `vkcube` de 500×500 a rămas pe drumul vechi, corect). La fel dacă aplicația nu ascultă; Mesa mai încearcă
+  conectarea o dată la 120 de cadre.
+- **Cursorul:** Xvfb îl desena în framebufferul lui. Mesa îl cere cu `XFixesGetCursorImage` la fiecare cadru
+  (imagine, poziție, punct activ) și îl desenează în copia trimisă aplicației. Se vede în captură.
+- **Ce nu se vede:** o fereastră X deschisă peste joc cât timp jocul desenează. După o jumătate de secundă
+  fără cadre, puntea arată din nou ecranul X.
+- ✅ **Măsurat cu `vkcube` la 1280×720**, nativ arm64 și x86 prin FEX (thunk Vulkan): 120 de cadre/s ajunse la
+  aplicație (1195–1201 în 10 s), Xvfb a dispărut din lista proceselor ocupate. Pe drumul vechi, aceeași
+  fereastră: 59 de cadre/s arătate (plafonul punții) și Xvfb la 83% dintr-un nucleu.
+- 🟨 **Neverificat în Dota 2**: bateria era la 43% și pe USB-ul PC-ului telefonul primește doar 68 mA. Setarea
+  „Cadre direct de la joc” e **oprită implicit** până la testul din joc. Fără variabila de mediu, codul nou din
+  Mesa nu face nimic.
+- La instalarea unui APK cu alt payload aplicația despachetează din nou rootfs-ul (un minut de lucru pe disc).

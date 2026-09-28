@@ -55,7 +55,7 @@ fun DisplayScreen(autoAction: String?) {
         if (!env.ensureInstalled(::append)) return@thread
         if (!session.startX()) { append("Xvfb did not report a framebuffer (see the log)."); return@thread }
         val h = holder ?: run { append("The surface is not ready."); return@thread }
-        append(DisplayBridge.start(h.surface, session.fxshmSocket, session.shmid, AppSettings.fps))
+        append(DisplayBridge.start(h.surface, session.fxshmSocket, session.shmid, AppSettings.fps, session.presentSocket))
         append(XInput.connect(0))
         view?.post { view?.inputEnabled = true; view?.requestFocus() }
     }

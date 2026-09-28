@@ -20,6 +20,8 @@ class XSession(
     @Volatile var shmid: Int = -1; private set
 
     val fxshmSocket get() = "${env.root}/tmp/.fxshm/sock"
+    /** Where games send their frames straight to the app (tools/fxpresent), or "": not at all. */
+    val presentSocket get() = if (AppSettings.directFrames) "${env.root}/tmp/fxpresent.sock" else ""
     private val preload get() = "${env.root}/usr/lib/fexdroid/libfxpath.so"
 
     val pulseSocket get() = "${env.root}/tmp/pulse/native"
@@ -39,6 +41,7 @@ class XSession(
         // sound threads are late more often than that. libpulse takes this over their request.
         "PULSE_LATENCY_MSEC" to "60",
     ) + (if (AppSettings.gpuMaxFrequency) mapOf("TU_KGSL_PWR_CONSTRAINT" to "max") else emptyMap()) +
+        (if (AppSettings.directFrames) mapOf("FEXDROID_PRESENT" to presentSocket) else emptyMap()) +
         // Mesa reads its options from the environment too.
         (if (AppSettings.limitVideoMemory) MemoryWatch.videoMemoryShare()?.let { mapOf("heap_memory_percent" to it) }.orEmpty()
             else emptyMap()) + extraEnv()

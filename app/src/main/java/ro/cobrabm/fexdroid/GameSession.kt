@@ -271,7 +271,8 @@ object GameSession {
                         append("FEX: profile ${AppSettings.fexProfile.name}, code cache ${if (AppSettings.fexDiskCache) "on" else "off"}" +
                             ", Source 2 libraries without TSO ${if (AppSettings.source2WithoutTso) "on" else "off"}" +
                             ", thread placement ${if (AppSettings.threadPlacement) "on" else "off"}" +
-                            ", video memory ${if (AppSettings.limitVideoMemory) "${MemoryWatch.videoMemoryShare()} of the phone's" else "as Mesa chooses"}")
+                            ", video memory ${if (AppSettings.limitVideoMemory) "${MemoryWatch.videoMemoryShare()} of the phone's" else "as Mesa chooses"}" +
+                            ", frames straight from the game ${if (AppSettings.directFrames) "on" else "off"}")
                     }
                     .onFailure { append("FEX: cannot write Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
@@ -359,7 +360,7 @@ object GameSession {
         val xs = session ?: return
         val s = surface ?: return
         if (bridgeOn || xs.shmid < 0) return
-        append(DisplayBridge.start(s, xs.fxshmSocket, xs.shmid, AppSettings.fps))
+        append(DisplayBridge.start(s, xs.fxshmSocket, xs.shmid, AppSettings.fps, xs.presentSocket))
         bridgeOn = true
         if (!inputReady) {
             append(XInput.connect(0))
