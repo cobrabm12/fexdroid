@@ -902,3 +902,75 @@ Porniri alternate, comparate doar la aceleași limite de frecvență.
   `MainActivity.dispatchGenericMotionEvent`. ✅ cu `adb shell input mouse tap/swipe`: clic și tragerea barei de
   derulare din Steam. Înainte, `input mouse tap` nu producea niciun clic. Rotița unui mouse real: de confirmat de
   utilizator (adb nu o poate simula).
+
+## N-039 · Unde se pierde timpul în emulare: fire pe nuclee, x87, măsurători cu profilerul  ✅/🧪 (Realme GT, 2026-09-28)
+Cerința: performanță din emulare și din driver, nu din setările jocului. Întâi măsurat, apoi schimbat.
+Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FEX_PROFILESTATS=1`),
+`simpleperf` din NDK pornit din shell cu `--app ro.cobrabm.fexdroid -t <tid>` (cere
+`setprop security.perf_harden 0`, pus la loc după), `strace -T -p <tid>` pe câte un fir.
+
+- **Meci real privit (Watch), telefon încins pe încărcător** (baterie 46 °C, limite 595/1075 MHz): 15–21 cadre/s.
+  Firul principal 68–79% dintr-un nucleu (deci nu e ocupat tot timpul), 7 fire `GlobPool` a câte ~22%, memoria
+  liberă ~600 MB, jocul 3,0 GB în RAM + 4,2 GB în swap (5,6 GB memorie anonimă, 0,9 GB KGSL, 0,3 GB cod JIT).
+  `kswapd`, `kshrink_slabd` și `hybridswapd` consumă și ele procesor. „Un cadru la 5–10 secunde”, cum a văzut
+  utilizatorul, nu s-a reprodus: cel mai probabil memoria plină după o sesiune lungă (🟨 nedovedit).
+- **„Disconnected from Server: Overflow error”** la primul Watch: serverul închide conexiunea
+  (`NETWORK_DISCONNECT_OVERFLOW`, `SIGNONSTATE_SPAWN`) la 29 s după `ProcessServerInfo`, cât timp clientul încă
+  încarcă harta (firul principal 83–88%). A doua încercare reușește fiindcă resursele sunt deja încărcate. Nu e o
+  eroare de rețea; se rezolvă doar prin încărcare mai rapidă.
+- **Firul principal așteaptă 7–9 ms în fiecare cadru** un `eventfd` semnalat de firele `GlobPool`: o parte din
+  lucrul cadrului rulează pe firele ajutătoare, iar kernelul le punea și pe nucleele mici (A55, limitate la
+  595 MHz). Tot kernelul muta firul principal între nuclee, uneori pe unul mic.
+- ✅ **Așezarea firelor (`ThreadTuner`, Setări › Performanță, pornit implicit):** firul cel mai ocupat al
+  procesului cel mai ocupat primește singur nucleul cel mai rapid, celelalte fire ale jocului nucleele mari
+  rămase, restul sesiunii (Steam, Xvfb, sunet, aplicația) nucleele mici. Aplicația are voie să facă asta pentru
+  procesele sesiunii (același utilizator, același domeniu SELinux); prin `run-as` nu se poate. Scena cu zece eroi,
+  aceleași limite (1075/1075/595 MHz), moduri alternate la 30 s, două sesiuni:
+
+  | așezare | cadre/s |
+  |---|---|
+  | fără | 31,0 · 31,1 |
+  | doar firul principal pe nucleul rapid (`pin`) | 33,0 |
+  | **fir principal pe 7, jocul pe 4–6, restul pe 0–3 (`big`)** | **37,8 · 37,2 · 36,0** |
+  | ca `big`, dar firele jocului și pe nucleul 7 | 36,2 |
+  | ca `big`, dar restul sesiunii pe orice nucleu | 36,4 |
+  | firele jocului și pe nucleele mici | 33,4 |
+  | fir principal pe 6–7, jocul pe 4–5 | 31,6 |
+
+  `files/tuner.txt` alege modul în timpul sesiunii: `off`, `pin`, `big`, `masks A B C` (hexazecimal).
+  Pe telefoane fără nuclee mici (Snapdragon 8 Elite) „restul sesiunii” rămâne pe toate nucleele în afară de cel
+  rezervat. 🟨 Netestat pe alt telefon.
+- ✅ **x87 pe 64 de biți în profilul „Echilibrat”** (`X87ReducedPrecision`), ca în configurația pe care FEX o
+  livrează pentru Steam (`Source/Steam/ConfigTemplate.json`). Cu 80 de biți fiecare operație x87 e un apel în
+  software: Dota, fir principal, 45–54 de mii pe secundă în meci. Dota pornește și rulează cu opțiunea (deci
+  blocarea profilului „Rapid” din N-034 vine de la TSO). Câștigul separat nu a fost măsurat.
+- 🧪 **Profilul firului principal** (10 s, 6790 de eșantioane): 87,5% cod de joc tradus (JIT), 8,0% kernel, 3,6%
+  FEX (dispecer, syscall-uri, compilare), 0,34% Turnip. Profilul e plat: adresa cea mai fierbinte are 0,65%.
+  Contoare hardware: 0,97 instrucțiuni pe ciclu (puțin pentru un Cortex-X1), 32% din cicluri blocate în frontend
+  și 39% în backend, 22 de ratări de cache de instrucțiuni la mia de instrucțiuni, 15 de cache L2 de date, 11 de
+  TLB de date, 3,6% salturi prezise greșit. Codul tradus e mare și împrăștiat (310 MB), datele sunt pe pagini de
+  4 KB. Paginile mari ar ajuta, dar kernelul le are oprite (`transparent_hugepage/enabled` = `never`, se schimbă
+  doar cu root).
+- 🧪 **Prezentarea imaginii:** Mesa trimite fiecare cadru cu `PutImage` prin socketul X (4,6 MB pe cadru, `writev`),
+  nu prin memorie partajată: MIT-SHM e folosit doar când serverul are și DRI3, iar Xvfb nu are. Patru copii pe
+  cadru (socket, Xvfb, framebuffer, suprafața Android). Firul de prezentare 12–35% dintr-un nucleu, Xvfb ~6%,
+  puntea ~5%: puțin față de cele ~300% ale jocului, deci nu limitează cadrele acum, dar încălzește. Rămâne
+  pentru prezentarea directă (D3).
+- 🧪 Imaginea de swapchain e 1600×720 pe un ecran virtual de 1584×720 (rezoluția salvată de joc înainte de
+  marginile laterale).
+- Patch FEX 0003: harta pentru profiler se scrie în directorul din `FEX_PERFMAP_DIR` (Android nu are `/tmp`);
+  pentru `FEX_LIBRARYJITNAMING=1`. 🟨 Construit, încă nefolosit la o măsurătoare.
+- **Căldura rămâne factorul cel mai mare:** toate măsurătorile de mai sus sunt cu nucleele mari la 1075 MHz din
+  2841/2419. Telefonul era pe încărcător; bateria a ajuns la 50 °C și testele au fost oprite.
+
+## N-040 · Clic dreapta, ecran negru la pornire, numărul versiunii  ✅ (Realme GT, 2026-09-28)
+- **Clic dreapta deschidea meniul aplicației:** Android transformă al doilea buton al mouse-ului în tasta Înapoi
+  (`KEYCODE_BACK` cu sursa mouse). `MainActivity.dispatchKeyEvent` o dă înapoi sesiunii ca butonul 3.
+  ✅ `adb shell input mouse keyevent 4` deschide meniul contextual din Steam. 🟨 Mouse real: de confirmat.
+- **Ecran negru deși Steam rula:** la pornire au existat pentru o jumătate de secundă două `SurfaceView`; la
+  dispariția celui de-al doilea, puntea de afișare (legată de primul) era oprită. Acum puntea rămâne pe o
+  suprafață care există și se mută doar când aceea dispare.
+- **Versiune:** `0.3.<număr de commit-uri>-alpha`, `versionCode` = numărul de commit-uri (crește la fiecare
+  versiune publicată; Android refuză un număr mai mic). Workflow-urile descarcă tot istoricul (`fetch-depth: 0`),
+  iar build-ul se oprește dacă istoricul e incomplet. `fexdroid-legacy.json` are câmpul `version`, afișat în
+  cartela de actualizare.
