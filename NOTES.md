@@ -1260,3 +1260,32 @@ bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauz
   „Cadre direct de la joc” e **oprită implicit** până la testul din joc. Fără variabila de mediu, codul nou din
   Mesa nu face nimic.
 - La instalarea unui APK cu alt payload aplicația despachetează din nou rootfs-ul (un minut de lucru pe disc).
+
+## N-049 · Clientul Steam nativ ARM64 al lui Valve: merge într-un Debian ARM64  🧪 (PC, emulat, 2026-09-29)
+De ce: azi clientul Steam și procesele lui web rulează traduse prin FEX (pornire 130 s, 2,1–2,9 GB, 16% + 6%
+dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru ARM64 (găsit prin Armada OS).
+- **De unde:** lista de pachete `steam_client_steamdeck_publicbeta_linuxarm64` de pe
+  `https://client-update.steamstatic.com` (35 de pachete, 1,0 GB; versiunea 1790545198 la 2026-09-29), plus
+  `steam-runtime-steamrt-arm64.tar.xz` (52 MB) de pe `repo.steampowered.com/steamrt3c/images/<versiune>/`.
+  Pachetul de început e `bins_linuxarm64_linuxarm64.zip.<hash>` (110 MB): conține `steamrtarm64/steam`, care
+  își descarcă singur restul. Canalul se alege cu fișierul `package/beta` = `steamdeck_publicbeta`.
+- **Capcane la despachetare:** arhiva are căi cu `\` (unzip face fișiere cu `\` în nume) și nu păstrează
+  dreptul de execuție.
+- 🧪 **Prima pornire, în `debian:trixie` arm64 sub qemu pe PC** (`build/steamarm/`, nu în git): clientul a
+  descărcat 666 MB de la Valve, a despachetat și a instalat („Update complete, launching...”). Arborele
+  rezultat are 3,3 GB și conține și `linux64`, `steamrt64`, `ubuntu12_64` (partea x86) și `androidarm64`.
+- **Biblioteci de sistem cerute în plus față de ce are o instalare minimă:** `libpipewire-0.3`, `libopenal1`,
+  `libnm0`, `libibus-1.0-5`, pe lângă GTK 2, NSS, X11, PulseAudio, ALSA.
+- 🧪 **Interfața:** cu bibliotecile puse, `steamui.so` se încarcă și clientul ajunge la interogarea plăcii
+  video, apoi procesul moare cu „Segmentation fault” sub qemu. Nu se poate spune dacă e clientul sau emularea
+  de pe PC: testul adevărat e pe telefon.
+- **Ce ar trebui făcut pe telefon** (nefăcut):
+  1. Binarele lui Valve au ca interpretor `/lib/ld-linux-aarch64.so.1`, care pe Android nu există. Fără să
+     le modificăm: la `execve`, în glibc-ul nostru sau în `libfxpath`, un ELF cu acest interpretor se pornește
+     prin `ld.so`-ul din rootfs.
+  2. Bibliotecile de mai sus în rootfs-ul arm64.
+  3. Jocurile x86 pornite de clientul ARM64: el folosește un „compat tool” FEX al lui Valve, cu un rootfs la
+     o cale fixă. Trebuie făcut să pornească FEX-ul nostru cu punctul nostru de intrare (ca la `sniper` acum).
+  4. Aceleași opțiuni CEF ca la clientul x86 (`-no-cef-sandbox`, fără GPU).
+- **Ce s-ar câștiga:** pornire mai scurtă a lui Steam, mai puțină memorie și mai puțin procesor pentru
+  interfață. Nu crește direct cadrele din joc. 🟨 Necuantificat până nu rulează pe telefon.
