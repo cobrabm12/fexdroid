@@ -104,6 +104,20 @@ class MainActivity : ComponentActivity() {
         return if (inside) view.mouseEvent(ev, located = false) else handled
     }
 
+    /** A mouse's second button arrives as the Back key: see [InputSurfaceView.mouseBackKey]. */
+    override fun dispatchKeyEvent(ev: android.view.KeyEvent): Boolean {
+        val view = InputSurfaceView.current
+        if (view != null && view.inputEnabled && !InputSurfaceView.overlayOpen &&
+            ev.keyCode == android.view.KeyEvent.KEYCODE_BACK && ev.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) {
+            when (ev.action) {
+                android.view.KeyEvent.ACTION_DOWN -> if (ev.repeatCount == 0) view.mouseBackKey(true)
+                android.view.KeyEvent.ACTION_UP -> view.mouseBackKey(false)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(ev)
+    }
+
     override fun onDestroy() {
         // Leaving the app for good: do not keep Xvfb/PulseAudio/the game running without a UI.
         if (isFinishing) GameSession.stop()

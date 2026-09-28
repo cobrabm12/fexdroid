@@ -147,7 +147,7 @@ fun PlayerScreen() {
                         holder.addCallback(object : SurfaceHolder.Callback {
                             override fun surfaceCreated(h: SurfaceHolder) { GameSession.attachSurface(h.surface) }
                             override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) {}
-                            override fun surfaceDestroyed(h: SurfaceHolder) { GameSession.detachSurface() }
+                            override fun surfaceDestroyed(h: SurfaceHolder) { GameSession.detachSurface(h.surface) }
                         })
                     }
                 },
@@ -333,7 +333,7 @@ private fun RunningHint(st: SessionState.Running) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
             Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.6f), contentColor = Color.White) {
-                Text("${st.game.title} se încarcă — prima pornire poate dura câteva minute. Meniul: butonul din dreapta sus.",
+                Text("${st.game.title} se încarcă — prima pornire poate dura câteva minute. Meniul: butonul din dreapta.",
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }

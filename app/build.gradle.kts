@@ -12,6 +12,16 @@ val gitSha: String = providers.environmentVariable("GITHUB_SHA").orElse(
     providers.exec { commandLine("git", "rev-parse", "HEAD") }.standardOutput.asText.map { it.trim() }
 ).get()
 
+// Version: MAJOR.MINOR say where the project is (0.x: for testers; 1.0: for everyone), the
+// third number is the count of commits, so every published build has a higher one than the
+// builds before it. It is the versionCode too: Android refuses to install a lower one.
+val versionBase = "0.3"
+val versionStage = "alpha"
+val commitCount: Int = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
+    .standardOutput.asText.map { it.trim().toInt() }.get()
+// A shallow clone counts one commit: the build would be refused as a downgrade on every phone.
+require(commitCount >= 70) { "git history is incomplete ($commitCount commits): fetch it all (fetch-depth: 0)" }
+
 android {
     namespace = "ro.cobrabm.fexdroid"
     compileSdk = 37
@@ -22,8 +32,8 @@ android {
         // 28 (Android 9) so more phones can at least run the compatibility check; the
         // Linux environment itself is verified on Android 14 (NOTES.md N-021).
         minSdk = 28
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = commitCount
+        versionName = "$versionBase.$commitCount-$versionStage"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
@@ -98,4 +108,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+}
+
+// For the release's description (.github/workflows/full-apk.yml).
+tasks.register("printVersion") {
+    val name = "$versionBase.$commitCount-$versionStage"
+    doLast { println(name) }
 }

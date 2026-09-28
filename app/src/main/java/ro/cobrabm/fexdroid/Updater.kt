@@ -27,7 +27,8 @@ import kotlin.concurrent.thread
 object Updater {
     private const val RELEASE = "https://github.com/cobrabm12/fexdroid/releases/download/apk-latest"
 
-    data class Info(val sha: String, val built: String, val size: Long, val sha256: String, val apkUrl: String)
+    data class Info(val sha: String, val built: String, val size: Long, val sha256: String, val apkUrl: String,
+        val version: String = "")
 
     sealed interface State {
         data object Idle : State
@@ -69,7 +70,7 @@ object Updater {
                 val conn = open("$base/fexdroid-legacy.json")
                 val j = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
                 val info = Info(j.getString("sha"), j.optString("built"), j.getLong("size"), j.getString("sha256"),
-                    "$base/fexdroid-legacy.apk")
+                    "$base/fexdroid-legacy.apk", j.optString("version"))
                 if (info.sha == BuildConfig.GIT_SHA) State.UpToDate else State.Available(info)
             } catch (t: Throwable) {
                 if (quiet) State.Idle else State.Failed(explain(t), null)

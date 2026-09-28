@@ -13,5 +13,5 @@ add_library(fxdisplay SHARED display_bridge.c)
 target_link_libraries(fxdisplay android log)
 
 # JNI library: phase 4 input (XTEST client) and audio (PulseAudio FIFO -> AAudio).
-add_library(fxio SHARED x11_input.c audio_bridge.c)
+add_library(fxio SHARED x11_input.c audio_bridge.c sched.c)
 target_link_libraries(fxio aaudio log)

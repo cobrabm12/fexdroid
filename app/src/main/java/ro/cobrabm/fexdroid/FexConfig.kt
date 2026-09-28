@@ -13,11 +13,15 @@ enum class FexProfile(val label: String, val description: String, val options: M
         "Ordine a memoriei x86 completă, și pentru vectori și memcpy. Cel mai lent; pentru jocuri care crapă.",
         mapOf("TSOEnabled" to "1", "VectorTSOEnabled" to "1", "MemcpySetTSOEnabled" to "1",
             "HalfBarrierTSOEnabled" to "1", "X87ReducedPrecision" to "0")),
-    /** FEX's own defaults. */
+    /**
+     * FEX's own defaults, and x87 on 64 bits as in the configuration FEX ships for Steam
+     * (Source/Steam/ConfigTemplate.json): 80-bit x87 is emulated in software, one call per
+     * operation (Dota 2 in a match: 50,000 a second on its main thread).
+     */
     BALANCED("Echilibrat",
-        "Setările implicite FEX. Recomandat.",
+        "Setările implicite FEX, cu x87 pe 64 de biți ca în configurația FEX pentru Steam. Recomandat.",
         mapOf("TSOEnabled" to "1", "VectorTSOEnabled" to "0", "MemcpySetTSOEnabled" to "0",
-            "HalfBarrierTSOEnabled" to "1", "X87ReducedPrecision" to "0")),
+            "HalfBarrierTSOEnabled" to "1", "X87ReducedPrecision" to "1")),
     /** No TSO emulation: much faster, but multithreaded games may crash or hang. */
     FAST("Rapid",
         "Fără emularea ordinii memoriei x86 și cu x87 pe 64 de biți. Mult mai rapid, dar unele jocuri pot crăpa sau îngheța.",
