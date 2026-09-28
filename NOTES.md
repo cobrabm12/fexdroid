@@ -866,3 +866,6 @@ Porniri alternate, comparate doar la aceleași limite de frecvență.
   carcasa 37–38 °C) nucleele mergeau la frecvența maximă și scena dădea 37–40 de cadre/s cu profilul, 44–48 cu un
   singur erou. Încins (carcasa 44–48 °C): 25–31.
 - Nereușit: opțiunile din FEX care ar reduce costul emulării (fără TSO) blochează jocul (N-034).
+- **Build-ul final, verificat:** Steam, Dota, scena cu zece eroi la 1656×720 cu profil și GPU la maxim, telefon
+  încins (limite 595 / 1075 / 1075 MHz, carcasa 46 °C): 30,9–32,6 cadre/s. În aceeași stare, înaintea acestei runde:
+  23,3–25,7. Sunet: 360 s, nicio pauză de ieșire.
