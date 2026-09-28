@@ -46,13 +46,11 @@ class MainActivity : ComponentActivity() {
         val autorun = intent.getBooleanExtra("autorun", false)
         val action = intent.getStringExtra("action")
         val cmd = intent.getStringExtra("cmd")
-        val devIntent = autorun || action != null
         // `--es action steam|dota` starts the game session at once, without waiting for a
         // visible surface (works with the screen locked; the player attaches when shown).
-        when (action) {
-            "steam" -> GameSession.start(this, Game.STEAM)
-            "dota" -> GameSession.start(this, Game.DOTA)
-        }
+        // It is not a developer screen: when the session ends the app is on Acasă.
+        val devAction = action.takeUnless { startSession(it) }
+        val devIntent = autorun || devAction != null
         setContent {
             FexdroidTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -74,7 +72,7 @@ class MainActivity : ComponentActivity() {
                                 when (dest) {
                                     Dest.HOME -> HomeScreen(onOpenSettings = { dest = Dest.SETTINGS })
                                     Dest.SETTINGS -> SettingsScreen()
-                                    Dest.ADVANCED -> AdvancedScreen(advancedTabFor(action), autorun, action, cmd)
+                                    Dest.ADVANCED -> AdvancedScreen(advancedTabFor(devAction), autorun, devAction, cmd)
                                 }
                             }
                         }
@@ -102,6 +100,19 @@ class MainActivity : ComponentActivity() {
         val at = IntArray(2).also(view::getLocationOnScreen)
         val inside = ev.rawX >= at[0] && ev.rawX < at[0] + view.width && ev.rawY >= at[1] && ev.rawY < at[1] + view.height
         return if (inside) view.mouseEvent(ev, located = false) else handled
+    }
+
+    /** True when [action] is one that starts a game session (and starts it, unless one runs). */
+    private fun startSession(action: String?): Boolean {
+        val game = when (action) { "steam" -> Game.STEAM; "dota" -> Game.DOTA; else -> return false }
+        if (!GameSession.active) GameSession.start(this, game)
+        return true
+    }
+
+    /** `am start --es action steam` while the app is open. */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        startSession(intent.getStringExtra("action"))
     }
 
     /** A mouse's second button arrives as the Back key: see [InputSurfaceView.mouseBackKey]. */

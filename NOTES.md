@@ -974,3 +974,56 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   versiune publicată; Android refuză un număr mai mic). Workflow-urile descarcă tot istoricul (`fetch-depth: 0`),
   iar build-ul se oprește dacă istoricul e incomplet. `fexdroid-legacy.json` are câmpul `version`, afișat în
   cartela de actualizare.
+
+## N-041 · Emularea ordinii memoriei (TSO) oprită pe bibliotecile jocului  ✅ scenă demo / 🟨 meci (Realme GT, 2026-09-28)
+- **De ce:** 87,5% din timpul firului principal e cod de joc tradus (N-039), iar fiecare acces la memorie din el
+  e tradus cu instrucțiuni ordonate (`LDAPR`/`STLR`) ca să păstreze ordinea memoriei x86. Cu `TSOEnabled=0`
+  peste tot, Dota se blochează la încărcare (N-034).
+- **Profil pe biblioteci** (`FEX_LIBRARYJITNAMING=1`, `scripts/perf-by-library.py`), scena cu zece eroi. Firul
+  principal: `libclient` 26,0%, `libserver` 11,9% (doar în demo, unde rulează și serverul), `libtier0` 8,3%,
+  kernel 7,5%, `libengine2` 6,9%, `libpanorama` 6,7%, `librendersystemvulkan` 6,2%, FEX 3,4%,
+  `libmaterialsystem2` 3,2%, `libnetworksystem` 3,1%, `libc` 3,1%, `libscenesystem` 3,1%. Tot procesul:
+  `librendersystemvulkan` 14,8%, `libclient` 11,0%, kernel 11,0%, `libpanorama` 7,8%, `libmaterialsystem2` 7,7%,
+  `libtier0` 7,5%, Turnip 7,4%, `libparticles` 6,7%.
+- **FEX are deja mecanismul**, `ExtendedVolatileMetadata` („Disable TSO for a full module: just provide the
+  module name”), dar în FEX-2609 nu avea efect: `Core.cpp` punea excepția doar pe blocurile care conțin o
+  instrucțiune marcată ca având nevoie de TSO, iar un modul dat doar cu numele nu are niciuna. Patch local 0004.
+  Verificat cu `scripts/fex-tso-check.py` (numără instrucțiunile din codul tradus): `sleep` cu `libc.so.6` în
+  listă → în codul din libc 0 `LDAPR`/`STLR`, în `ld-linux` 8403.
+- **Capcană la testare:** un proces pornit de Steam rulează pe binarul FEX al lui Steam (FEX se re-execută din
+  `/proc/self/exe`), deci un FEX nou copiat pe telefon e folosit abia după repornirea sesiunii.
+- **Lista** (`FexConfig.SOURCE2_WITHOUT_TSO`, 18 biblioteci): client, server, engine2, panorama,
+  rendersystemvulkan, materialsystem2, scenesystem, particles, animationsystem, vphysics2, worldrenderer,
+  meshsystem, soundsystem, resourcesystem, panorama_text_pango, schemasystem, vscript, v8. Rămân cu TSO:
+  `libtier0` (primitivele de fire), sistemul de fișiere, rețeaua, clientul Steam, SDL, libc, libstdc++.
+- **Rezultat, scena cu zece eroi**, sesiuni alternate, ferestre de 10 s împerecheate după limita de frecvență:
+
+  | limită nucleu rapid / mic | cu TSO peste tot | fără TSO în cele 18 |
+  |---|---|---|
+  | 1420 / 1612 MHz | 38,7 (7 ferestre) | 43,8 (5 ferestre) |
+  | 1075 / 595 MHz | 36,0–37,8 (sesiuni anterioare), 37,5 | 42,4 (3 ferestre), 43,1 |
+
+  Adică +13…15%. Dota încarcă, pornește scena și un meci privit.
+- **Setare** „Memorie rapidă pentru Dota 2 și CS2 (experimental)”, **oprită implicit**: codul care se bazează pe
+  ordinea memoriei x86 fără operații atomice poate greși rar; testat doar câteva minute. Pe Realme e pornită.
+- `am start --es action steam` cu aplicația deschisă, după oprirea unei sesiuni pornite tot așa: aplicația
+  deschidea „Avansat” și pornea Steam în ecranul de test (1280×720). Reparat (`onNewIntent`, `startSession`).
+
+## N-042 · Meci real: memoria se termină  🧪 (Realme GT 12 GB, 2026-09-28)
+- **Scena demo nu e reprezentativă.** Meci privit, minutul 39, scor 51–55, telefon la 46–47 °C (limite
+  1075/595 MHz), cu așezarea firelor și fără TSO în cele 18 biblioteci: 13–15 cadre/s, cu căderi la 5–8.
+  `console.log`: 224 × „Excessive frame time” (cadre de peste 100 ms), „Slamming client tick to server tick”,
+  iar după 100 s serverul închide conexiunea: `NETWORK_DISCONNECT_OVERFLOW` (clientul nu ține pasul).
+- **Reprodus „un cadru la 5–10 secunde”** (raportat de utilizator): la al patrulea meci încărcat în aceeași
+  sesiune, 0–1 cadre în 10 s. `MemAvailable` 17 MB, `MemFree` 26 MB, swap liber 1,8 din 7,5 GB; jocul 4,9 GB în
+  RAM + 3,4 GB în swap = **8,4 GB**. Firul principal al jocului 10–15% (stă în erori de pagină), iar procesorul
+  e luat de `kswapd0`, `kshrink_slabd`, zece fire `kverityd`, `lmkd` și de aplicațiile pe care Android le omoară
+  și le repornește (`lowmemorykiller: Kill … oom_score_adj 0`). La un minut după, Android a închis toată sesiunea.
+- **Memoria jocului pe etape:** meniul principal 4,5 GB; după primul meci privit 7,2 GB; după al patrulea 8,4 GB.
+  La meniu: 3,55 GB memorie anonimă fără nume (din care 1,84 GB în patru zone de peste 512 MB și 0,74 GB în 798
+  de zone de 1–8 MB), KGSL 0,36 GB, biblioteci 0,23 GB, cod JIT 0,22 GB, alocatorul FEX 0,18 GB.
+- **Primul „Watch in-game” dă mereu „Overflow error”:** serverul închide la ~30 s după `ProcessServerInfo`, cât
+  timp clientul încarcă harta. A doua încercare reușește (resursele sunt deja în memorie).
+- **De făcut:** de aflat ce sunt zonele mari (alocatorul jocului, memoria gazdei Mesa sau FEX) și de ce cresc
+  între meciuri; o măsurătoare repetabilă pe un replay; un avertisment în aplicație când memoria liberă scade.
+  🟨 Pe un telefon de 12 GB un meci lung nu e încă de încredere.

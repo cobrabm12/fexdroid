@@ -30,6 +30,20 @@ enum class FexProfile(val label: String, val description: String, val options: M
 }
 
 object FexConfig {
+    /**
+     * Libraries of Source 2 games (Dota 2, Counter-Strike 2) that run without the emulation of
+     * x86's memory ordering (TSO), FEX's option ExtendedVolatileMetadata (NOTES N-041). They
+     * are where a match spends its time; the ones that are not here (tier0 with the thread
+     * primitives, the file system, the network, Steam's client, libc) keep it, and so does
+     * every other program. Switching TSO off everywhere hangs Dota 2 while it loads.
+     */
+    val SOURCE2_WITHOUT_TSO = listOf(
+        "libclient.so", "libserver.so", "libengine2.so", "libpanorama.so", "librendersystemvulkan.so",
+        "libmaterialsystem2.so", "libscenesystem.so", "libparticles.so", "libanimationsystem.so",
+        "libvphysics2.so", "libworldrenderer.so", "libmeshsystem.so", "libsoundsystem.so",
+        "libresourcesystem.so", "libpanorama_text_pango.so", "libschemasystem.so", "libvscript.so", "libv8.so",
+    )
+
     /** FEX_APP_CONFIG_LOCATION (LinuxEnv): FEX's per-user layer over the global Config.json. */
     fun configDir(env: LinuxEnv) = File(env.home, ".fex-emu")
     /** FEX_APP_CACHE_LOCATION (LinuxEnv): JIT disk cache, kept across payload updates. */
@@ -41,13 +55,15 @@ object FexConfig {
      * sets the options below, so the file is owned by the app and rewritten every time.
      * FEX reads every value as a string.
      */
-    fun write(env: LinuxEnv, profile: FexProfile, diskCache: Boolean) {
+    fun write(env: LinuxEnv, profile: FexProfile, diskCache: Boolean, source2WithoutTso: Boolean) {
         val config = JSONObject()
         for ((k, v) in profile.options) config.put(k, v)
         config.put("Multiblock", "1")
         // Code blocks compiled once are stored under the cache dir and reused by later
         // runs (FEX-2609 CPU.DiskCache): shorter loading after the first start.
         config.put("DiskCache", if (diskCache) "1" else "0")
+        if (source2WithoutTso && profile.options["TSOEnabled"] == "1")
+            config.put("ExtendedVolatileMetadata", SOURCE2_WITHOUT_TSO.joinToString(":"))
         val root = JSONObject().put("Config", config)
         val dir = configDir(env).apply { mkdirs() }
         cacheDir(env).mkdirs()

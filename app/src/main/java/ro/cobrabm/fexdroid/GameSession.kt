@@ -264,8 +264,12 @@ object GameSession {
                 }
                 runCatching { DotaProfile.apply(env, AppSettings.dotaPerformance) }
                     .onSuccess { it?.let(::append) }.onFailure { append("Profilul Dota 2 nu a putut fi aplicat: $it") }
-                runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache) }
-                    .onSuccess { append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}") }
+                runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache, AppSettings.source2WithoutTso) }
+                    .onSuccess {
+                        append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}" +
+                            ", memorie rapidă Source 2 ${if (AppSettings.source2WithoutTso) "pornită" else "oprită"}" +
+                            ", așezarea firelor ${if (AppSettings.threadPlacement) "pornită" else "oprită"}")
+                    }
                     .onFailure { append("FEX: nu pot scrie Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
                 step(StartStep.DISPLAY)
