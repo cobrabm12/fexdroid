@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <jni.h>
 #include <sched.h>
+#include <sys/resource.h>
 
 JNIEXPORT jint JNICALL
 Java_ro_cobrabm_fexdroid_Sched_setAffinity(JNIEnv *env, jclass cls, jint tid, jlong mask) {
@@ -26,4 +27,11 @@ Java_ro_cobrabm_fexdroid_Sched_getAffinity(JNIEnv *env, jclass cls, jint tid) {
     for (int i = 0; i < 63; i++)
         if (CPU_ISSET(i, &set)) mask |= 1LL << i;
     return mask;
+}
+
+// setpriority() for one thread: on Linux PRIO_PROCESS with a thread id means that thread.
+JNIEXPORT jint JNICALL
+Java_ro_cobrabm_fexdroid_Sched_setNice(JNIEnv *env, jclass cls, jint tid, jint nice) {
+    (void)env; (void)cls;
+    return setpriority(PRIO_PROCESS, (id_t)tid, nice) == 0 ? 0 : -errno;
 }

@@ -1150,3 +1150,53 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   jucat așa; alt telefon. Camera din Dota se mută și când cursorul ajunge la marginea imaginii, deci o
   atingere lângă margine o pornește: se oprește din setările jocului (Options › Camera › Edge Pan).
 - Meniul din joc a devenit mai înalt decât ecranul odată cu rândul nou și acum derulează.
+
+## N-046 · Runda de performanță din 28 septembrie seara: ce limitează și ce nu  🧪 (Realme GT, 2026-09-28)
+Cerința: mai multe cadre la aceeași rezoluție, din emulare și driver. Telefonul pe USB la PC (încarcă puțin:
+bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauze).
+
+- **Măsurătoare care nu depinde de temperatură** (`build/measure/cyc.sh`): replay-ul la momentul obișnuit, cu
+  jocul ținut la 15 cadre/s (`+fps_max 15`; cele 30 de tick-uri pe secundă ale meciului sunt și ele fixe), apoi
+  40 s de contoare (`simpleperf stat --per-thread`). Aceeași muncă, deci instrucțiunile și ciclurile se pot
+  compara între rulări. Trei rulări cu aceleași setări: firul principal 0,90 / 0,98 G instrucțiuni/s, tot jocul
+  2,57 / 2,33, adică ±10% de la o rulare la alta (locul din replay diferă cu câteva secunde). Diferențe sub
+  10% nu se văd cu ea.
+- ⚠ **`+fps_max` din linia de comandă rămâne salvat** în `machine_convars.vcfg`: jocul a pornit apoi limitat
+  la 15 cadre/s și fără opțiune. Pus la loc pe 120 de mână. Scripturile de test trebuie să dea mereu valoarea.
+- **Replay pe pauză: 49–55 cadre/s; același loc, în redare: 23–25**, la aceleași limite de frecvență
+  (1555 MHz). Deci randarea și drumul de afișare nu limitează; jumătate din timpul firului principal e simularea
+  meciului (30 de tick-uri pe secundă, oricâte cadre ar fi).
+- **Firul principal nu e ocupat tot timpul:** 75–78% dintr-un nucleu în redare, 65% pe pauză. Restul așteaptă
+  în `epoll_pwait` firele ajutătoare (28% din timp pe pauză, 10% în redare) și le trezește cu câte un `futex`
+  (25 de treziri pe cadru).
+- **Firele ajutătoare fac muncă adevărată**, nu așteaptă în buclă: `libparticles` 29%, `libclient` 17%,
+  `libtier0` 9,5%, `libanimationsystem` 7%, `libscenesystem` 6%. `ThreadSpin` (buclă cu `rdtsc` + `pause`)
+  e blocul cel mai fierbinte, dar are doar 3,9%.
+- **Codul tradus al blocurilor fierbinți e aproape unu la unu** cu cel x86 (citit din memoria jocului,
+  `build/measure/dis.sh`): o încărcare x86 devine un `ldr`, un `test` un `subs`, un salt un `b`. Fiecare bloc
+  începe cu două instrucțiuni care țin minte blocul curent (pentru semnale); `ret` folosește stiva de perechi
+  apel/întoarcere pe care FEX-2609 o are deja. Nu am găsit nimic de câștigat din configurare.
+- 🧪 **AVX ascuns jocului** (`FEX_HOSTFEATURES=disableavx`): tot jocul 2,81 G instrucțiuni/s față de 2,33 și
+  2,57, firul principal 1,05 față de 0,98 și 0,90. Nu e mai bine, probabil mai rău. AVX rămâne.
+- 🧪 **Așezarea firelor**, pe replay-ul pus pe pauză, ferestre alternate de 20 s: firul de prezentare pe
+  nucleele mici 55,0 față de 53,9 cadre/s (în zgomot, iar măsurătoarea se apropie de plafonul ei de 60); firele
+  de randare pe nucleele mici 41,2 (mai rău); firele jocului și pe nucleul firului principal 51,9 (mai rău).
+  Rămâne „big”. `files/tuner.txt` primește acum și reguli după numele firului (`masks 80 70 0f WSI:0f`,
+  al treilea câmp e prioritatea), doar pentru măsurători.
+- **GPU-ul e ocupat 26–30%** la frecvența maximă, în redare. Nu limitează.
+- **Cine mai consumă procesor în timpul meciului** (telefon încins, nuclee mici la 595 MHz): jocul 236%,
+  `hybridswapd` 32%, aplicația (puntea de imagine) 32%, Xvfb 19,5%, Steam 16%, sunetul 37% în total
+  (`audioserver` 15,6%, serviciul audio 12,3%, PulseAudio 9,3%), `surfaceflinger` 13%. Procentele sunt mari
+  fiindcă nucleele mici merg la o treime din frecvență; ca putere înseamnă puțin.
+- **Căldura:** la 46–47 °C pe baterie limitele ajung la 1075 / 1075 / 595 MHz (nucleul rapid, cele mari, cele
+  mici), din 2841 / 2419 / 1804. De la rece la încins trec 10–15 minute de joc.
+- ✅ **Memoria lui Steam:** 2,9 GB cu interfața clasică deschisă pe Magazin (pagina Magazinului singură ține
+  0,4 GB), 2,4 GB deschisă pe Bibliotecă, 2,1 GB în Big Picture. Aplicația pornește acum interfața clasică
+  direct pe Bibliotecă (`steam://nav/games`); Big Picture rămâne cum era. `-silent` nu are efect la noi.
+- **Concluzie:** cadrele sunt limitate de firul principal al jocului, care rulează cod tradus fără puncte
+  fierbinți, pe un nucleu pe care telefonul îl încetinește la mai puțin de jumătate când se încinge. Din
+  setările FEX, din așezarea firelor și din driver nu mai e nimic de câteva procente de luat pe telefonul
+  ăsta. Ce ar mai aduce cadre: mai puțină căldură (răcire, fără încărcare în timpul jocului) și schimbări în
+  generatorul de cod al lui FEX, care nu sunt de o seară.
+- Unelte: `scripts/perf-by-block.py` (profil pe blocuri și pe biblioteci din `FEX_BLOCKJITNAMING=1`); locale,
+  în `build/measure/`: `cyc.sh`, `threads.sh`, `dis.sh`, `procmem.py`.
