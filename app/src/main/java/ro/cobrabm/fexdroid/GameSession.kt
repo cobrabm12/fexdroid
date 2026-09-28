@@ -262,6 +262,8 @@ object GameSession {
                 if (GameRootfs.needsBuild(env)) {
                     runCatching { GameRootfs.build(env, ::append) }.onFailure { append("Mediul jocului: eroare: $it") }
                 }
+                runCatching { DotaProfile.apply(env, AppSettings.dotaPerformance) }
+                    .onSuccess { it?.let(::append) }.onFailure { append("Profilul Dota 2 nu a putut fi aplicat: $it") }
                 runCatching { FexConfig.write(env, AppSettings.fexProfile, AppSettings.fexDiskCache) }
                     .onSuccess { append("FEX: profil ${AppSettings.fexProfile.label}, cache de cod ${if (AppSettings.fexDiskCache) "pornit" else "oprit"}") }
                     .onFailure { append("FEX: nu pot scrie Config.json: $it") }
