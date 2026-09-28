@@ -14,7 +14,7 @@ fexdroid is an Android app that starts the Linux version of **Steam**, and games
 |---|---|
 | Steam client | Installs itself from Valve on first start; sign-in, library, store, downloads |
 | Installing games | From Steam, on the phone, over Wi-Fi |
-| Dota 2 | Starts from Steam, online; hero demo, watching live matches |
+| Dota 2 | Starts from Steam, online; hero demo, watching live matches and replays |
 | Input | Touch, USB/Bluetooth mouse and keyboard |
 | Sound | Yes |
 | Updates | From inside the app |
@@ -26,7 +26,7 @@ Not there yet: on-screen game controls and gamepads, a match played from start t
 
 | Phone | Chip | Android | Result |
 |---|---|---|---|
-| Realme GT 5G | Snapdragon 888, Adreno 660, 12 GB | 14 | Dota 2 from Steam. 36–44 frames/s in a ten-hero test scene, 13–15 in a late-game match on a hot phone |
+| Realme GT 5G | Snapdragon 888, Adreno 660, 12 GB | 14 | Dota 2 from Steam. Replay of a real match, minute 22: 25–28 frames/s on a cool phone, 20–23 on a warm one. Ten-hero test scene: 36–44 |
 | Galaxy S26 Ultra | Snapdragon 8 Elite Gen 5, Adreno 840 | 16 | Steam and Dota 2 run; 25–32 frames/s in a match, measured with an earlier build |
 
 Numbers are from the phones themselves, not estimates. How they were measured is in [NOTES.md](NOTES.md) (in Romanian).
@@ -35,7 +35,7 @@ Numbers are from the phones themselves, not estimates. How they were measured is
 
 - A **Snapdragon** chip with an **Adreno 6xx, 7xx or 8xx** (Snapdragon 845 or newer). Other graphics processors fall back to drawing on the CPU, which is far too slow for 3D games.
 - **Android 12 or newer** (tested on 14 and 16), 64-bit, memory pages of 4 KB (the app checks).
-- **12 GB of RAM or more** for Dota 2. The game holds 5 to 8 GB under the emulator.
+- **12 GB of RAM or more** for Dota 2. Under the emulator the game holds 5 to 6 GB, and about 3 GB of video memory, which on a phone is the same memory.
 - **Free space**: about 5 GB for Steam, and what the game needs on top (Dota 2: about 70 GB).
 
 The app's first screen shows a verdict for your phone.
@@ -53,7 +53,7 @@ Later versions install from inside the app.
 ## Known limits
 
 - **Heat decides the frame rate.** Phones lower their processor's speed when hot; a Snapdragon 888 drops to about 40% of it. Play off the charger if you can, and take the case off.
-- **Memory.** On a 12 GB phone, several matches in one session can exhaust memory: the game slows to a crawl and Android closes it. Close other apps, and restart fexdroid between matches.
+- **Memory.** On a 12 GB phone, several matches in one session can exhaust memory: the game slows to a crawl and Android closes it. The app shows a warning before that. Close other apps, and restart fexdroid between matches.
 - **The first “Watch in-game”** of a session often ends with “Overflow error”, because the map loads slower than the server waits. The second try works.
 - **Performance settings** are in Settings › Performance. “Fast memory access for Dota 2 and CS2” gave 13% more frames in our tests; it is experimental and off by default.
 
