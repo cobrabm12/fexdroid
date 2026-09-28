@@ -10,7 +10,7 @@ import kotlin.concurrent.thread
  * Memory, the resource a big game runs out of first on a phone (NOTES N-042, N-044).
  *
  * Dota 2 under the emulator holds 4.5 GB of ordinary memory at its main menu and 5 to 6 GB
- * in a match, plus 3 GB of video memory, which on a phone is the same memory. Next to Steam
+ * in a match, plus 3 to 4 GB of video memory, which on a phone is the same memory. Next to Steam
  * and Android that is more than a 12 GB phone has: what does not fit is compressed (swap).
  * When that is used up too, the game drops to a frame every few seconds and Android ends
  * the session.
@@ -39,10 +39,10 @@ object MemoryWatch {
 
     /**
      * The share of the phone's memory Turnip reports to games as video memory (Mesa's option
-     * heap_memory_percent); Mesa's own choice is 75%. Dota 2 uses about 2.1 GB whatever the
-     * size is, and 17% of the size for textures on top: 3.6 GB of a reported 8.6 GB, 2.9 GB
-     * of 4.6 GB. With 2.4 GB it ends with "out of GPU video memory" while a match loads, so
-     * the size is never under 4 GB.
+     * heap_memory_percent); Mesa's own choice is 75%. Dota 2 sizes its textures by it, but most
+     * of what it holds does not depend on it: in a match its video memory grows for a quarter
+     * of an hour, to 4.1 GB of a reported 4.6 GB and to 4.3 GB (still growing) of 8.6 GB. With
+     * 2.4 GB it ends with "out of GPU video memory" while a match loads (NOTES N-044).
      */
     fun videoMemoryShare(): String? {
         val total = meminfo()["MemTotal"] ?: return null
