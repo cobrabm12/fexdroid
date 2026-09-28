@@ -21,7 +21,7 @@ data class Resolution(val width: Int, val height: Int) {
          * picture fills it without black bars (20:9 phone: 1280x720 becomes 1600x720). The
          * height, which sets the rendering cost class, stays. Shapes are limited to 4:3..21:9.
          */
-        fun fitted(ctx: Context, base: Resolution, marginPercent: Int = 0): Resolution {
+        fun fitted(ctx: Context, base: Resolution, marginPercent: Int = 0, wideSides: Boolean = false): Resolution {
             val wm = ctx.getSystemService(android.view.WindowManager::class.java) ?: return base
             val (a, b) = if (android.os.Build.VERSION.SDK_INT >= 30) {
                 wm.maximumWindowMetrics.bounds.let { it.width() to it.height() }
@@ -32,8 +32,9 @@ data class Resolution(val width: Int, val height: Int) {
             }
             if (a <= 0 || b <= 0) return base
             // The picture is shown inside a margin on every side (AppSettings.screenMargin).
-            val margin = 2.0 * minOf(a, b) * marginPercent / 100
-            val aspect = ((maxOf(a, b) - margin) / (minOf(a, b) - margin)).coerceIn(4.0 / 3.0, 21.0 / 9.0)
+            val margin = 1.0 * minOf(a, b) * marginPercent / 100
+            val side = if (wideSides) maxOf(margin, AppSettings.WIDE_SIDE_DP * ctx.resources.displayMetrics.density.toDouble()) else margin
+            val aspect = ((maxOf(a, b) - 2 * side) / (minOf(a, b) - 2 * margin)).coerceIn(4.0 / 3.0, 21.0 / 9.0)
             val width = (Math.round(base.height * aspect / 8.0) * 8).toInt()
             return Resolution(width, base.height)
         }
@@ -50,6 +51,12 @@ object AppSettings {
     val FPS_PRESETS = listOf(30, 45, 60)
     /** Percent of the screen's short side left free on every side of the picture. */
     val MARGIN_PRESETS = listOf(0, 3, 5, 8)
+    /**
+     * Width kept free at the left and right edges with [wideSides]. realme/OPPO/OnePlus put a
+     * system overlay for their game tools on the top half of the left edge, 24 dp wide
+     * (GamesFloatBar): touches and the mouse never reach what a game shows under it.
+     */
+    const val WIDE_SIDE_DP = 28
 
     private lateinit var prefs: SharedPreferences
 
@@ -62,6 +69,8 @@ object AppSettings {
      * (edge rejection, game modes): Dota 2 has its menu buttons and network figures there.
      */
     var screenMargin by mutableIntStateOf(3); private set
+    /** The picture keeps [WIDE_SIDE_DP] free at the left and right edges of the screen. */
+    var wideSides by mutableStateOf(false); private set
     var fps by mutableIntStateOf(60); private set
     var dynamicColor by mutableStateOf(true); private set
     var theme by mutableStateOf(ThemeMode.DARK); private set
@@ -94,6 +103,8 @@ object AppSettings {
         )
         fitScreen = prefs.getBoolean("fit_screen", true)
         screenMargin = prefs.getInt("screen_margin", 3)
+        wideSides = prefs.getBoolean("wide_sides",
+            android.os.Build.MANUFACTURER.lowercase() in setOf("realme", "oppo", "oneplus"))
         fps = prefs.getInt("fps", 60)
         dynamicColor = prefs.getBoolean("dynamic_color", true)
         theme = runCatching { ThemeMode.valueOf(prefs.getString("theme", null) ?: "DARK") }.getOrDefault(ThemeMode.DARK)
@@ -114,7 +125,9 @@ object AppSettings {
     fun updateFitScreen(v: Boolean) { fitScreen = v; prefs.edit().putBoolean("fit_screen", v).apply() }
     /** The X screen size to start a session with. */
     fun updateScreenMargin(v: Int) { screenMargin = v; prefs.edit().putInt("screen_margin", v).apply() }
-    fun sessionResolution(ctx: Context) = if (fitScreen) Resolution.fitted(ctx, resolution, screenMargin) else resolution
+    fun updateWideSides(v: Boolean) { wideSides = v; prefs.edit().putBoolean("wide_sides", v).apply() }
+    fun sessionResolution(ctx: Context) =
+        if (fitScreen) Resolution.fitted(ctx, resolution, screenMargin, wideSides) else resolution
 
     fun updateFps(v: Int) { fps = v; prefs.edit().putInt("fps", v).apply() }
     fun updateDynamicColor(v: Boolean) { dynamicColor = v; prefs.edit().putBoolean("dynamic_color", v).apply() }

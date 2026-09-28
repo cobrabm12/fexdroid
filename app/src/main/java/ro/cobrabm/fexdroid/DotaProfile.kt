@@ -11,6 +11,9 @@ import java.io.File
  * hot (NOTES N-036): shadows, particles and the extra lighting passes cost CPU time per frame
  * (draw calls, animation) and GPU heat, which lowers the CPU's frequency limit further.
  *
+ * Anti-aliasing is left as the player set it: the game offers FidelityFX Super Resolution
+ * only with anti-aliasing on.
+ *
  * The values the player had are kept in `video.txt.fexdroid-orig` and put back when the
  * profile is switched off.
  */
@@ -30,7 +33,6 @@ object DotaProfile {
         "setting.r_deferred_specular" to "0",
         "setting.r_deferred_specular_bloom" to "0",
         "setting.r_ssao" to "0",
-        "setting.r_dota_fxaa" to "0",
         "setting.r_dota_normal_maps" to "0",
         "setting.r_dota_allow_parallax_mapping" to "0",
         "setting.r_dota_allow_wind_on_trees" to "0",
