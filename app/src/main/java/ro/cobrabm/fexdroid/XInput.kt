@@ -22,6 +22,9 @@ object XInput {
         return ANDROID_TO_EVDEV[e.keyCode]?.plus(8) ?: -1
     }
 
+    /** X keycode for an Android key code (on-screen keys), or -1. */
+    fun xKeycode(androidKey: Int): Int = ANDROID_TO_EVDEV[androidKey]?.plus(8) ?: -1
+
     private val ANDROID_TO_EVDEV: Map<Int, Int> = buildMap {
         val letters = "qwertyuiop" to 16
         letters.first.forEachIndexed { i, c -> put(KeyEvent.KEYCODE_A + (c - 'a'), letters.second + i) }

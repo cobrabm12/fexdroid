@@ -1117,3 +1117,36 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   singură minute întregi. Scripturile de test verifică imaginea înainte de apăsări și s-au oprit; invitația nu
   a fost nici acceptată, nici refuzată (a expirat, apoi fereastra a fost închisă cu „Dismiss”).
 
+## N-045 · Taste pe ecran, joc prin atingere  ✅ (Realme GT, 2026-09-28)
+
+- **Ce este:** două coloane de taste, în stânga și în dreapta imaginii (`OnScreenKeys.kt`), pornite din
+  Setări › Joc prin atingere sau din meniul din joc. Aranjamentul e un rând de nume despărțite prin spații,
+  implicit pentru Dota 2: stânga `Esc Q W E R D F`, dreapta `Mouse Swipe A S Alt Ctrl` (plus butonul de meniu,
+  care altfel ar sta peste taste). `Shift`, `Ctrl`, `Alt` rămân apăsate până la a doua atingere.
+- **Atingerea pe imagine:** tasta `Mouse` alege butonul apăsat de o atingere (stânga/dreapta); atingerea cu două
+  degete apasă celălalt buton. Tasta `Swipe` alege între rotiță și tragere cu butonul din mijloc, care în Dota
+  mută camera. Apăsarea lungă urmată de mișcare rămâne tragere cu butonul stâng (selecție).
+- **Imaginea se îngustează** cu 56 dp pe fiecare parte cât timp tastele sunt pornite: pe Realme GT 1344x720 în
+  loc de 1584x720. Rezoluția se alege la pornirea sesiunii: tastele pornite din meniu în timpul jocului
+  stau peste marginile imaginii, transparente, până la următoarea pornire (verificat în Steam).
+- 🧪 **Compose nu poate împărți degetele între taste și imagine.** Cu un deget pe o tastă desenată în Compose,
+  al doilea deget pus pe imagine (un `AndroidView`) nu ajunge deloc la ea: vederea primește `ACTION_POINTER_DOWN`
+  fără un `ACTION_DOWN` înainte, iar `ViewGroup` îl oprește. Verificat pe telefon: cursorul nu s-a mișcat.
+  Rezolvare: `MainActivity.dispatchTouchEvent` trece fiecare eveniment prin `OnScreenKeys.filter`, care scoate
+  degetele de pe taste și reface evenimentul pentru restul ferestrei, ca și cum celelalte degete ar fi singure.
+  Tastele din Compose sunt doar desenate.
+- **Test cu mai multe degete fără mâini:** `adb shell input` știe un singur deget, iar `sendevent` e refuzat
+  de SELinux pe Realme. `TouchScript.kt` redă în fereastra aplicației un șir de pași:
+  `am start --activity-single-top -n ro.cobrabm.fexdroid/.MainActivity --es touches "d0:168,1000 w400 d1:900,620 w80 u1 w400 u0"`
+  (`d` deget jos, `m` mutat, `u` ridicat, `w` așteptare în ms). Fără `--activity-single-top` intenția nu ajunge
+  la o activitate deja deschisă.
+- **Verificat pe telefon, în Steam:** tastele Q, W, E scriu în căutare; Ctrl apoi A selectează textul; cu tasta
+  F ținută, o atingere pe imagine cu alt deget e un clic în locul atins; atingerea cu două degete apasă
+  celălalt buton.
+- **Verificat în Dota 2 (demo de erou, 1344x720):** atingere cu butonul drept: eroul merge în locul atins;
+  glisare cu „cameră”: harta se mută după deget; tasta W apoi atingere cu două degete: vraja (Ice Vortex) a
+  fost lansată în locul atins, mana a scăzut de la 1587 la 1511.
+- **Neverificat:** cu degete adevărate (toate apăsările au fost redate prin adb și `TouchScript`); un meci
+  jucat așa; alt telefon. Camera din Dota se mută și când cursorul ajunge la marginea imaginii, deci o
+  atingere lângă margine o pornește: se oprește din setările jocului (Options › Camera › Edge Pan).
+- Meniul din joc a devenit mai înalt decât ecranul odată cu rândul nou și acum derulează.

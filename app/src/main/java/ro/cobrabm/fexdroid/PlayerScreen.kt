@@ -102,6 +102,7 @@ fun PlayerScreen() {
             ic.show(WindowInsetsCompat.Type.systemBars())
             activity.requestedOrientation = prev
             view?.releasePointerCapture()
+            OnScreenKeys.reset()
         }
     }
 
@@ -136,7 +137,8 @@ fun PlayerScreen() {
     ) {
         // The margin the session's resolution was computed for (AppSettings.screenMargin).
         val margin = minOf(maxWidth, maxHeight) * (AppSettings.screenMargin / 100f)
-        val side = if (AppSettings.wideSides && margin < AppSettings.WIDE_SIDE_DP.dp) AppSettings.WIDE_SIDE_DP.dp else margin
+        val edge = if (AppSettings.wideSides && margin < AppSettings.WIDE_SIDE_DP.dp) AppSettings.WIDE_SIDE_DP.dp else margin
+        val side = edge + AppSettings.keysDp.dp
         // Recreate the view when the X resolution changes (it maps touches to X coordinates).
         androidx.compose.runtime.key(res) {
             AndroidView(
@@ -174,7 +176,14 @@ fun PlayerScreen() {
             SessionState.Idle -> {}
         }
 
-        if (state is SessionState.Running || state is SessionState.Starting) {
+        val keys = AppSettings.onScreenKeys && state is SessionState.Running && GameSession.inputReady
+        if (keys) {
+            OnScreenKeys.Strip("left", remember(AppSettings.keysLeft) { OnScreenKeys.parse(AppSettings.keysLeft) },
+                Modifier.align(Alignment.CenterStart).padding(start = edge))
+            // The menu button would sit on the keys: it is the first of them.
+            OnScreenKeys.Strip("right", remember(AppSettings.keysRight) { listOf(OnScreenKeys.Menu) + OnScreenKeys.parse(AppSettings.keysRight) },
+                Modifier.align(Alignment.CenterEnd).padding(end = edge), onMenu = { menuOpen = !menuOpen })
+        } else if (state is SessionState.Running || state is SessionState.Starting) {
             // Middle of the right edge: games keep their own buttons and figures in the corners.
             FloatingMenuButton(Modifier.align(Alignment.CenterEnd).displayCutoutPadding()) { menuOpen = !menuOpen }
         }
@@ -183,6 +192,7 @@ fun PlayerScreen() {
             GameMenu(
                 keyboardShown = keyboardShown, mouseCaptured = mouseCaptured,
                 onKeyboard = { menuOpen = false; toggleKeyboard() },
+                onKeys = { menuOpen = false; AppSettings.updateOnScreenKeys(!AppSettings.onScreenKeys) },
                 onMouse = { menuOpen = false; toggleMouse() },
                 onLog = { menuOpen = false; logOpen = true },
                 onMinimize = { menuOpen = false; GameSession.playerVisible = false },
@@ -225,7 +235,7 @@ private fun FloatingMenuButton(modifier: Modifier, onClick: () -> Unit) {
 @Composable
 private fun GameMenu(
     keyboardShown: Boolean, mouseCaptured: Boolean,
-    onKeyboard: () -> Unit, onMouse: () -> Unit, onLog: () -> Unit,
+    onKeyboard: () -> Unit, onKeys: () -> Unit, onMouse: () -> Unit, onLog: () -> Unit,
     onMinimize: () -> Unit, onStop: () -> Unit, onClose: () -> Unit,
 ) {
     var frames by remember { mutableLongStateOf(DisplayBridge.changedFrames()) }
@@ -237,7 +247,8 @@ private fun GameMenu(
         Modifier.padding(12.dp).widthIn(max = 300.dp).fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
     ) {
-        Column(Modifier.padding(vertical = 8.dp)) {
+        // Taller than a phone's screen in landscape: it scrolls.
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(str(R.string.player_menu), style = MaterialTheme.typography.titleMedium)
@@ -247,6 +258,8 @@ private fun GameMenu(
                 IconButton(onClick = onClose) { Icon(AppIcons.Close, str(R.string.close)) }
             }
             MenuItem(AppIcons.Keyboard, if (keyboardShown) str(R.string.player_hide_keyboard) else str(R.string.player_keyboard), onKeyboard)
+            MenuItem(AppIcons.Keyboard, str(if (AppSettings.onScreenKeys) R.string.player_keys_hide else R.string.player_keys_show),
+                onKeys, str(R.string.player_keys_hint))
             MenuItem(AppIcons.Mouse, if (mouseCaptured) str(R.string.player_release_mouse) else str(R.string.player_capture_mouse),
                 onMouse, str(R.string.player_capture_hint))
             MenuItem(AppIcons.Log, str(R.string.player_log), onLog)

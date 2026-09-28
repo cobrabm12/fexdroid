@@ -91,6 +91,12 @@
     <string name="install_failed">The installation failed: %1$s</string>
     <string name="install_progress">Downloading and installing: %1$d MB</string>
     <string name="install_progress_of">Downloading and installing: %1$d / %2$d MB</string>
+    <string name="key_camera">camera</string>
+    <string name="key_left">left</string>
+    <string name="key_right">right</string>
+    <string name="key_swipe">swipe</string>
+    <string name="key_tap">tap</string>
+    <string name="key_wheel">wheel</string>
     <string name="nav_advanced">Advanced</string>
     <string name="nav_home">Home</string>
     <string name="nav_settings">Settings</string>
@@ -103,6 +109,9 @@
     <string name="player_closed_itself">The program closed. If you did not close it yourself, press “Send the log”.</string>
     <string name="player_hide_keyboard">Hide the keyboard</string>
     <string name="player_keyboard">Keyboard</string>
+    <string name="player_keys_hide">Hide the on-screen keys</string>
+    <string name="player_keys_hint">At the sides of the picture, for playing by touch</string>
+    <string name="player_keys_show">On-screen keys</string>
     <string name="player_loading_hint">%1$s is loading. The first start can take a few minutes. Menu: the button on the right.</string>
     <string name="player_log">Log</string>
     <string name="player_log_empty">(empty)</string>
@@ -133,6 +142,7 @@
     <string name="settings_big_picture_about">The full-screen interface, for touch and controllers. Heavier than the desktop one. The first sign-in is done in the desktop interface.</string>
     <string name="settings_cache_size">Cache: %1$s</string>
     <string name="settings_clear_cache">Clear the cache</string>
+    <string name="settings_controls">Playing by touch</string>
     <string name="settings_disk_cache">Code cache on disk</string>
     <string name="settings_disk_cache_about">Experimental. Translated x86 code is kept and used again, so later starts are faster. With FEX-2609 some programs crash (Steam\'s setup is one), so it is off by default.</string>
     <string name="settings_dota_profile">Performance profile for Dota 2</string>
@@ -152,6 +162,13 @@
     <string name="settings_install_3">Steam downloads it from Valve when it starts for the first time (about 2 GB, a few minutes). Then sign in.</string>
     <string name="settings_install_4">In Steam: Store › Dota 2 › Play Game › Install. About 70 GB; the download goes on with the app in the background.</string>
     <string name="settings_install_note">Everything is installed on the phone, no PC needed. Nothing from Valve is in this app: Steam and the games are downloaded from Valve, with your own account. Use Wi-Fi and keep the phone on its charger.</string>
+    <string name="settings_keys">On-screen keys</string>
+    <string name="settings_keys_about">Keys at the left and right of the picture, which gets narrower to make room for them. The game\'s menu can show and hide them too.</string>
+    <string name="settings_keys_default">Back to the keys for Dota 2</string>
+    <string name="settings_keys_help">Names separated by spaces: letters, digits, F1 to F12, Esc, Tab, Space, Enter, Back, Del, Up, Down, Left, Right. Shift, Ctrl and Alt stay pressed until you tap them again. Mouse chooses the button a tap presses: left or right; a tap with two fingers presses the other one. Swipe chooses what a swipe does: turns the wheel, or moves the camera (a drag with the middle button).</string>
+    <string name="settings_keys_left">Keys on the left</string>
+    <string name="settings_keys_right">Keys on the right</string>
+    <string name="settings_keys_unknown">Names not understood: %1$s</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">Auto</string>
     <string name="settings_margin">Margin</string>

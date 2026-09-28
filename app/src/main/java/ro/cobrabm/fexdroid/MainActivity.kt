@@ -103,6 +103,12 @@ class MainActivity : ComponentActivity() {
         return if (inside) view.mouseEvent(ev, located = false) else handled
     }
 
+    /** Fingers on the on-screen keys are taken out before the window sees the touch. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        val rest = OnScreenKeys.filter(ev) ?: return true
+        return try { super.dispatchTouchEvent(rest) } finally { if (rest !== ev) rest.recycle() }
+    }
+
     /** True when [action] is one that starts a game session (and starts it, unless one runs). */
     private fun startSession(action: String?): Boolean {
         val game = when (action) { "steam" -> Game.STEAM; "dota" -> Game.DOTA; else -> return false }
@@ -114,6 +120,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         startSession(intent.getStringExtra("action"))
+        // `--es touches "d0:168,1000 w400 d1:900,620 w80 u1 w400 u0"`: touches of several fingers.
+        intent.getStringExtra("touches")?.let { TouchScript.play(this, it) }
     }
 
     /** A mouse's second button arrives as the Back key: see [InputSurfaceView.mouseBackKey]. */

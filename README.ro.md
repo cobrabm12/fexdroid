@@ -15,12 +15,12 @@ fexdroid este o aplicație Android care pornește versiunea de Linux a lui **Ste
 | Clientul Steam | Se instalează singur de la Valve la prima pornire; autentificare, bibliotecă, magazin, descărcări |
 | Instalarea jocurilor | Din Steam, pe telefon, prin Wi-Fi |
 | Dota 2 | Pornește din Steam, online; demo de erou, meciuri live și replay-uri |
-| Control | Atingere, mouse și tastatură pe USB/Bluetooth |
+| Control | Atingere, mouse și tastatură pe USB/Bluetooth, taste pe ecran pentru joc prin atingere (noi, aranjament pentru Dota 2, se poate schimba) |
 | Sunet | Da |
 | Actualizări | Din aplicație |
 | Limbi | Engleză, română |
 
-Încă nu: controale de joc pe ecran și gamepad, un meci jucat de la cap la coadă pe fiecare telefon testat, Samsung DeX.
+Încă nu: gamepad, un meci jucat de la cap la coadă pe fiecare telefon testat, Samsung DeX.
 
 ## Telefoane testate
 
