@@ -270,7 +270,8 @@ object GameSession {
                     .onSuccess {
                         append("FEX: profile ${AppSettings.fexProfile.name}, code cache ${if (AppSettings.fexDiskCache) "on" else "off"}" +
                             ", Source 2 libraries without TSO ${if (AppSettings.source2WithoutTso) "on" else "off"}" +
-                            ", thread placement ${if (AppSettings.threadPlacement) "on" else "off"}")
+                            ", thread placement ${if (AppSettings.threadPlacement) "on" else "off"}" +
+                            ", video memory ${if (AppSettings.limitVideoMemory) "${MemoryWatch.videoMemoryShare()} of the phone's" else "as Mesa chooses"}")
                     }
                     .onFailure { append("FEX: cannot write Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
@@ -290,6 +291,7 @@ object GameSession {
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())
                 if (AppSettings.threadPlacement) ThreadTuner.start(env.files)
+                MemoryWatch.start(::append)
                 // A game started in the session that installed it: the entry point asks for
                 // the rootfs (tools/steam/_v2-entry-point) and waits until the request is gone.
                 thread(name = "game-rootfs", isDaemon = true) {
@@ -315,6 +317,7 @@ object GameSession {
     fun stop() {
         synchronized(this) { generation++ }
         ThreadTuner.stop()
+        MemoryWatch.stop()
         DisplayBridge.stop()
         bridgeOn = false
         inputReady = false

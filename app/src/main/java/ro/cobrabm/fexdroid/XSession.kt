@@ -38,7 +38,10 @@ class XSession(
         // Programs ask PulseAudio for buffers of a few milliseconds; under the emulator their
         // sound threads are late more often than that. libpulse takes this over their request.
         "PULSE_LATENCY_MSEC" to "60",
-    ) + (if (AppSettings.gpuMaxFrequency) mapOf("TU_KGSL_PWR_CONSTRAINT" to "max") else emptyMap()) + extraEnv()
+    ) + (if (AppSettings.gpuMaxFrequency) mapOf("TU_KGSL_PWR_CONSTRAINT" to "max") else emptyMap()) +
+        // Mesa reads its options from the environment too.
+        (if (AppSettings.limitVideoMemory) MemoryWatch.videoMemoryShare()?.let { mapOf("heap_memory_percent" to it) }.orEmpty()
+            else emptyMap()) + extraEnv()
 
     /** Optional KEY=VALUE lines in files/session-env.txt, for experiments (TU_DEBUG, ...). */
     private fun extraEnv(): Map<String, String> {

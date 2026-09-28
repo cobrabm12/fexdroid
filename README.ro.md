@@ -14,7 +14,7 @@ fexdroid este o aplicație Android care pornește versiunea de Linux a lui **Ste
 |---|---|
 | Clientul Steam | Se instalează singur de la Valve la prima pornire; autentificare, bibliotecă, magazin, descărcări |
 | Instalarea jocurilor | Din Steam, pe telefon, prin Wi-Fi |
-| Dota 2 | Pornește din Steam, online; demo de erou, meciuri live privite |
+| Dota 2 | Pornește din Steam, online; demo de erou, meciuri live și replay-uri |
 | Control | Atingere, mouse și tastatură pe USB/Bluetooth |
 | Sunet | Da |
 | Actualizări | Din aplicație |
@@ -26,7 +26,7 @@ fexdroid este o aplicație Android care pornește versiunea de Linux a lui **Ste
 
 | Telefon | Cip | Android | Rezultat |
 |---|---|---|---|
-| Realme GT 5G | Snapdragon 888, Adreno 660, 12 GB | 14 | Dota 2 din Steam. 36–44 cadre/s într-o scenă de test cu zece eroi, 13–15 într-un meci avansat, cu telefonul încins |
+| Realme GT 5G | Snapdragon 888, Adreno 660, 12 GB | 14 | Dota 2 din Steam. Replay-ul unui meci real, minutul 22: 25–28 cadre/s cu telefonul rece, 20–23 când e cald. Scena de test cu zece eroi: 36–44 |
 | Galaxy S26 Ultra | Snapdragon 8 Elite Gen 5, Adreno 840 | 16 | Steam și Dota 2 rulează; 25–32 cadre/s în meci, măsurat cu o versiune mai veche |
 
 Cifrele sunt de pe telefoane, nu estimări. Cum au fost măsurate scrie în [NOTES.md](NOTES.md).
@@ -35,7 +35,7 @@ Cifrele sunt de pe telefoane, nu estimări. Cum au fost măsurate scrie în [NOT
 
 - Cip **Snapdragon** cu **Adreno 6xx, 7xx sau 8xx** (Snapdragon 845 sau mai nou). Cu alte plăci grafice desenul se face pe procesor, mult prea lent pentru jocuri 3D.
 - **Android 12 sau mai nou** (testat pe 14 și 16), pe 64 de biți, cu pagini de memorie de 4 KB (aplicația verifică).
-- **12 GB de RAM sau mai mult** pentru Dota 2. Jocul ocupă 5–8 GB sub emulator.
+- **12 GB de RAM sau mai mult** pentru Dota 2. Sub emulator jocul ocupă 5–6 GB, plus cam 3 GB de memorie video, care pe telefon e aceeași memorie.
 - **Spațiu liber**: cam 5 GB pentru Steam, plus cât cere jocul (Dota 2: cam 70 GB).
 
 Primul ecran al aplicației arată un verdict pentru telefonul tău.
@@ -53,7 +53,7 @@ Versiunile următoare se instalează din aplicație.
 ## Limite cunoscute
 
 - **Căldura hotărăște numărul de cadre.** Telefoanele își reduc viteza procesorului când se încing; un Snapdragon 888 coboară la cam 40% din ea. Joacă de pe baterie dacă poți și scoate husa.
-- **Memoria.** Pe un telefon de 12 GB, mai multe meciuri într-o sesiune pot epuiza memoria: jocul abia se mai mișcă, apoi Android îl închide. Închide celelalte aplicații și repornește fexdroid între meciuri.
+- **Memoria.** Pe un telefon de 12 GB, mai multe meciuri într-o sesiune pot epuiza memoria: jocul abia se mai mișcă, apoi Android îl închide. Aplicația te avertizează înainte. Închide celelalte aplicații și repornește fexdroid între meciuri.
 - **Primul „Watch in-game”** dintr-o sesiune se termină des cu „Overflow error”, fiindcă harta se încarcă mai încet decât așteaptă serverul. A doua încercare merge.
 - **Setările de performanță** sunt în Setări › Performanță. „Memorie rapidă pentru Dota 2 și CS2” a dat 13% mai multe cadre în testele noastre; e experimentală și oprită implicit.
 

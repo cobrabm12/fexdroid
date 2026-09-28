@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -169,7 +170,7 @@ fun PlayerScreen() {
                 game = state.game, onLog = { logOpen = true },
             )
             is SessionState.Failed -> EndPanel(str(R.string.session_did_not_start, state.game.title), state.message, state.game, onLog = { logOpen = true })
-            is SessionState.Running -> RunningHint(state)
+            is SessionState.Running -> { RunningHint(state); MemoryWarning() }
             SessionState.Idle -> {}
         }
 
@@ -321,6 +322,20 @@ private fun EndPanel(title: String, message: String, game: Game, onLog: () -> Un
             OutlinedButton(onClick = { GameSession.stop() }) { Text(str(R.string.close)) }
             Spacer(Modifier.width(8.dp))
             Button(onClick = { GameSession.start(ctx, game) }) { Text(str(R.string.try_again)) }
+        }
+    }
+}
+
+/** Shown while memory is about to run out (MemoryWatch): the match can still be finished. */
+@Composable
+private fun MemoryWarning() {
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.TopCenter) {
+        AnimatedVisibility(MemoryWatch.low, enter = fadeIn(), exit = fadeOut()) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f),
+                contentColor = MaterialTheme.colorScheme.onErrorContainer) {
+                Text(str(R.string.player_memory_low), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.widthIn(max = 420.dp).padding(horizontal = 16.dp, vertical = 8.dp))
+            }
         }
     }
 }
