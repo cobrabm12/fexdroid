@@ -1096,3 +1096,24 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   2150/1804 MHz), 20–23 când e cald (1305/1804 MHz).
 - De 185 de ori pe secundă firul principal face `access("/dev/random")` + `getrandom` + `getpid` + `getuid`
   (generare de numere aleatoare): ~1000 de apeluri de sistem pe secundă, 1–2% din fir. Lăsat așa.
+- 🧪 **Memoria video crește cu timpul, nu cu scena.** Cu replay-ul pe pauză (imagine fixă) crește la fel:
+  2,79 GB la 3½ minute de la pornirea jocului, apoi +350, +280, +190, +130, +100, +80, +70 MB pe minut, până la
+  4,00 GB la 10½ minute. Creșterea care se stinge arată o umplere treptată (streaming de texturi), nu o scurgere
+  de memorie în driver sau în prezentare, care ar crește constant.
+- 🧪 **`setting.mem_level` și `setting.gpu_mem_level`** din `video.txt` (jocul le pune pe 2, maxim, după cât
+  anunță driverul): puse pe 0 rămân așa, dar nu schimbă nimic măsurabil: memorie video 3,91 GB la 10 minute
+  (3,95–4,00 cu 2), memorie obișnuită 5,98 GB (6,23 cu 2, în alt moment al meciului). Se scriu cu jocul oprit;
+  la închidere jocul își rescrie fișierul. Lăsate pe 2.
+- **Concluzie pentru telefoane de 12 GB:** Dota ocupă ~6 GB de memorie obișnuită și ~4 GB de memorie video după
+  un sfert de oră de meci, lângă ~1,7 GB Steam și Android. Încape doar prin swap comprimat (zram: 1,8 GB fizici
+  pentru 6,8 GB mutați), iar swap-ul liber stă la ~1 GB. Nicio setare încercată nu schimbă asta cu mai mult de
+  0,3 GB. Avertismentul de memorie și repornirea între meciuri rămân soluția.
+- 🧪 Alte încercări în același replay, nepăstrate: `-threads 4` (3 fire ajutătoare în loc de 7): 21,2 față de
+  21,0 cadre/s, dar meciul se încarcă în 180 s în loc de 65–95; firele ajutătoare și pe nucleele mici: 22,3
+  față de 23,9; fără constrângerea de frecvență a GPU-ului: 15,2 față de 19–23 (constrângerea rămâne pornită).
+- **Replay cinci minute la rând** (de la minutul 22, 720p, toate setările): 21,6 cadre/s în medie, 21,0 în a doua
+  jumătate; bateria de la 41,9 la 45,7 °C; limitele nucleului rapid 1305–1420 MHz.
+- O invitație de party primită în timpul testelor acoperă meniul și replay-ul cu o fereastră care nu dispare
+  singură minute întregi. Scripturile de test verifică imaginea înainte de apăsări și s-au oprit; invitația nu
+  a fost nici acceptată, nici refuzată (a expirat, apoi fereastra a fost închisă cu „Dismiss”).
+
