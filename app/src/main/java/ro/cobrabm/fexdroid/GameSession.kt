@@ -286,7 +286,10 @@ object GameSession {
                 // Big Picture only once somebody has logged in: the first start (client download,
                 // login) is verified in the desktop interface only.
                 val loggedIn = File(env.home, ".local/share/Steam/userdata").listFiles()?.any { it.isDirectory } == true
-                val extra = if (game == Game.STEAM && AppSettings.steamBigPicture && loggedIn) listOf("-gamepadui") else emptyList()
+                // The desktop interface opens on the Library: the Store's page, where Steam opens by
+                // itself, holds 0.4 GB for as long as Steam runs (NOTES N-046).
+                val extra = if (game != Game.STEAM || !loggedIn) emptyList()
+                    else if (AppSettings.steamBigPicture) listOf("-gamepadui") else listOf("steam://nav/games")
                 val p = xs.launch(game.tag, game.argv(env) + extra)
                 if (!current()) return@thread xs.stopAll()
                 state = SessionState.Running(game, System.currentTimeMillis())

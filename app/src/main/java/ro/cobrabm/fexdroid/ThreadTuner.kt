@@ -12,6 +12,8 @@ object Sched {
     @JvmStatic external fun setAffinity(tid: Int, mask: Long): Int
     /** The mask, or minus errno. */
     @JvmStatic external fun getAffinity(tid: Int): Long
+    /** 0, or the negative errno. */
+    @JvmStatic external fun setNice(tid: Int, nice: Int): Int
 }
 
 /**
@@ -28,6 +30,9 @@ object Sched {
  * `files/tuner.txt` chooses while a session runs (for measurements): "off", "pin" (only the
  * busiest thread is placed), "big" (the default), or "masks A B C": the cores, as hexadecimal
  * masks, of the busiest thread, of the other threads of its process and of everything else.
+ * After the three masks may come rules for threads of that process by the start of their name,
+ * "NAME:MASK" or "NAME:MASK:NICE" ("WSI:0f", "GlobPool:70:5"), and "owner::NICE" for the
+ * busiest thread.
  */
 object ThreadTuner {
     private const val PERIOD_MS = 2000L
@@ -136,11 +141,20 @@ object ThreadTuner {
 
     private fun name(tid: Int) = File("/proc/$tid/comm").runCatching { readText().trim() }.getOrDefault("?")
 
-    /** "masks A B C" as three masks of existing cores, or null. */
+    /** "masks A B C ..." as three masks of existing cores, or null. */
     private fun masks(mode: String, cores: Cores): List<Long>? {
         val f = mode.split(' ')
-        if (f.size != 4 || f[0] != "masks") return null
-        return f.drop(1).map { (it.toLongOrNull(16) ?: return null) and cores.all }.takeIf { m -> m.all { it != 0L } }
+        if (f.size < 4 || f[0] != "masks") return null
+        return f.subList(1, 4).map { (it.toLongOrNull(16) ?: return null) and cores.all }.takeIf { m -> m.all { it != 0L } }
+    }
+
+    /** A rule of a "masks" mode: threads whose name starts with [name] get [mask] and [nice]. */
+    private class Rule(val name: String, val mask: Long?, val nice: Int?)
+
+    private fun rules(mode: String, cores: Cores): List<Rule> = mode.split(' ').drop(4).mapNotNull { r ->
+        val f = r.split(':')
+        if (f.size < 2 || f[0].isEmpty()) return@mapNotNull null
+        Rule(f[0], f[1].toLongOrNull(16)?.and(cores.all)?.takeIf { it != 0L }, f.getOrNull(2)?.toIntOrNull()?.coerceIn(-20, 19))
     }
 
     /** Every thread of the app and the session where [mode] wants it. */
@@ -151,11 +165,16 @@ object ThreadTuner {
             "big" -> listOf(cores.fast, cores.big and cores.fast.inv(), cores.small)
             else -> masks(mode, cores) ?: return
         }
+        val rules = rules(mode, cores)
         for (p in pids(uid)) {
             val mask = if (p == game) gameMask else otherMask
             File("/proc/$p/task").list()?.forEach { t ->
                 val tid = t.toIntOrNull() ?: return@forEach
-                Sched.setAffinity(tid, if (tid == owner) ownerMask else mask)
+                val rule = if (p != game || rules.isEmpty()) null
+                    else if (tid == owner) rules.firstOrNull { it.name == "owner" }
+                    else name(tid).let { n -> rules.firstOrNull { n.startsWith(it.name) } }
+                Sched.setAffinity(tid, if (tid == owner) ownerMask else rule?.mask ?: mask)
+                rule?.nice?.let { Sched.setNice(tid, it) }
             }
         }
     }
