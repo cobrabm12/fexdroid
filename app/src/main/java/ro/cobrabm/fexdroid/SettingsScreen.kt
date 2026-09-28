@@ -78,6 +78,10 @@ fun SettingsScreen() {
                 Setting("Profil FEX", AppSettings.fexProfile.description) {
                     Choice(FexProfile.entries, AppSettings.fexProfile, { it.label }, AppSettings::updateFexProfile)
                 }
+                SwitchSetting("Profil de performanță pentru Dota 2",
+                    "Setările video ale jocului pe cele mai ieftine valori: fără umbre, efecte puține, texturi mai mici. " +
+                        "Se aplică la pornirea lui Steam, după ce jocul a fost pornit o dată. Oprit: revin setările tale.",
+                    AppSettings.dotaPerformance, AppSettings::updateDotaPerformance)
                 SwitchSetting("Cache de cod pe disc",
                     "Experimental. Codul x86 tradus o dată e păstrat și refolosit, deci pornirile următoare sunt mai rapide. Cu FEX-2609 unele programe crapă (de ex. instalarea Steam), așa că e oprit implicit.",
                     AppSettings.fexDiskCache, AppSettings::updateFexDiskCache)
