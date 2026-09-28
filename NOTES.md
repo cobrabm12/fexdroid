@@ -1326,3 +1326,8 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   FEX); biblioteca de jocuri comună cu clientul x86.
 - ⚠ **Netestat pe telefon.** Patch-ul glibc schimbă pornirea fiecărui program din sesiune, inclusiv a celor
   de până acum; pe PC trec testele de mai sus, dar FEX nu poate fi rulat acolo.
+- ✅ **Clientul Steam obișnuit (x86, prin FEX) cu glibc-ul nou, pe un al doilea telefon** (raport de la Marius,
+  2026-09-29, versiunea 0.3.102): Xiaomi 23090RA98G (Redmi Note 13 Pro+, Dimensity 7200 / MT6886, Mali,
+  Android 16, 7 GB). Steam pornește și ajunge la interfață; auto-testele din raport trec toate (FEX x86_64 și
+  i386, semafoare SysV, `/tmp`, `vulkaninfo` pe lavapipe). Deci patch-ul glibc `0004` nu strică pornirea
+  programelor de până acum. Clientul ARM64 nu a fost încă pornit pe telefon: raportul e din sesiunea obișnuită.
