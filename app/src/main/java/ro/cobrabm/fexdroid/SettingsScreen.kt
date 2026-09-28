@@ -78,6 +78,10 @@ fun SettingsScreen() {
                 Setting("Profil FEX", AppSettings.fexProfile.description) {
                     Choice(FexProfile.entries, AppSettings.fexProfile, { it.label }, AppSettings::updateFexProfile)
                 }
+                SwitchSetting("Placa grafică la viteză maximă",
+                    "Jocurile cer plăcii grafice frecvența cea mai mare cât desenează. Mai multe cadre, telefon mai cald. " +
+                        "Doar pe telefoane cu Adreno.",
+                    AppSettings.gpuMaxFrequency, AppSettings::updateGpuMaxFrequency)
                 SwitchSetting("Profil de performanță pentru Dota 2",
                     "Setările video ale jocului pe cele mai ieftine valori: fără umbre, efecte puține, texturi mai mici. " +
                         "Se aplică la pornirea lui Steam, după ce jocul a fost pornit o dată. Oprit: revin setările tale.",

@@ -832,3 +832,37 @@ aceleași limite (`scaling_max_freq`), alternate.
 - **GT Mode (Realme) nu ridică limitele pe un telefon deja încins:** cu `gt_mode_state_setting=1`, după ore de
   rulat pe încărcător (carcasă 45–47 °C, baterie 43–44 °C, nuclee 65–72 °C), limitele au rămas 1,61 / 1,21 / 1,42 GHz
   și au coborât pe moment la 0,60 / 1,08 / 1,08 GHz. Meciul: 12–14 cadre/s, cu căderi la 5. De măsurat de la rece.
+
+## N-037 · A treia rundă de optimizări: profil Dota, GPU la frecvență maximă, 540p  🟨 (Realme GT, 2026-09-28)
+Scena de măsură nouă: Demo Hero cu **zece eroi care se bat** (cinci inamici, patru aliați puși cu butoanele
+`+ENEMY`/`+ALLY`), mai aproape de un meci decât un erou singur. Cadrele: `fexdroid-display`, ferestre de 10 s.
+Porniri alternate, comparate doar la aceleași limite de frecvență.
+
+| Schimbare | Fără | Cu | Limite (MHz, mic/mare/X1) |
+|---|---|---|---|
+| Profil de performanță Dota | 29,5 | 36,9–40,0 | 1804 / 2419 / 2841 (telefon rece) |
+| Profil de performanță Dota | 23,8 | 34,2 | 1804 / 1555–1996 / 1555–2150 |
+| GPU la frecvență maximă (`TU_KGSL_PWR_CONSTRAINT=max`) | 25,6 · 25,7 | 30,5 · 29,8 | 1612 / 1209 / 1420 fără; 595 / 1075 / 1075 cu |
+| `TU_KGSL_PWR_CONSTRAINT=70` | 25,6 | 25,6 | fără efect pe kernelul 5.4 |
+| 540p față de 720p (cu profil și GPU max) | 30,2 | 31,1 | 1612 / 1209 / 1420 |
+| `r_low_latency 0` | 25,2–25,7 | 25,3–25,8 | nimic |
+| AVX ascuns jocului (`HostFeatures: disableavx`) | 25,9 | 25,7 | nimic |
+
+- **Profilul Dota** (`DotaProfile.kt`, Setări › Performanță, oprit implicit): scrie în
+  `userdata/<cont>/570/local/cfg/video.txt` valorile cele mai ieftine (fără umbre, particule minime, fără treceri
+  de lumină suplimentare, texturi mai mici, `useadvanced 1`). Fișierul e per mașină, nu e în Steam Cloud. Valorile
+  jucătorului rămân în `video.txt.fexdroid-orig` și revin când profilul e oprit. GPU ocupat 44–54% în loc de 70–80%.
+- **GPU la frecvență maximă** (patch Mesa 0006, Setări › Performanță, pornit implicit): Turnip cere kernelului
+  `KGSL_PROP_PWR_CONSTRAINT` = maxim pe contextul lui, aceeași interfață pe care o folosește driverul Qualcomm.
+  Guvernorul urmărea încărcarea GPU-ului, care la noi stătea la 35–50% (cadrele se așteaptă unul pe altul), deci
+  ținea frecvența jos. Cu constrângerea, firul de randare nu mai așteaptă deloc după GPU (`strace`: 0 așteptări
+  lungi, față de ~22 ms pe cadru), GPU ocupat 13–18%. Prețul: telefon mai cald, limitele procesorului coboară
+  (595 / 1075 / 1075 MHz), dar câștigul net rămâne +17%. Dacă kernelul refuză contextul cu acest flag, Turnip îl
+  creează fără.
+- **După aceste două schimbări limita e doar firul principal al jocului**: 88% dintr-un nucleu, restul firelor
+  îl așteaptă. De aici încolo contează viteza unui nucleu prin emulator și temperatura.
+- **540p** e în Setări, dar nu aduce cadre în plus când GPU-ul nu mai e limita; poate ajuta doar la căldură.
+- **Răcirea contează mai mult decât orice reglaj:** cu telefonul răcit (utilizatorul l-a ținut în ușa frigiderului;
+  carcasa 37–38 °C) nucleele mergeau la frecvența maximă și scena dădea 37–40 de cadre/s cu profilul, 44–48 cu un
+  singur erou. Încins (carcasa 44–48 °C): 25–31.
+- Nereușit: opțiunile din FEX care ar reduce costul emulării (fără TSO) blochează jocul (N-034).

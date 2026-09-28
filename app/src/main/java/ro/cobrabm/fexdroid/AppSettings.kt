@@ -69,6 +69,11 @@ object AppSettings {
     var gameWithoutSteam by mutableStateOf(false); private set
     /** Steam starts in Big Picture (-gamepadui): full screen, made for touch and controllers. */
     var steamBigPicture by mutableStateOf(true); private set
+    /**
+     * The GPU runs at its highest frequency while a game draws (TU_KGSL_PWR_CONSTRAINT=max,
+     * Mesa patch 0006). Faster frames, a warmer phone.
+     */
+    var gpuMaxFrequency by mutableStateOf(true); private set
     /** Dota 2's video settings set to the cheapest values before a session starts (DotaProfile). */
     var dotaPerformance by mutableStateOf(false); private set
     /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
@@ -95,6 +100,7 @@ object AppSettings {
         gameWithoutSteam = prefs.getBoolean("game_without_steam", false)
         steamBigPicture = prefs.getBoolean("steam_big_picture", true)
         dotaPerformance = prefs.getBoolean("dota_performance", false)
+        gpuMaxFrequency = prefs.getBoolean("gpu_max_frequency", true)
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)
         fexDiskCache = prefs.getBoolean("fex_disk_cache_v2", false)
@@ -116,6 +122,7 @@ object AppSettings {
     fun updateFexProfile(v: FexProfile) { fexProfile = v; prefs.edit().putString("fex_profile", v.name).apply() }
     fun updateFexDiskCache(v: Boolean) { fexDiskCache = v; prefs.edit().putBoolean("fex_disk_cache_v2", v).apply() }
     fun updateSteamBigPicture(v: Boolean) { steamBigPicture = v; prefs.edit().putBoolean("steam_big_picture", v).apply() }
+    fun updateGpuMaxFrequency(v: Boolean) { gpuMaxFrequency = v; prefs.edit().putBoolean("gpu_max_frequency", v).apply() }
     fun updateDotaPerformance(v: Boolean) { dotaPerformance = v; prefs.edit().putBoolean("dota_performance", v).apply() }
     fun updateGameWithoutSteam(v: Boolean) { gameWithoutSteam = v; prefs.edit().putBoolean("game_without_steam", v).apply() }
 }
