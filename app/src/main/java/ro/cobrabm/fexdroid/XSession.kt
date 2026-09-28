@@ -40,6 +40,12 @@ class XSession(
         // Programs ask PulseAudio for buffers of a few milliseconds; under the emulator their
         // sound threads are late more often than that. libpulse takes this over their request.
         "PULSE_LATENCY_MSEC" to "60",
+        // The C library picks AVX2 versions of memcpy, strlen and the like when the processor
+        // has AVX2. FEX makes two 128-bit operations of every 256-bit one (no 256-bit SVE on
+        // phones), so they cost more than the SSE2 versions: 16% of a test program's cycles
+        // (NOTES N-047). Programs keep AVX; only glibc is told not to choose by it. Both
+        // spellings, for the old glibc of Steam's runtimes and for new ones.
+        "GLIBC_TUNABLES" to "glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX2_Usable,-AVX_Usable",
     ) + (if (AppSettings.gpuMaxFrequency) mapOf("TU_KGSL_PWR_CONSTRAINT" to "max") else emptyMap()) +
         (if (AppSettings.directFrames) mapOf("FEXDROID_PRESENT" to presentSocket) else emptyMap()) +
         // Mesa reads its options from the environment too.
