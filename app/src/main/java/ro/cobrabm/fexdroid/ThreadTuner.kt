@@ -86,7 +86,7 @@ object ThreadTuner {
                         if (active) { place(uid, -1, -1, cores, "off"); active = false }
                         mode = wantedMode; owner = -1; candidate = -1; seen = 0
                     }
-                    if (mode == "off") { status = "oprit"; continue }
+                    if (mode == "off") { status = "off"; continue }
                     // The busiest process of the session, then its busiest thread.
                     val process = HashMap<Int, Long>()
                     for (p in pids(uid)) if (p != pid) ticks(File("/proc/$p/stat"))?.let { process[p] = it }
@@ -110,8 +110,8 @@ object ThreadTuner {
                     } else if (active && ++period % EVERYTHING_EVERY == 0) {
                         place(uid, busiest, owner, cores, mode) // Threads started since.
                     }
-                    status = if (owner < 0) "niciun fir greu" else
-                        "$mode: firul $owner (${name(owner)}) singur pe nucleul " +
+                    status = if (owner < 0) "no busy thread" else
+                        "$mode: thread $owner (${name(owner)}) alone on core " +
                             "${java.lang.Long.numberOfTrailingZeros(cores.fast)}, ${(share * 100).toInt()}%"
                 }
             } catch (_: InterruptedException) {

@@ -95,8 +95,8 @@ object DotaProfile {
             }
         }
         return when {
-            changed > 0 -> "Dota 2: profilul de performanță a fost aplicat setărilor video."
-            restored > 0 -> "Dota 2: setările video dinaintea profilului de performanță au fost puse la loc."
+            changed > 0 -> "Dota 2: the performance profile was applied to the video settings."
+            restored > 0 -> "Dota 2: the video settings from before the performance profile were put back."
             else -> null
         }
     }

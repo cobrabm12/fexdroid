@@ -80,8 +80,8 @@ object Updater {
 
     private fun explain(t: Throwable): String = when (t) {
         is java.net.UnknownHostException, is java.net.ConnectException, is java.net.NoRouteToHostException ->
-            "Nu există conexiune la internet."
-        is java.net.SocketTimeoutException, is javax.net.ssl.SSLException -> "Conexiunea s-a întrerupt. Încearcă din nou."
+            str(R.string.error_no_internet)
+        is java.net.SocketTimeoutException, is javax.net.ssl.SSLException -> str(R.string.error_connection_lost)
         else -> t.message ?: t.toString()
     }
 
@@ -118,7 +118,7 @@ object Updater {
                     }
                     val got = digest.digest().joinToString("") { "%02x".format(it) }
                     if (done != info.size || !got.equals(info.sha256, ignoreCase = true))
-                        throw RuntimeException("Fișierul descărcat nu se potrivește cu cel publicat. Încearcă din nou.")
+                        throw RuntimeException(str(R.string.update_mismatch))
                     val flags = PendingIntent.FLAG_UPDATE_CURRENT or
                         (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
                     val result = PendingIntent.getBroadcast(app, id,
@@ -141,10 +141,8 @@ object Updater {
             PackageInstaller.STATUS_FAILURE_ABORTED -> if (info != null) State.Available(info) else State.Idle
             // Builds before 2026-09-27 20:00 were signed with a different key on every run.
             PackageInstaller.STATUS_FAILURE_INCOMPATIBLE, PackageInstaller.STATUS_FAILURE_CONFLICT ->
-                State.Failed("Versiunea instalată e semnată cu altă cheie decât cea nouă, așa că Android nu o poate " +
-                    "înlocui. O singură dată: dezinstalează aplicația și instaleaz-o din nou de pe GitHub. " +
-                    "(${message ?: "cod $status"})", info)
-            else -> State.Failed("Instalarea a eșuat: ${message ?: "cod $status"}", info)
+                State.Failed(str(R.string.update_other_key, message ?: "$status"), info)
+            else -> State.Failed(str(R.string.install_failed, message ?: "$status"), info)
         }
     }
 }

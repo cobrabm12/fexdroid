@@ -13,6 +13,7 @@
     <!-- appCategory/isGame: OEM game modes (Samsung Game Booster, Xiaomi Game Turbo, realme GT
          mode) and Android's GameManager treat the app as a game: performance profiles, DND. -->
     <application
+        android:name=".App"
         android:appCategory="game"
         android:isGame="true"
         android:label="fexdroid"

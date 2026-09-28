@@ -1027,3 +1027,19 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
 - **De făcut:** de aflat ce sunt zonele mari (alocatorul jocului, memoria gazdei Mesa sau FEX) și de ce cresc
   între meciuri; o măsurătoare repetabilă pe un replay; un avertisment în aplicație când memoria liberă scade.
   🟨 Pe un telefon de 12 GB un meci lung nu e încă de încredere.
+
+## N-043 · Aplicația în două limbi, texte pentru public  ✅ (Realme GT, 2026-09-28)
+- Textele aplicației sunt în resurse Android: `res/values/strings.xml` (engleză, implicit) și
+  `res/values-ro/strings.xml` (română), 190 de texte. O limbă nouă = o copie tradusă a fișierului.
+- `str(R.string.nume, argumente)` (`Strings.kt`) merge și în codul fără `Context` (fire de lucru, erori).
+  Setări › Aspect › Limbă: Automat (limba telefonului) / English / Română; se schimbă pe loc.
+- **Rapoartele și jurnalul sesiunii sunt mereu în engleză** (`Strings.inEnglish`), ca să le poată citi oricine
+  le primește. Ecranele din „Avansat” sunt doar în engleză (unelte de dezvoltator).
+- Texte aduse la zi cu ocazia asta: instalarea se face toată pe telefon (nu mai apar scripturile de PC),
+  memoria (Dota ocupă 5–8 GB; avertisment sub 16 GB), Adreno 840 verificat, Samsung nu mai e „netestat”.
+- `App` (clasă `Application`) inițializează textele și setările înaintea activității, a serviciului și a
+  receptorului de actualizare.
+- README în engleză (`README.md`) și română (`README.ro.md`); pagina versiunii are acum numărul versiunii,
+  ce să instalezi și suma SHA-256.
+- ✅ Văzut pe telefon: Acasă și Setări în engleză (telefonul e pe en-GB), apoi în română după alegerea din
+  Setări, fără repornire.

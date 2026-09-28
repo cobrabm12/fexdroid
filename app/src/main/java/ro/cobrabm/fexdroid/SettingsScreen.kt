@@ -54,102 +54,92 @@ fun SettingsScreen() {
             Modifier.widthIn(max = 680.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Setări", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(str(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp))
 
-            Section("Ecran") {
-                Setting("Rezoluție", "Mărimea ecranului virtual. Mai mică = mai rapid. Se aplică la următoarea pornire.") {
+            Section(str(R.string.settings_screen)) {
+                Setting(str(R.string.settings_resolution), str(R.string.settings_resolution_about)) {
                     Choice(Resolution.PRESETS, AppSettings.resolution, { "${it.height}p" }, AppSettings::updateResolution)
                 }
-                SwitchSetting("Potrivește la ecranul telefonului",
-                    "Lățimea ecranului virtual urmează forma ecranului, fără benzi negre. Oprit: 16:9.",
+                SwitchSetting(str(R.string.settings_fit),
+                    str(R.string.settings_fit_about),
                     AppSettings.fitScreen, AppSettings::updateFitScreen)
-                Setting("Margine", "Distanța imaginii față de marginile ecranului. Colțurile rotunjite și camera acoperă ce " +
-                    "desenează jocul acolo, iar atingerile de pe margine se pierd des.") {
-                    Choice(AppSettings.MARGIN_PRESETS, AppSettings.screenMargin, { if (it == 0) "Fără" else "$it%" },
+                Setting(str(R.string.settings_margin), str(R.string.settings_margin_about)) {
+                    Choice(AppSettings.MARGIN_PRESETS, AppSettings.screenMargin, { if (it == 0) str(R.string.settings_margin_none) else "$it%" },
                         AppSettings::updateScreenMargin)
                 }
-                SwitchSetting("Margini laterale late",
-                    "Imaginea stă mai departe de marginile din stânga și din dreapta. Pe realme, OPPO și OnePlus bara " +
-                        "de jocuri a telefonului acoperă marginea stângă: butoanele jocului de acolo nu se pot atinge.",
+                SwitchSetting(str(R.string.settings_wide_sides),
+                    str(R.string.settings_wide_sides_about),
                     AppSettings.wideSides, AppSettings::updateWideSides)
-                Setting("Cadre pe secundă", "Cât de des se caută o imagine nouă de la joc. Se copiază pe ecran doar imaginile noi.") {
+                Setting(str(R.string.settings_fps), str(R.string.settings_fps_about)) {
                     Choice(AppSettings.FPS_PRESETS, AppSettings.fps, { "$it" }, AppSettings::updateFps)
                 }
-                if (GameSession.active) Note("Un joc rulează acum: noile valori se aplică după repornire.")
+                if (GameSession.active) Note(str(R.string.settings_after_restart))
             }
 
-            Section("Performanță") {
-                Setting("Profil FEX", AppSettings.fexProfile.description) {
-                    Choice(FexProfile.entries, AppSettings.fexProfile, { it.label }, AppSettings::updateFexProfile)
+            Section(str(R.string.settings_performance)) {
+                Setting(str(R.string.settings_fex_profile), str(AppSettings.fexProfile.description)) {
+                    Choice(FexProfile.entries, AppSettings.fexProfile, { str(it.label) }, AppSettings::updateFexProfile)
                 }
-                SwitchSetting("Placa grafică la viteză maximă",
-                    "Jocurile cer plăcii grafice frecvența cea mai mare cât desenează. Mai multe cadre, telefon mai cald. " +
-                        "Doar pe telefoane cu Adreno.",
+                SwitchSetting(str(R.string.settings_gpu_max),
+                    str(R.string.settings_gpu_max_about),
                     AppSettings.gpuMaxFrequency, AppSettings::updateGpuMaxFrequency)
-                SwitchSetting("Nucleul cel mai rapid pentru firul principal",
-                    "Firul cel mai ocupat al jocului primește singur nucleul cel mai rapid al telefonului; restul " +
-                        "sesiunii rulează pe celelalte nuclee.",
+                SwitchSetting(str(R.string.settings_thread_placement),
+                    str(R.string.settings_thread_placement_about),
                     AppSettings.threadPlacement, AppSettings::updateThreadPlacement)
-                SwitchSetting("Memorie rapidă pentru Dota 2 și CS2 (experimental)",
-                    "Bibliotecile jocului rulează fără emularea ordinii memoriei x86, partea cea mai scumpă a traducerii. " +
-                        "Mai multe cadre. Dacă jocul se blochează sau se închide, oprește opțiunea și trimite jurnalul.",
+                SwitchSetting(str(R.string.settings_source2_tso),
+                    str(R.string.settings_source2_tso_about),
                     AppSettings.source2WithoutTso, AppSettings::updateSource2WithoutTso)
-                SwitchSetting("Profil de performanță pentru Dota 2",
-                    "Setările video ale jocului pe cele mai ieftine valori: fără umbre, efecte puține, texturi mai mici. " +
-                        "Se aplică la pornirea lui Steam, după ce jocul a fost pornit o dată. Oprit: revin setările tale.",
+                SwitchSetting(str(R.string.settings_dota_profile),
+                    str(R.string.settings_dota_profile_about),
                     AppSettings.dotaPerformance, AppSettings::updateDotaPerformance)
-                SwitchSetting("Cache de cod pe disc",
-                    "Experimental. Codul x86 tradus o dată e păstrat și refolosit, deci pornirile următoare sunt mai rapide. Cu FEX-2609 unele programe crapă (de ex. instalarea Steam), așa că e oprit implicit.",
+                SwitchSetting(str(R.string.settings_disk_cache),
+                    str(R.string.settings_disk_cache_about),
                     AppSettings.fexDiskCache, AppSettings::updateFexDiskCache)
                 var cacheBytes by remember { mutableStateOf<Long?>(null) }
                 LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { runCatching { FexConfig.cacheSize(env) }.getOrNull() } }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Cache: ${cacheBytes?.let { "${it shr 20} MB" } ?: "…"}", style = MaterialTheme.typography.bodySmall,
+                    Text(str(R.string.settings_cache_size, cacheBytes?.let { "${it shr 20} MB" } ?: "…"), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     val scope = rememberCoroutineScope()
                     TextButton(enabled = !GameSession.active, onClick = {
                         scope.launch { cacheBytes = withContext(Dispatchers.IO) { FexConfig.clearCache(env); 0L } }
-                    }) { Text("Șterge cache-ul") }
+                    }) { Text(str(R.string.settings_clear_cache)) }
                 }
-                if (GameSession.active) Note("Se aplică la următoarea pornire a jocului.")
+                if (GameSession.active) Note(str(R.string.settings_next_start))
             }
 
-            Section("Joc") {
-                SwitchSetting("Steam în Big Picture",
-                    "Interfața pe tot ecranul, pentru atingere și controller. Prima autentificare se face în interfața clasică.",
+            Section(str(R.string.settings_game)) {
+                SwitchSetting(str(R.string.settings_big_picture),
+                    str(R.string.settings_big_picture_about),
                     AppSettings.steamBigPicture, AppSettings::updateSteamBigPicture)
                 SwitchSetting(
-                    "Rulează jocul fără Steam",
-                    "Butonul principal de pe Acasă devine „Pornește Dota 2 (direct)”.",
+                    str(R.string.settings_without_steam),
+                    str(R.string.settings_without_steam_about),
                     AppSettings.gameWithoutSteam, AppSettings::updateGameWithoutSteam,
                 )
-                Note("Fără clientul Steam, jocul pornește doar pentru test: fără autentificare, " +
-                    "fără meciuri online și fără actualizări. Pentru joc normal folosește Steam.")
+                Note(str(R.string.settings_without_steam_note))
             }
 
-            Section("Aspect") {
-                Setting("Temă", null) {
+            Section(str(R.string.settings_appearance)) {
+                Setting(str(R.string.settings_language), null) {
+                    Choice(Language.entries, AppSettings.language,
+                        { if (it == Language.SYSTEM) str(R.string.settings_language_system) else it.label }, AppSettings::updateLanguage)
+                }
+                Setting(str(R.string.settings_theme), null) {
                     Choice(ThemeMode.entries, AppSettings.theme, {
-                        when (it) { ThemeMode.DARK -> "Întunecată"; ThemeMode.SYSTEM -> "Sistem"; ThemeMode.LIGHT -> "Luminoasă" }
+                        when (it) { ThemeMode.DARK -> str(R.string.settings_theme_dark); ThemeMode.SYSTEM -> str(R.string.settings_theme_system); ThemeMode.LIGHT -> str(R.string.settings_theme_light) }
                     }, AppSettings::updateTheme)
                 }
                 if (dynamicColorAvailable)
-                    SwitchSetting("Culori din imaginea de fundal", "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
+                    SwitchSetting(str(R.string.settings_dynamic_color), "Material You", AppSettings.dynamicColor, AppSettings::updateDynamicColor)
             }
 
-            Section("Instalare Steam și jocuri") {
-                Note("Deocamdată fișierele mari se copiază de pe un PC cu Linux, prin USB (adb), " +
-                    "cu scripturile din depozitul fexdroid. Contul Steam nu se copiază: te autentifici pe telefon cu codul QR.")
-                InstallStep(1, "Mediul Linux", "Inclus în aplicație; se instalează singur la prima pornire.", env.root.path)
-                InstallStep(2, "Biblioteci Steam (x86)",
-                    "Pe PC: scripts/build-rootfs-steam.sh, apoi scripts/deploy-phone.sh (sau doar pasul „Steam x86 rootfs” din el).",
-                    env.x86Steam.path)
-                InstallStep(3, "Client Steam",
-                    "Se descarcă automat de la Valve la prima pornire, sau se copiază de pe PC cu scripts/adb-copy-steam-client.sh.",
-                    "${env.home.path}/.local/share/Steam")
-                InstallStep(4, "Dota 2",
-                    "Instalează-l întâi în Steam pe PC, apoi: scripts/adb-copy-steam-game.sh 570 (~70 GB, se poate relua).",
-                    "${env.steamLibrary.path}/steamapps/common/dota 2 beta")
+            Section(str(R.string.settings_install)) {
+                Note(str(R.string.settings_install_note))
+                InstallStep(1, str(R.string.home_linux_env), str(R.string.settings_install_1), env.root.path)
+                InstallStep(2, str(R.string.home_steam_libs), str(R.string.settings_install_2), env.x86Steam.path)
+                InstallStep(3, str(R.string.home_steam_client), str(R.string.settings_install_3), "${env.home.path}/.local/share/Steam")
+                InstallStep(4, "Dota 2", str(R.string.settings_install_4), "${env.steamLibrary.path}/steamapps/common/dota 2 beta")
             }
 
             val pi = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() }

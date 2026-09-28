@@ -66,7 +66,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
         ) {
             Column(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
                 Text("fexdroid", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text("Jocuri Linux pentru PC, direct pe telefon",
+                Text(str(R.string.home_tagline),
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
@@ -85,20 +85,20 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
             val dotaOk = ready && s.dota
             val steamAction: @Composable (Boolean) -> Unit = { primary ->
                 BigAction(
-                    primary = primary, icon = AppIcons.Play, title = "Pornește Steam",
+                    primary = primary, icon = AppIcons.Play, title = str(R.string.home_start_steam),
                     subtitle = when {
-                        s == null -> "Verific instalarea…"
-                        !steamOk -> "Lipsesc bibliotecile Steam — vezi Setări"
-                        !s.steamClient -> "Prima pornire descarcă clientul Steam de la Valve"
-                        else -> "Autentificare cu cod QR din aplicația Steam"
+                        s == null -> str(R.string.home_checking_install)
+                        !steamOk -> str(R.string.home_steam_libs_missing)
+                        !s.steamClient -> str(R.string.home_first_start_downloads)
+                        else -> str(R.string.home_login_hint)
                     },
                     enabled = steamOk,
                 ) { GameSession.start(ctx, Game.STEAM) }
             }
             val dotaAction: @Composable (Boolean) -> Unit = { primary ->
                 BigAction(
-                    primary = primary, icon = AppIcons.Gamepad, title = "Pornește Dota 2 (direct)",
-                    subtitle = if (dotaOk) "Fără clientul Steam: fără joc online, doar test" else "Dota 2 nu e instalat — vezi Setări",
+                    primary = primary, icon = AppIcons.Gamepad, title = str(R.string.home_start_dota),
+                    subtitle = if (dotaOk) str(R.string.home_dota_direct_hint) else str(R.string.home_dota_missing),
                     enabled = dotaOk,
                 ) { GameSession.start(ctx, Game.DOTA) }
             }
@@ -110,7 +110,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
                 TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Icon(AppIcons.Info, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Cum instalez Steam și jocurile?")
+                    Text(str(R.string.home_how_to_install))
                 }
             }
         }
@@ -131,23 +131,22 @@ private fun UpdateCard() {
     }
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (info.version.isEmpty()) "Versiune nouă disponibilă" else "Versiunea ${info.version} este disponibilă",
+            Text(if (info.version.isEmpty()) str(R.string.update_available) else str(R.string.update_available_version, info.version),
                 style = MaterialTheme.typography.titleMedium)
-            Text("Construită la ${info.built.take(16).replace('T', ' ')} UTC · ${info.size shr 20} MB",
+            Text(str(R.string.update_built, info.built.take(16).replace('T', ' '), info.size shr 20),
                 style = MaterialTheme.typography.bodySmall)
             when (st) {
                 is Updater.State.Downloading -> {
                     LinearProgressIndicator(progress = { st.doneBytes.toFloat() / info.size.coerceAtLeast(1) },
                         modifier = Modifier.fillMaxWidth())
-                    Text("Descarc: ${st.doneBytes shr 20} / ${info.size shr 20} MB", style = MaterialTheme.typography.bodySmall)
+                    Text(str(R.string.update_downloading, st.doneBytes shr 20, info.size shr 20), style = MaterialTheme.typography.bodySmall)
                 }
-                is Updater.State.Confirming -> Text("Confirmă instalarea dacă Android întreabă. Aplicația se închide la " +
-                    "instalare: deschide-o din nou după aceea.", style = MaterialTheme.typography.bodySmall)
+                is Updater.State.Confirming -> Text(str(R.string.update_confirm), style = MaterialTheme.typography.bodySmall)
                 else -> {
                     if (st is Updater.State.Failed) Text(st.message, color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall)
-                    if (GameSession.active) Text("Oprește jocul înainte de actualizare.", style = MaterialTheme.typography.bodySmall)
-                    Button(enabled = !GameSession.active, onClick = { Updater.install(ctx, info) }) { Text("Actualizează") }
+                    if (GameSession.active) Text(str(R.string.update_stop_game_first), style = MaterialTheme.typography.bodySmall)
+                    Button(enabled = !GameSession.active, onClick = { Updater.install(ctx, info) }) { Text(str(R.string.update_button)) }
                 }
             }
         }
@@ -158,10 +157,10 @@ private fun UpdateCard() {
 private fun RunningCard() {
     val st = GameSession.state
     val (title, detail) = when (st) {
-        is SessionState.Starting -> "${st.game.title} pornește…" to st.step.label
-        is SessionState.Running -> "${st.game.title} rulează" to "Rezoluție ${GameSession.resolution.label}"
-        is SessionState.Exited -> "${st.game.title} s-a închis" to "Cod de ieșire ${st.code}"
-        is SessionState.Failed -> "${st.game.title} nu a pornit" to st.message
+        is SessionState.Starting -> str(R.string.session_starting, st.game.title) to st.step.label
+        is SessionState.Running -> str(R.string.session_running, st.game.title) to str(R.string.session_resolution, GameSession.resolution.label)
+        is SessionState.Exited -> str(R.string.session_closed, st.game.title) to str(R.string.session_exit_code, st.code)
+        is SessionState.Failed -> str(R.string.session_did_not_start, st.game.title) to st.message
         SessionState.Idle -> return
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -177,10 +176,10 @@ private fun RunningCard() {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { GameSession.playerVisible = true }) {
-                    Icon(AppIcons.Play, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Revino la joc")
+                    Icon(AppIcons.Play, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(str(R.string.home_back_to_game))
                 }
                 OutlinedButton(onClick = { GameSession.stop() }) {
-                    Icon(AppIcons.Stop, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Oprește")
+                    Icon(AppIcons.Stop, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(str(R.string.stop))
                 }
             }
         }
@@ -191,34 +190,34 @@ private fun RunningCard() {
 private fun StatusCard(s: InstallStatus?, env: LinuxEnv) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(vertical = 8.dp)) {
-            Text("Stare", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+            Text(str(R.string.home_status), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (s == null) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(12.dp)); Text("Verific…")
+                    Spacer(Modifier.width(12.dp)); Text(str(R.string.home_checking))
                 }
                 return@Column
             }
             StatusRow(
                 if (s.payloadProblem != null) Level.ERROR else if (s.payloadReady) Level.OK else Level.INFO,
-                "Mediul Linux",
-                s.payloadProblem ?: if (s.payloadReady) "Instalat (${env.installedVersion()})"
-                else "Se instalează automat la prima pornire (1–2 minute)",
+                str(R.string.home_linux_env),
+                s.payloadProblem ?: if (s.payloadReady) str(R.string.home_installed_version, env.installedVersion())
+                else str(R.string.home_installs_at_first_start),
             )
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-            StatusRow(if (s.steamRootfs) Level.OK else Level.ERROR, "Biblioteci Steam (x86)",
-                if (s.steamRootfs) "Instalate" else "Lipsesc — necesare pentru Steam")
+            StatusRow(if (s.steamRootfs) Level.OK else Level.ERROR, str(R.string.home_steam_libs),
+                if (s.steamRootfs) str(R.string.home_installed_plural) else str(R.string.home_missing_needed))
             if (!s.steamRootfs || SteamRootfs.state !is SteamRootfs.State.Idle) SteamRootfsInstall()
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-            StatusRow(if (s.steamClient) Level.OK else Level.INFO, "Client Steam",
-                if (s.steamClient) "Prezent" else "Se descarcă la prima pornire a Steam")
+            StatusRow(if (s.steamClient) Level.OK else Level.INFO, str(R.string.home_steam_client),
+                if (s.steamClient) str(R.string.home_present) else str(R.string.home_downloads_at_first_start))
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-            StatusRow(if (s.gameRootfs) Level.OK else Level.INFO, "Mediul jocurilor",
-                if (s.gameRootfs) "Pregătit" else "Se pregătește singur după ce Steam descarcă runtime-ul")
+            StatusRow(if (s.gameRootfs) Level.OK else Level.INFO, str(R.string.home_game_env),
+                if (s.gameRootfs) str(R.string.home_ready) else str(R.string.home_game_env_later))
             HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             StatusRow(if (s.dota) Level.OK else Level.INFO, "Dota 2",
-                if (s.dota) "Instalat" else "Neinstalat — se instalează din Steam")
+                if (s.dota) str(R.string.home_installed) else str(R.string.home_not_installed))
         }
     }
 }
@@ -235,22 +234,22 @@ private fun SteamRootfsInstall() {
                 val mb = st.doneBytes shr 20
                 if (st.totalBytes > 0) {
                     LinearProgressIndicator(progress = { st.doneBytes.toFloat() / st.totalBytes }, modifier = Modifier.fillMaxWidth())
-                    Text("Descarc și instalez: $mb / ${st.totalBytes shr 20} MB", style = MaterialTheme.typography.bodySmall)
+                    Text(str(R.string.install_progress_of, mb, st.totalBytes shr 20), style = MaterialTheme.typography.bodySmall)
                 } else {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("Descarc și instalez: $mb MB", style = MaterialTheme.typography.bodySmall)
+                    Text(str(R.string.install_progress, mb), style = MaterialTheme.typography.bodySmall)
                 }
             }
-            is SteamRootfs.State.Failed -> Text("Instalarea a eșuat: ${st.message}", style = MaterialTheme.typography.bodySmall,
+            is SteamRootfs.State.Failed -> Text(str(R.string.install_failed, st.message), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error)
-            SteamRootfs.State.Done -> Text("Instalate.", style = MaterialTheme.typography.bodySmall)
-            SteamRootfs.State.Idle -> Text("Pachete Debian (amd64 + i386), fără fișiere Valve. ~250 MB descărcare, ~600 MB instalate.",
+            SteamRootfs.State.Done -> Text(str(R.string.home_installed_done), style = MaterialTheme.typography.bodySmall)
+            SteamRootfs.State.Idle -> Text(str(R.string.home_steam_libs_about),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (st is SteamRootfs.State.Idle || st is SteamRootfs.State.Failed)
             FilledTonalButton(onClick = { SteamRootfs.install(ctx) }) {
                 Icon(AppIcons.Play, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                Text(if (st is SteamRootfs.State.Failed) "Încearcă din nou" else "Descarcă și instalează")
+                Text(if (st is SteamRootfs.State.Failed) str(R.string.try_again) else str(R.string.home_download_install))
             }
     }
 }
@@ -267,21 +266,21 @@ private fun CompatibilityCard() {
     val list = items
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(vertical = 8.dp)) {
-            Text("Compatibilitate dispozitiv", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+            Text(str(R.string.home_compatibility), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (list == null) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(12.dp)); Text("Verific telefonul…")
+                    Spacer(Modifier.width(12.dp)); Text(str(R.string.home_checking_phone))
                 }
                 return@Column
             }
             val verdict = DeviceCheck.verdict(list)
             val problems = list.count { it.level != Level.OK }
             StatusRow(verdict, when (verdict) {
-                Level.OK -> "Telefonul îndeplinește cerințele"
-                Level.INFO -> "Poate funcționa, cu $problems observații"
-                Level.ERROR -> "Mediul Linux nu poate rula pe acest telefon"
+                Level.OK -> str(R.string.home_phone_ok)
+                Level.INFO -> str(R.string.home_phone_maybe, problems)
+                Level.ERROR -> str(R.string.home_phone_no)
             }, "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
             if (expanded || verdict != Level.OK) {
                 for (i in list.filter { expanded || it.level != Level.OK }) {
@@ -290,9 +289,9 @@ private fun CompatibilityCard() {
                 }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Mai puțin" else "Toate verificările") }
+                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) str(R.string.home_less) else str(R.string.home_all_checks)) }
                 // The full report: these checks, the emulator self-tests and the last session's log.
-                TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite") }
+                TextButton(onClick = { shareSessionReport(ctx) }) { Text(str(R.string.home_send)) }
             }
         }
     }

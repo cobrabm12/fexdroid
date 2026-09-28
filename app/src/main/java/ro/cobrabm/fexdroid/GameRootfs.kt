@@ -66,9 +66,9 @@ object GameRootfs {
     /** Builds (or rebuilds) the rootfs. Returns false when Steam has no platform yet. */
     @Synchronized
     fun build(env: LinuxEnv, log: (String) -> Unit): Boolean {
-        val platform = platform(env) ?: return false.also { log("Mediul jocului: Steam nu a descărcat încă runtime-ul sniper.") }
+        val platform = platform(env) ?: return false.also { log("Game environment: Steam has not downloaded the sniper runtime yet.") }
         val started = System.currentTimeMillis()
-        log("Mediul jocului: construiesc din ${platform.name} …")
+        log("Game environment: building from ${platform.name} …")
         val tmp = File(env.files, "sniper-rootfs.new")
         deleteTree(tmp)
         val usr = File(tmp, "usr").apply { mkdirs() }
@@ -100,7 +100,7 @@ object GameRootfs {
                             bytes += copy(src, dest)
                         }
                         chmod(dest, if ((attr["mode"]?.toIntOrNull(8) ?: 0) and EXEC_BITS != 0) MODE_755 else MODE_644)
-                        if (++files % 2000 == 0) log("Mediul jocului: $files fișiere …")
+                        if (++files % 2000 == 0) log("Game environment: $files files …")
                     }
                 }
             }
@@ -121,8 +121,8 @@ object GameRootfs {
         deleteTree(root)
         if (!tmp.renameTo(root)) throw IllegalStateException("cannot move ${tmp.name} into place")
         env.writeIdentityFiles() // resolv.conf, hosts
-        log("Mediul jocului: gata. $files fișiere, $links legături, ${bytes shr 20} MB, " +
-            "$replaced biblioteci înlocuite, ${(System.currentTimeMillis() - started) / 1000} s.")
+        log("Game environment: done. $files files, $links links, ${bytes shr 20} MB, " +
+            "$replaced libraries replaced, ${(System.currentTimeMillis() - started) / 1000} s.")
         return true
     }
 

@@ -162,13 +162,13 @@ fun PlayerScreen() {
         when (state) {
             is SessionState.Starting -> StartupPanel(state, onLog = { logOpen = true }, onCancel = { GameSession.stop() })
             is SessionState.Exited -> EndPanel(
-                title = "${state.game.title} s-a închis",
+                title = str(R.string.session_closed, state.game.title),
                 // Steam's start script ends with code 0 whatever happened to Steam itself.
-                message = if (state.code == 0) "Programul s-a închis singur. Dacă nu l-ai închis tu, apasă „Trimite jurnalul”."
-                    else "Programul s-a oprit cu codul ${state.code}. Apasă „Trimite jurnalul”.",
+                message = if (state.code == 0) str(R.string.player_closed_itself)
+                    else str(R.string.player_stopped_code, state.code),
                 game = state.game, onLog = { logOpen = true },
             )
-            is SessionState.Failed -> EndPanel("${state.game.title} nu a pornit", state.message, state.game, onLog = { logOpen = true })
+            is SessionState.Failed -> EndPanel(str(R.string.session_did_not_start, state.game.title), state.message, state.game, onLog = { logOpen = true })
             is SessionState.Running -> RunningHint(state)
             SessionState.Idle -> {}
         }
@@ -196,10 +196,10 @@ fun PlayerScreen() {
     if (confirmStop) {
         AlertDialog(
             onDismissRequest = { confirmStop = false },
-            title = { Text("Oprești jocul?") },
-            text = { Text("Progresul nesalvat se pierde.") },
-            confirmButton = { Button(onClick = { confirmStop = false; GameSession.stop() }) { Text("Oprește") } },
-            dismissButton = { TextButton(onClick = { confirmStop = false }) { Text("Anulează") } },
+            title = { Text(str(R.string.player_stop_question)) },
+            text = { Text(str(R.string.player_stop_warning)) },
+            confirmButton = { Button(onClick = { confirmStop = false; GameSession.stop() }) { Text(str(R.string.stop)) } },
+            dismissButton = { TextButton(onClick = { confirmStop = false }) { Text(str(R.string.cancel)) } },
         )
     }
 }
@@ -217,7 +217,7 @@ private fun FloatingMenuButton(modifier: Modifier, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(AppIcons.Menu, "Meniu", Modifier.size(20.dp), tint = Color.White.copy(alpha = 0.8f))
+        Icon(AppIcons.Menu, str(R.string.player_menu), Modifier.size(20.dp), tint = Color.White.copy(alpha = 0.8f))
     }
 }
 
@@ -239,19 +239,19 @@ private fun GameMenu(
         Column(Modifier.padding(vertical = 8.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Meniu", style = MaterialTheme.typography.titleMedium)
-                    Text("${GameSession.resolution.label} · $fps cadre/s", style = MaterialTheme.typography.bodySmall,
+                    Text(str(R.string.player_menu), style = MaterialTheme.typography.titleMedium)
+                    Text(str(R.string.player_menu_status, GameSession.resolution.label, fps), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = onClose) { Icon(AppIcons.Close, "Închide") }
+                IconButton(onClick = onClose) { Icon(AppIcons.Close, str(R.string.close)) }
             }
-            MenuItem(AppIcons.Keyboard, if (keyboardShown) "Ascunde tastatura" else "Tastatură", onKeyboard)
-            MenuItem(AppIcons.Mouse, if (mouseCaptured) "Eliberează mouse-ul" else "Captează mouse-ul",
-                onMouse, "Ctrl+Alt îl eliberează")
-            MenuItem(AppIcons.Log, "Jurnal", onLog)
-            MenuItem(AppIcons.Back, "Înapoi la meniu", onMinimize, "Jocul rămâne pornit")
+            MenuItem(AppIcons.Keyboard, if (keyboardShown) str(R.string.player_hide_keyboard) else str(R.string.player_keyboard), onKeyboard)
+            MenuItem(AppIcons.Mouse, if (mouseCaptured) str(R.string.player_release_mouse) else str(R.string.player_capture_mouse),
+                onMouse, str(R.string.player_capture_hint))
+            MenuItem(AppIcons.Log, str(R.string.player_log), onLog)
+            MenuItem(AppIcons.Back, str(R.string.player_minimize), onMinimize, str(R.string.player_minimize_hint))
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
-            MenuItem(AppIcons.Stop, "Oprește", onStop, tint = MaterialTheme.colorScheme.error)
+            MenuItem(AppIcons.Stop, str(R.string.stop), onStop, tint = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -274,13 +274,13 @@ private fun MenuItem(icon: ImageVector, text: String, onClick: () -> Unit, hint:
 @Composable
 private fun StartupPanel(st: SessionState.Starting, onLog: () -> Unit, onCancel: () -> Unit) {
     PanelCard {
-        Text("Pornesc ${st.game.title}", style = MaterialTheme.typography.headlineSmall)
+        Text(str(R.string.player_starting, st.game.title), style = MaterialTheme.typography.headlineSmall)
         LinearProgressIndicator(
             progress = { (st.step.ordinal + 0.5f) / StartStep.entries.size },
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         )
         for (step in StartStep.entries) {
-            val label = if (step == StartStep.LAUNCH) "Pornesc ${st.game.title}" else step.label
+            val label = if (step == StartStep.LAUNCH) str(R.string.player_starting, st.game.title) else step.label
             Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 when {
                     step.ordinal < st.step.ordinal -> Icon(AppIcons.CheckCircle, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -297,9 +297,9 @@ private fun StartupPanel(st: SessionState.Starting, onLog: () -> Unit, onCancel:
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 32.dp))
         }
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onLog) { Text("Vezi jurnal") }
+            TextButton(onClick = onLog) { Text(str(R.string.player_show_log)) }
             Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = onCancel) { Text("Anulează") }
+            OutlinedButton(onClick = onCancel) { Text(str(R.string.cancel)) }
         }
     }
 }
@@ -315,12 +315,12 @@ private fun EndPanel(title: String, message: String, game: Game, onLog: () -> Un
         }
         Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite jurnalul") }
-            TextButton(onClick = onLog) { Text("Vezi jurnal") }
+            TextButton(onClick = { shareSessionReport(ctx) }) { Text(str(R.string.player_send_log)) }
+            TextButton(onClick = onLog) { Text(str(R.string.player_show_log)) }
             Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { GameSession.stop() }) { Text("Închide") }
+            OutlinedButton(onClick = { GameSession.stop() }) { Text(str(R.string.close)) }
             Spacer(Modifier.width(8.dp))
-            Button(onClick = { GameSession.start(ctx, game) }) { Text("Încearcă din nou") }
+            Button(onClick = { GameSession.start(ctx, game) }) { Text(str(R.string.try_again)) }
         }
     }
 }
@@ -333,7 +333,7 @@ private fun RunningHint(st: SessionState.Running) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
             Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.6f), contentColor = Color.White) {
-                Text("${st.game.title} se încarcă — prima pornire poate dura câteva minute. Meniul: butonul din dreapta.",
+                Text(str(R.string.player_loading_hint, st.game.title),
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }
@@ -357,12 +357,12 @@ private fun LogPanel(onClose: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Jurnal", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                TextButton(onClick = { shareSessionReport(ctx) }) { Text("Trimite") }
-                IconButton(onClick = onClose) { Icon(AppIcons.Close, "Închide") }
+                Text(str(R.string.player_log), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = { shareSessionReport(ctx) }) { Text(str(R.string.player_send)) }
+                IconButton(onClick = onClose) { Icon(AppIcons.Close, str(R.string.close)) }
             }
             SelectionContainer(Modifier.fillMaxSize().verticalScroll(scroll).horizontalScroll(rememberScrollState())) {
-                Text(log.ifEmpty { "(gol)" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                Text(log.ifEmpty { str(R.string.player_log_empty) }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
             }
         }
     }
@@ -374,11 +374,11 @@ private fun LogPanel(onClose: () -> Unit) {
  */
 internal fun shareSessionReport(ctx: android.content.Context) {
     val activity = ctx as? MainActivity ?: return
-    android.widget.Toast.makeText(ctx, "Pregătesc raportul (câteva secunde)…", android.widget.Toast.LENGTH_SHORT).show()
+    android.widget.Toast.makeText(ctx, str(R.string.report_preparing), android.widget.Toast.LENGTH_SHORT).show()
     kotlin.concurrent.thread(name = "session-report") { // The self-tests and device checks take a few seconds.
         val text = GameSession.reportOnce(ctx) ?: return@thread // Already preparing one.
         // Also readable over adb without root: /sdcard/Android/data/<pkg>/files/report.txt
         runCatching { java.io.File(ctx.getExternalFilesDir(null), "report.txt").writeText(text) }
-        activity.runOnUiThread { activity.share(text, "fexdroid: jurnal") }
+        activity.runOnUiThread { activity.share(text, str(R.string.report_subject)) }
     }
 }

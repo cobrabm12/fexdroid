@@ -86,7 +86,7 @@ object ProcessTree {
         while (pids.any(::alive) && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(50)
         val left = pids.filter(::alive)
         if (left.isNotEmpty()) {
-            log("Procese care nu s-au oprit în ${graceMs} ms, le opresc forțat: ${left.joinToString()}")
+            log("Processes that did not stop in ${graceMs} ms are killed: ${left.joinToString()}")
             left.forEach { signal(it, OsConstants.SIGKILL) }
         }
         roots.forEach { runCatching { it.destroyForcibly() } }

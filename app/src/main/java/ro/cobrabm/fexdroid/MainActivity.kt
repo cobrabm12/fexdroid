@@ -22,15 +22,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import java.io.File
 
 /** Bottom navigation destinations. */
-enum class Dest(val label: String, val icon: ImageVector) {
-    HOME("Acasă", AppIcons.Home),
-    SETTINGS("Setări", AppIcons.Settings),
-    ADVANCED("Avansat", AppIcons.Build),
+enum class Dest(val label: Int, val icon: ImageVector) {
+    HOME(R.string.nav_home, AppIcons.Home),
+    SETTINGS(R.string.nav_settings, AppIcons.Settings),
+    ADVANCED(R.string.nav_advanced, AppIcons.Build),
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Strings.init(this)
         AppSettings.init(this)
         enableEdgeToEdge()
         // Games and long test runs: never let the screen time out while we are visible.
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
                                 NavigationBar {
                                     for (d in Dest.entries) NavigationBarItem(
                                         selected = dest == d, onClick = { dest = d },
-                                        icon = { Icon(d.icon, null) }, label = { Text(d.label) },
+                                        icon = { Icon(d.icon, null) }, label = { Text(str(d.label)) },
                                     )
                                 }
                             },
@@ -144,6 +145,6 @@ class MainActivity : ComponentActivity() {
             putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, text)
         }
-        startActivity(Intent.createChooser(send, "Trimite raportul"))
+        startActivity(Intent.createChooser(send, str(R.string.home_send)))
     }
 }
