@@ -84,6 +84,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Wheel and button events of a mouse over the game's picture that the Compose hierarchy did
+     * not hand to the view showing it (it forwards pointer moves and the touch stream, not
+     * every generic motion event).
+     */
+    override fun dispatchGenericMotionEvent(ev: android.view.MotionEvent): Boolean {
+        val view = InputSurfaceView.current
+        val handled = super.dispatchGenericMotionEvent(ev)
+        if (view == null || !view.inputEnabled || InputSurfaceView.overlayOpen ||
+            !ev.isFromSource(android.view.InputDevice.SOURCE_MOUSE) || view.lastMouseEventTime == ev.eventTime) return handled
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_SCROLL, android.view.MotionEvent.ACTION_BUTTON_PRESS,
+            android.view.MotionEvent.ACTION_BUTTON_RELEASE -> {}
+            else -> return handled
+        }
+        val at = IntArray(2).also(view::getLocationOnScreen)
+        val inside = ev.rawX >= at[0] && ev.rawX < at[0] + view.width && ev.rawY >= at[1] && ev.rawY < at[1] + view.height
+        return if (inside) view.mouseEvent(ev, located = false) else handled
+    }
+
     override fun onDestroy() {
         // Leaving the app for good: do not keep Xvfb/PulseAudio/the game running without a UI.
         if (isFinishing) GameSession.stop()

@@ -890,5 +890,15 @@ Porniri alternate, comparate doar la aceleași limite de frecvență.
   descărcat din nou la fiecare pornire (21:29, 23:58, 06:55, 07:30 UTC). Între pornirile jocului din aceeași
   sesiune Steam nu se descarcă nimic. La noi cache-ul nici nu folosește: procesarea lui (`fossilize_replay`)
   rămâne la 0% (N-031). De ce îl consideră Steam mereu învechit nu e lămurit (driverul Mesa a fost schimbat de
-  mai multe ori în noaptea aceea, dar ultima descărcare a fost cu același driver). De oprit din
-  Steam › Settings › Downloads; cheia din `config.vdf` încă necunoscută.
+  mai multe ori în noaptea aceea, dar ultima descărcare a fost cu același driver).
+  Oprit din Steam › Settings › Downloads, Steam scrie în `config/config.vdf`, sub `ShaderCacheManager`,
+  `"DisableShaderCache" "1"` și șterge cache-ul (2,9 GB → 30 MB). `fexdroid-steam.sh` pune cheia o singură dată
+  (marker `files/.shader-precache-default`), la instalări noi într-un `config.vdf` minimal creat înainte de prima
+  pornire (🟨 netestat pe o instalare nouă). ✅ Verificat pe Realme: următoarea pornire a lui Steam nu mai
+  descarcă nimic.
+- **Mouse:** butoanele X urmează acum starea butoanelor din fiecare eveniment (`syncButtons`), oricare dintre
+  DOWN/UP și BUTTON_PRESS/BUTTON_RELEASE ajunge la view; o apăsare fără buton numit înseamnă primul buton.
+  Evenimentele de rotiță și de buton pe care ierarhia Compose nu le dă view-ului le predă
+  `MainActivity.dispatchGenericMotionEvent`. ✅ cu `adb shell input mouse tap/swipe`: clic și tragerea barei de
+  derulare din Steam. Înainte, `input mouse tap` nu producea niciun clic. Rotița unui mouse real: de confirmat de
+  utilizator (adb nu o poate simula).

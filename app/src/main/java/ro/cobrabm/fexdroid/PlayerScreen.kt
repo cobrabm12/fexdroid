@@ -104,6 +104,9 @@ fun PlayerScreen() {
         }
     }
 
+    androidx.compose.runtime.SideEffect { InputSurfaceView.overlayOpen = menuOpen || logOpen || confirmStop }
+    DisposableEffect(Unit) { onDispose { InputSurfaceView.overlayOpen = false } }
+
     BackHandler {
         when {
             logOpen -> logOpen = false
