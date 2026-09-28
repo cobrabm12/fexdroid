@@ -86,6 +86,8 @@ fun SettingsScreen() {
                 SwitchSetting(str(R.string.settings_thread_placement),
                     str(R.string.settings_thread_placement_about),
                     AppSettings.threadPlacement, AppSettings::updateThreadPlacement)
+                SwitchSetting(str(R.string.settings_video_memory), str(R.string.settings_video_memory_about),
+                    AppSettings.limitVideoMemory, AppSettings::updateLimitVideoMemory)
                 SwitchSetting(str(R.string.settings_source2_tso),
                     str(R.string.settings_source2_tso_about),
                     AppSettings.source2WithoutTso, AppSettings::updateSource2WithoutTso)

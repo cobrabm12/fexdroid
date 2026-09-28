@@ -114,6 +114,7 @@ object PerfSnapshot {
 
         read("/proc/meminfo")?.lines()?.filter { it.startsWith("MemAvailable") || it.startsWith("SwapFree") || it.startsWith("MemTotal") }
             ?.joinToString(", ") { it.replace(Regex("\\s+"), " ") }?.let { appendLine("memory: $it") }
+        MemoryWatch.last.takeIf { it.isNotEmpty() }?.let { appendLine("memory watch: $it${if (MemoryWatch.low) " (LOW)" else ""}") }
         appendLine("settings: screen $screen, FEX profile ${AppSettings.fexProfile}")
         // A game whose window does not have the input focus slows itself down (N-034).
         val focus = ArrayList<String>()

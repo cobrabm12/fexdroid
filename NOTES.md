@@ -1043,3 +1043,52 @@ Unelte noi: `scripts/fex-thread-stats.py` (procesor pe fir + contoarele FEX, `FE
   ce să instalezi și suma SHA-256.
 - ✅ Văzut pe telefon: Acasă și Setări în engleză (telefonul e pe en-GB), apoi în română după alegerea din
   Setări, fără repornire.
+
+## N-044 · Memoria video, replay ca test repetabil, profil într-un meci real  ✅/🧪 (Realme GT, 2026-09-28)
+- **Test repetabil pe un meci real:** replay-ul unui meci privit (`replays/<id>.dem`, butonul „Download Replay”
+  de pe ecranul de final), pornit direct cu opțiunea de lansare `+playdemo replays/<id>.dem`
+  (`files/launch-options-570.txt`), apoi cursorul de timp tras mereu în același loc (minutul 22, scor 28–17).
+  Scena demo cu zece eroi cere de două ori mai puțin de la firul principal decât un meci.
+- **Memoria video era partea nevăzută.** `/proc/meminfo` `GPUTotalUsed`: 3,5–3,7 GB cu Dota într-un meci, 0,17 GB
+  fără joc. În `smaps` se văd doar zonele KGSL mapate în proces (0,3–1,3 GB); texturile stau în alocări KGSL
+  fără mapare. Pe telefon e aceeași memorie ca restul, deci jocul ocupa de fapt 5,6 + 3 ≈ 8,6 GB.
+- **Cauza:** Turnip anunță ca memorie video 75% din memoria sistemului (`os_gpu_heap_size_calculate`), adică
+  8,6 GB pe un telefon de 12 GB, iar Source 2 își dimensionează texturile după ea. Opțiunea Mesa
+  `heap_memory_percent` se poate da și ca variabilă de mediu.
+
+  | anunțat | folosit (`GPUTotalUsed`) | rezultat |
+  |---|---|---|
+  | 75% = 8,6 GB | 3,5–3,7 GB | merge |
+  | 40% = 4,6 GB | 2,8–2,9 GB | merge, swap liber 1,8 GB în loc de 1,0 |
+  | 20% = 2,4 GB | 2,33 GB | `VK_ERROR_OUT_OF_DEVICE_MEMORY` la încărcarea meciului, jocul se închide |
+
+  Din raportul jocului la eroare: texturi 393 MB (bugetul de streaming 412 MB, ~17% din cât e anunțat),
+  vertex buffers 172 MB, **26 de zone de transfer („Staging”) mapate permanent, 872 MB**, restul rezerve ale
+  alocatorului (VMA). Deci folosit ≈ 2,1 GB + 17% din cât e anunțat.
+- ✅ **Setare „Mai puțină memorie video pentru jocuri”**, pornită implicit: `heap_memory_percent` = 40% din
+  memoria telefonului, dar cel puțin 4 GB și cel mult 75% (`MemoryWatch.videoMemoryShare`). Verificat din
+  aplicație: jurnalul sesiunii spune „video memory 0.40”, `GPUTotalUsed` 2,84 GB în replay.
+  🟨 Neverificat într-o sesiune de ore și pe un telefon de 8 GB (acolo marginea e de ~0,5 GB).
+- ✅ **Avertisment de memorie** (`MemoryWatch`): când `MemAvailable` e sub 500 MB sau swap-ul liber sub 600 MB de
+  trei ori la rând, ecranul de joc arată un mesaj, iar jurnalul notează valorile. Raportul are linia
+  „memory watch”. 🟨 Pragurile vin din două sesiuni pe un singur telefon.
+- **Memoria obișnuită a jocului** (4,4 GB la meniu, 4,5–4,9 GB în meci) e date reale: în patru zone de câte
+  1 GB am găsit texte de interfață, nume de resurse, shadere; paginile prezente sunt pline de zerouri în
+  proporție de 0–6%. FEX adaugă ~0,5 GB (cod tradus 0,2, alocator 0,2, tabele 0,1).
+- **Interfața Steam înghețată în timpul jocului** (`SIGSTOP` pe `steamwebhelper`): 19,4 față de 18,2 cadre/s,
+  în marja de zgomot; Steam nu a repornit procesele în 90 s. Nu e folosit.
+- 🧪 **Profil pe biblioteci în meci** (replay, fir principal, 11152 de eșantioane): `libclient` 46,2%,
+  `libparticles` 10,0%, `libpanorama` 6,5%, `libtier0` 6,3%, `libanimationsystem` 5,1%, kernel 4,7%,
+  `libengine2` 3,2%, `librendersystemvulkan` 2,8%, `libc` 2,5%, FEX 2,4%, Turnip 0,3%. Pe blocuri
+  (`FEX_BLOCKJITNAMING=1`, `build/measure/byblock.py`): primele 10 blocuri 12,5%, primele 100 37%, primele
+  1000 75%. Cele mai fierbinți funcții din `libclient` sunt cod C++ obișnuit cu `lock cmpxchg` / `lock xadd`;
+  nicio instrucțiune anume nu iese în evidență.
+- 🧪 **TSO oprit și în `libtier0`, `libc`, `libstdc++`, `libm`:** jocul pornește și rulează, 21,7 față de 21,4
+  cadre/s la aceleași limite, adică nimic măsurabil. Lista rămâne la 18.
+- **Frecvența nucleului rapid** stă la limita termică (1305 din 1305 MHz în 15 din 20 de citiri), deci guvernorul
+  nu ține nimic în rezervă; limita o pune temperatura. Nucleele mici rămân la 1804 MHz (maximul lor) și când
+  cele mari sunt limitate la 1305.
+- **Replay, minutul 22, cu toate setările din aplicație:** 25–28 cadre/s cu telefonul răcit (limite
+  2150/1804 MHz), 20–23 când e cald (1305/1804 MHz).
+- De 185 de ori pe secundă firul principal face `access("/dev/random")` + `getrandom` + `getpid` + `getuid`
+  (generare de numere aleatoare): ~1000 de apeluri de sistem pe secundă, 1–2% din fir. Lăsat așa.

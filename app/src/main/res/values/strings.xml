@@ -106,6 +106,7 @@
     <string name="player_loading_hint">%1$s is loading. The first start can take a few minutes. Menu: the button on the right.</string>
     <string name="player_log">Log</string>
     <string name="player_log_empty">(empty)</string>
+    <string name="player_memory_low">The phone is running out of memory. The game may slow down a lot or close. After this match, stop the game and start it again.</string>
     <string name="player_menu">Menu</string>
     <string name="player_menu_status">%1$s · %2$d frames/s</string>
     <string name="player_minimize">Back to the app</string>
@@ -170,6 +171,8 @@
     <string name="settings_thread_placement">The fastest core for the main thread</string>
     <string name="settings_thread_placement_about">The busiest thread of the game gets the phone\'s fastest core for itself; the game\'s other threads run on the other big cores, Steam and the rest on the small ones.</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_video_memory">Less video memory for games</string>
+    <string name="settings_video_memory_about" formatted="false">Games are told of 40% of the phone\'s memory as video memory (at least 4 GB) instead of 75%, so they keep fewer textures loaded. On a phone video memory is ordinary memory: Dota 2 holds 0.7 GB less. Off if a game ends with “out of video memory”.</string>
     <string name="settings_wide_sides">Wide left and right margins</string>
     <string name="settings_wide_sides_about">The picture stays further from the left and right edges. On realme, OPPO and OnePlus the phone\'s game bar covers the left edge: a game\'s buttons under it cannot be touched.</string>
     <string name="settings_without_steam">Run the game without Steam</string>
