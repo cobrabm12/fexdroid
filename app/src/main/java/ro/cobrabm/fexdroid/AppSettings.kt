@@ -85,6 +85,8 @@ object AppSettings {
     var gpuMaxFrequency by mutableStateOf(true); private set
     /** The busiest thread of a game gets the fastest core for itself (ThreadTuner). */
     var threadPlacement by mutableStateOf(true); private set
+    /** Source 2 games' own libraries run without TSO emulation (FexConfig.SOURCE2_WITHOUT_TSO). */
+    var source2WithoutTso by mutableStateOf(false); private set
     /** Dota 2's video settings set to the cheapest values before a session starts (DotaProfile). */
     var dotaPerformance by mutableStateOf(false); private set
     /** FEX speed/accuracy trade-off (FexConfig), written before every game start. */
@@ -115,6 +117,7 @@ object AppSettings {
         dotaPerformance = prefs.getBoolean("dota_performance", false)
         gpuMaxFrequency = prefs.getBoolean("gpu_max_frequency", true)
         threadPlacement = prefs.getBoolean("thread_placement", true)
+        source2WithoutTso = prefs.getBoolean("source2_without_tso", false)
         fexProfile = runCatching { FexProfile.valueOf(prefs.getString("fex_profile", null) ?: "BALANCED") }
             .getOrDefault(FexProfile.BALANCED)
         fexDiskCache = prefs.getBoolean("fex_disk_cache_v2", false)
@@ -138,6 +141,7 @@ object AppSettings {
     fun updateFexProfile(v: FexProfile) { fexProfile = v; prefs.edit().putString("fex_profile", v.name).apply() }
     fun updateFexDiskCache(v: Boolean) { fexDiskCache = v; prefs.edit().putBoolean("fex_disk_cache_v2", v).apply() }
     fun updateSteamBigPicture(v: Boolean) { steamBigPicture = v; prefs.edit().putBoolean("steam_big_picture", v).apply() }
+    fun updateSource2WithoutTso(v: Boolean) { source2WithoutTso = v; prefs.edit().putBoolean("source2_without_tso", v).apply() }
     fun updateThreadPlacement(v: Boolean) { threadPlacement = v; prefs.edit().putBoolean("thread_placement", v).apply() }
     fun updateGpuMaxFrequency(v: Boolean) { gpuMaxFrequency = v; prefs.edit().putBoolean("gpu_max_frequency", v).apply() }
     fun updateDotaPerformance(v: Boolean) { dotaPerformance = v; prefs.edit().putBoolean("dota_performance", v).apply() }

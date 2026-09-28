@@ -90,6 +90,10 @@ fun SettingsScreen() {
                     "Firul cel mai ocupat al jocului primește singur nucleul cel mai rapid al telefonului; restul " +
                         "sesiunii rulează pe celelalte nuclee.",
                     AppSettings.threadPlacement, AppSettings::updateThreadPlacement)
+                SwitchSetting("Memorie rapidă pentru Dota 2 și CS2 (experimental)",
+                    "Bibliotecile jocului rulează fără emularea ordinii memoriei x86, partea cea mai scumpă a traducerii. " +
+                        "Mai multe cadre. Dacă jocul se blochează sau se închide, oprește opțiunea și trimite jurnalul.",
+                    AppSettings.source2WithoutTso, AppSettings::updateSource2WithoutTso)
                 SwitchSetting("Profil de performanță pentru Dota 2",
                     "Setările video ale jocului pe cele mai ieftine valori: fără umbre, efecte puține, texturi mai mici. " +
                         "Se aplică la pornirea lui Steam, după ce jocul a fost pornit o dată. Oprit: revin setările tale.",
