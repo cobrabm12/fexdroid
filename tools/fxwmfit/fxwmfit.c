@@ -81,6 +81,14 @@ static Window toplevel_of(Display* d, Window root, Window w) {
   return None;
 }
 
+static int same_client(Window a, Window b) {
+  return (a & ~0x1fffffUL) == (b & ~0x1fffffUL); // Resource ids: client base above 21 bits.
+}
+
+static int viewable(Display* d, Window w, XWindowAttributes* a) {
+  return XGetWindowAttributes(d, w, a) && a->map_state == IsViewable;
+}
+
 static int verbose;
 
 // Focus to the topmost window that takes it, unless that window (or one inside it) has it.
@@ -99,6 +107,10 @@ static void refocus(Display* d, Window root) {
   }
   if (verbose) fprintf(stderr, "fxwmfit: focus 0x%lx (toplevel 0x%lx), topmost 0x%lx\n", cur, holder, want);
   if (want == None || want == holder) return;
+  // A client moves the focus among its own windows: to a menu it just opened (an
+  // override-redirect window, which closes again when it loses the focus), to a dialog.
+  XWindowAttributes a;
+  if (holder != None && same_client(holder, want) && viewable(d, holder, &a)) return;
   XSetInputFocus(d, want, RevertToPointerRoot, CurrentTime);
   XChangeProperty(d, root, XInternAtom(d, "_NET_ACTIVE_WINDOW", False), XA_WINDOW, 32, PropModeReplace,
                   (unsigned char*)&want, 1);
@@ -115,14 +127,6 @@ static Window hidden[MAX_HIDDEN];
 static int nhidden;
 static Window hidden_for; // The full-screen window they were hidden for.
 static int hide_covered = 1;
-
-static int same_client(Window a, Window b) {
-  return (a & ~0x1fffffUL) == (b & ~0x1fffffUL); // Resource ids: client base above 21 bits.
-}
-
-static int viewable(Display* d, Window w, XWindowAttributes* a) {
-  return XGetWindowAttributes(d, w, a) && a->map_state == IsViewable;
-}
 
 static void hide_under(Display* d, Window root, int sw, int sh) {
   XWindowAttributes a;

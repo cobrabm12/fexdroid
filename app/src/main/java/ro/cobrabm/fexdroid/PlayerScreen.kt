@@ -104,6 +104,9 @@ fun PlayerScreen() {
         }
     }
 
+    androidx.compose.runtime.SideEffect { InputSurfaceView.overlayOpen = menuOpen || logOpen || confirmStop }
+    DisposableEffect(Unit) { onDispose { InputSurfaceView.overlayOpen = false } }
+
     BackHandler {
         when {
             logOpen -> logOpen = false
@@ -132,10 +135,11 @@ fun PlayerScreen() {
     ) {
         // The margin the session's resolution was computed for (AppSettings.screenMargin).
         val margin = minOf(maxWidth, maxHeight) * (AppSettings.screenMargin / 100f)
+        val side = if (AppSettings.wideSides && margin < AppSettings.WIDE_SIDE_DP.dp) AppSettings.WIDE_SIDE_DP.dp else margin
         // Recreate the view when the X resolution changes (it maps touches to X coordinates).
         androidx.compose.runtime.key(res) {
             AndroidView(
-                modifier = Modifier.padding(margin).fillMaxHeight()
+                modifier = Modifier.padding(horizontal = side, vertical = margin).fillMaxHeight()
                     .aspectRatio(res.width.toFloat() / res.height, matchHeightConstraintsFirst = true),
                 factory = { c ->
                     InputSurfaceView(c, res.width, res.height).apply {

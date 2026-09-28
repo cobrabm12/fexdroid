@@ -68,6 +68,10 @@ fun SettingsScreen() {
                     Choice(AppSettings.MARGIN_PRESETS, AppSettings.screenMargin, { if (it == 0) "Fără" else "$it%" },
                         AppSettings::updateScreenMargin)
                 }
+                SwitchSetting("Margini laterale late",
+                    "Imaginea stă mai departe de marginile din stânga și din dreapta. Pe realme, OPPO și OnePlus bara " +
+                        "de jocuri a telefonului acoperă marginea stângă: butoanele jocului de acolo nu se pot atinge.",
+                    AppSettings.wideSides, AppSettings::updateWideSides)
                 Setting("Cadre pe secundă", "Cât de des se caută o imagine nouă de la joc. Se copiază pe ecran doar imaginile noi.") {
                     Choice(AppSettings.FPS_PRESETS, AppSettings.fps, { "$it" }, AppSettings::updateFps)
                 }

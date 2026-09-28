@@ -20,7 +20,19 @@ import android.view.inputmethod.InputConnection
  * Ctrl+Alt releases a captured mouse.
  */
 class InputSurfaceView(context: Context, private val xWidth: Int, private val xHeight: Int) : SurfaceView(context) {
-    private companion object { const val WHEEL_STEP_X = 40f }
+    companion object {
+        private const val WHEEL_STEP_X = 40f
+        /** The view on screen, for mouse events the activity hands over (MainActivity). */
+        @Volatile var current: InputSurfaceView? = null
+        /** A menu, the log or a dialog of the app is over the picture: the mouse is theirs. */
+        @Volatile var overlayOpen = false
+    }
+
+    /** eventTime of the last mouse event handled here. */
+    @Volatile var lastMouseEventTime = 0L; private set
+
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); current = this }
+    override fun onDetachedFromWindow() { if (current === this) current = null; super.onDetachedFromWindow() }
 
     var inputEnabled = false
     private enum class Touch { NONE, PENDING, SCROLL, DRAG, RIGHT_CLICK }
@@ -51,13 +63,39 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
         return x to y
     }
 
-    private fun androidButtonToX(b: Int): Int = when (b) {
-        MotionEvent.BUTTON_PRIMARY -> 1
-        MotionEvent.BUTTON_TERTIARY -> 2
-        MotionEvent.BUTTON_SECONDARY -> 3
-        MotionEvent.BUTTON_BACK -> 8
-        MotionEvent.BUTTON_FORWARD -> 9
-        else -> 0
+    private val mouseButtons = listOf(
+        MotionEvent.BUTTON_PRIMARY to 1, MotionEvent.BUTTON_TERTIARY to 2, MotionEvent.BUTTON_SECONDARY to 3,
+        MotionEvent.BUTTON_BACK to 8, MotionEvent.BUTTON_FORWARD to 9,
+    )
+    private val pressed = HashSet<Int>()
+
+    /**
+     * X buttons follow the event's button state. Every mouse event carries it, so it does not
+     * matter which of DOWN/UP and BUTTON_PRESS/BUTTON_RELEASE arrive, or in what order: not all
+     * of them get through a Compose hierarchy to a view inside it.
+     */
+    private fun syncButtons(state: Int) {
+        for ((mask, b) in mouseButtons) {
+            if (state and mask != 0) { if (pressed.add(b)) XInput.button(b, true) }
+            else if (pressed.remove(b)) XInput.button(b, false)
+        }
+    }
+
+    /** A mouse event; [located]: its coordinates are this view's. */
+    fun mouseEvent(e: MotionEvent, located: Boolean = true): Boolean {
+        if (!inputEnabled) return false
+        lastMouseEventTime = e.eventTime
+        if (located && e.actionMasked != MotionEvent.ACTION_SCROLL) { val (x, y) = toX(e.x, e.y); XInput.moveTo(x, y) }
+        when (e.actionMasked) {
+            // DOWN and MOVE belong to a press: a source that does not say which button means the first.
+            MotionEvent.ACTION_DOWN -> syncButtons(if (e.buttonState != 0) e.buttonState else MotionEvent.BUTTON_PRIMARY)
+            MotionEvent.ACTION_MOVE -> if (e.buttonState != 0) syncButtons(e.buttonState)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> syncButtons(0)
+            MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE ->
+                syncButtons(e.buttonState)
+            MotionEvent.ACTION_SCROLL -> scroll(e)
+        }
+        return true
     }
 
     private fun scroll(e: MotionEvent) {
@@ -85,7 +123,7 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (!inputEnabled) return false
-        if (e.isFromSource(InputDevice.SOURCE_MOUSE)) return onGenericMotionEvent(e)
+        if (e.isFromSource(InputDevice.SOURCE_MOUSE)) return mouseEvent(e)
         requestFocus()
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -128,15 +166,7 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
 
     override fun onGenericMotionEvent(e: MotionEvent): Boolean {
         if (!inputEnabled || !e.isFromSource(InputDevice.SOURCE_MOUSE)) return super.onGenericMotionEvent(e)
-        when (e.actionMasked) {
-            MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
-                val (x, y) = toX(e.x, e.y); XInput.moveTo(x, y)
-            }
-            MotionEvent.ACTION_BUTTON_PRESS -> androidButtonToX(e.actionButton).takeIf { it > 0 }?.let { XInput.button(it, true) }
-            MotionEvent.ACTION_BUTTON_RELEASE -> androidButtonToX(e.actionButton).takeIf { it > 0 }?.let { XInput.button(it, false) }
-            MotionEvent.ACTION_SCROLL -> scroll(e)
-        }
-        return true
+        return mouseEvent(e)
     }
 
     /** Relative motion while the pointer is captured (games that warp/lock the cursor). */
@@ -146,8 +176,7 @@ class InputSurfaceView(context: Context, private val xWidth: Int, private val xH
                 for (i in 0 until e.historySize) XInput.moveBy(e.getHistoricalX(i).toInt(), e.getHistoricalY(i).toInt())
                 XInput.moveBy(e.x.toInt(), e.y.toInt())
             }
-            MotionEvent.ACTION_BUTTON_PRESS -> androidButtonToX(e.actionButton).takeIf { it > 0 }?.let { XInput.button(it, true) }
-            MotionEvent.ACTION_BUTTON_RELEASE -> androidButtonToX(e.actionButton).takeIf { it > 0 }?.let { XInput.button(it, false) }
+            MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE -> syncButtons(e.buttonState)
             MotionEvent.ACTION_SCROLL -> scroll(e)
         }
         return true

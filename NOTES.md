@@ -869,3 +869,36 @@ Porniri alternate, comparate doar la aceleași limite de frecvență.
 - **Build-ul final, verificat:** Steam, Dota, scena cu zece eroi la 1656×720 cu profil și GPU la maxim, telefon
   încins (limite 595 / 1075 / 1075 MHz, carcasa 46 °C): 30,9–32,6 cadre/s. În aceeași stare, înaintea acestei runde:
   23,3–25,7. Sunet: 360 s, nicio pauză de ieșire.
+
+## N-038 · Bara de jocuri realme, meniurile Steam, descărcarea de la fiecare pornire  🟨 (Realme GT, 2026-09-28)
+- **Marginea stângă nu se putea atinge** (nici cu mouse-ul): realme pune peste aplicațiile marcate ca joc o
+  fereastră de sistem, `GamesFloatBar` (`dumpsys input`: `frame=[576,-71][1080,72]` în coordonate portret,
+  `TRUSTED_OVERLAY`), adică în landscape fâșia x 0–72 px, y 0–504 px. Butonul de ieșire din demo/meci al Dota era
+  sub ea (centrul la ~62 px), cheița de setări imediat lângă (~106 px). „Margini laterale late” ține 28 dp
+  (84 px) liberi în stânga și în dreapta; implicit pornit pe realme, OPPO și OnePlus. Realme GT: 1584×720, săgeata
+  ajunge la ~114 px. Văzut în capturi; atingerea cu degetul o confirmă utilizatorul.
+- **Meniurile Steam nu se mai deschideau** de la N-034: meniul e o fereastră override-redirect a aceluiași client,
+  care primește focusul și se închide când îl pierde; `fxwmfit` îl dădea înapoi ferestrei principale în cel mult o
+  secundă. Acum focusul nu se mai ia de la o fereastră vizibilă a aceluiași client. Verificat: meniul „Steam” se
+  deschide.
+- **FSR** în Dota e disponibil doar cu Anti-Aliasing pornit (tooltip-ul jocului). Testul din N-034 („nu crapă pe
+  Adreno 660”) a fost făcut cu Anti-Aliasing oprit, deci FSR nu rula: concluzia de acolo nu e valabilă. Profilul
+  de performanță nu mai oprește Anti-Aliasing.
+- **„Updating / Validating” la fiecare pornire a lui Steam:** nu sunt fișierele jocului. `content_log.txt`:
+  `AppID 570 update started : download 0/2222610096 … stage 0/2947264340`, apoi `starting commit from
+  ".../steamapps/shadercache/570/downloads/"`: e cache-ul de shadere precompilate (Shader Pre-caching), ~2,2 GB,
+  descărcat din nou la fiecare pornire (21:29, 23:58, 06:55, 07:30 UTC). Între pornirile jocului din aceeași
+  sesiune Steam nu se descarcă nimic. La noi cache-ul nici nu folosește: procesarea lui (`fossilize_replay`)
+  rămâne la 0% (N-031). De ce îl consideră Steam mereu învechit nu e lămurit (driverul Mesa a fost schimbat de
+  mai multe ori în noaptea aceea, dar ultima descărcare a fost cu același driver).
+  Oprit din Steam › Settings › Downloads, Steam scrie în `config/config.vdf`, sub `ShaderCacheManager`,
+  `"DisableShaderCache" "1"` și șterge cache-ul (2,9 GB → 30 MB). `fexdroid-steam.sh` pune cheia o singură dată
+  (marker `files/.shader-precache-default`), la instalări noi într-un `config.vdf` minimal creat înainte de prima
+  pornire (🟨 netestat pe o instalare nouă). ✅ Verificat pe Realme: următoarea pornire a lui Steam nu mai
+  descarcă nimic.
+- **Mouse:** butoanele X urmează acum starea butoanelor din fiecare eveniment (`syncButtons`), oricare dintre
+  DOWN/UP și BUTTON_PRESS/BUTTON_RELEASE ajunge la view; o apăsare fără buton numit înseamnă primul buton.
+  Evenimentele de rotiță și de buton pe care ierarhia Compose nu le dă view-ului le predă
+  `MainActivity.dispatchGenericMotionEvent`. ✅ cu `adb shell input mouse tap/swipe`: clic și tragerea barei de
+  derulare din Steam. Înainte, `input mouse tap` nu producea niciun clic. Rotița unui mouse real: de confirmat de
+  utilizator (adb nu o poate simula).

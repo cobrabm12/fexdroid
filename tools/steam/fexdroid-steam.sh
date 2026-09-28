@@ -45,6 +45,23 @@ fi
 ln -sfn "$STEAMROOT" "$HOME/.steam/root"
 ln -sfn "$STEAMROOT" "$HOME/.steam/steam"
 
+# 2b) Shader pre-caching off, once: Steam downloads 2 GB of precompiled shaders per game at
+# every start and "processes" them before a game starts, which makes no progress under FEX
+# (NOTES N-031, N-038). Steam > Settings > Downloads turns it back on; the marker keeps this
+# from overriding that choice.
+cfg="$STEAMROOT/config/config.vdf"
+if [ ! -e "$FXD_FILES/.shader-precache-default" ]; then
+    if [ ! -e "$cfg" ]; then
+        mkdir -p "$STEAMROOT/config"
+        printf '"InstallConfigStore"\n{\n\t"Software"\n\t{\n\t\t"Valve"\n\t\t{\n\t\t\t"Steam"\n\t\t\t{\n\t\t\t\t"ShaderCacheManager"\n\t\t\t\t{\n\t\t\t\t\t"DisableShaderCache"\t\t"1"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n' > "$cfg"
+        log "shader pre-caching: off (new configuration)"
+    elif grep -q '"ShaderCacheManager"' "$cfg" && ! grep -q '"DisableShaderCache"' "$cfg"; then
+        sed -i '/"ShaderCacheManager"/{n;s/{/{\n\t\t\t\t\t"DisableShaderCache"\t\t"1"/;}' "$cfg"
+        log "shader pre-caching: off"
+    fi
+    : > "$FXD_FILES/.shader-precache-default"
+fi
+
 # 3) No containers: games' runtimes get the pass-through entry point too. Steam installs
 # and updates these runtimes while it runs, so keep checking in the background.
 replace_entry_points() {
