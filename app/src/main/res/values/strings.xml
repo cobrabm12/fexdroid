@@ -143,6 +143,8 @@
     <string name="settings_cache_size">Cache: %1$s</string>
     <string name="settings_clear_cache">Clear the cache</string>
     <string name="settings_controls">Playing by touch</string>
+    <string name="settings_direct_frames">Frames straight from the game (experimental)</string>
+    <string name="settings_direct_frames_about">The game\'s picture skips the X server on its way to the screen: less work for the processor, less heat. Windows that open over the game do not show while it draws.</string>
     <string name="settings_disk_cache">Code cache on disk</string>
     <string name="settings_disk_cache_about">Experimental. Translated x86 code is kept and used again, so later starts are faster. With FEX-2609 some programs crash (Steam\'s setup is one), so it is off by default.</string>
     <string name="settings_dota_profile">Performance profile for Dota 2</string>
@@ -181,6 +183,9 @@
     <string name="settings_screen">Screen</string>
     <string name="settings_source2_tso">Fast memory access for Dota 2 and CS2 (experimental)</string>
     <string name="settings_source2_tso_about">The game\'s own libraries run without the emulation of x86 memory ordering, the most expensive part of the translation. More frames. If the game hangs or closes, switch this off and send the log.</string>
+    <string name="settings_steam_arm64">Native Steam client (experiment)</string>
+    <string name="settings_steam_arm64_about">Valve\'s Steam made for ARM processors, not translated like the usual one. It is downloaded from Valve (about 1 GB), installs apart from the usual Steam and needs you to sign in again. Games cannot be started from it yet: do not install them there. It may not start on every phone.</string>
+    <string name="settings_steam_arm64_start">Start</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_light">Light</string>

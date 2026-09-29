@@ -89,6 +89,8 @@ fun SettingsScreen() {
                     AppSettings.threadPlacement, AppSettings::updateThreadPlacement)
                 SwitchSetting(str(R.string.settings_video_memory), str(R.string.settings_video_memory_about),
                     AppSettings.limitVideoMemory, AppSettings::updateLimitVideoMemory)
+                SwitchSetting(str(R.string.settings_direct_frames), str(R.string.settings_direct_frames_about),
+                    AppSettings.directFrames, AppSettings::updateDirectFrames)
                 SwitchSetting(str(R.string.settings_source2_tso),
                     str(R.string.settings_source2_tso_about),
                     AppSettings.source2WithoutTso, AppSettings::updateSource2WithoutTso)
@@ -121,6 +123,12 @@ fun SettingsScreen() {
                     AppSettings.gameWithoutSteam, AppSettings::updateGameWithoutSteam,
                 )
                 Note(str(R.string.settings_without_steam_note))
+                // Experiment: Valve's own arm64 client instead of the translated one.
+                Setting(str(R.string.settings_steam_arm64), str(R.string.settings_steam_arm64_about)) {
+                    TextButton(enabled = !GameSession.active, onClick = { GameSession.start(ctx, Game.STEAM_ARM64) }) {
+                        Text(str(R.string.settings_steam_arm64_start))
+                    }
+                }
             }
 
             Section(str(R.string.settings_controls)) {

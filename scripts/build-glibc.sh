@@ -43,6 +43,10 @@ grep -q "$FXD_ROOT/dev/shm/" include/shm-directory.h || { echo "shm-directory.h 
 # start the shared-memory daemon on demand (see NOTES.md N-017).
 sed -i "s|#define FXSHM_LDSO   \"/lib/ld-linux-aarch64.so.1\"|#define FXSHM_LDSO   \"$FXD_LDSO\"|; s|#define FXSHM_DAEMON \"/usr/libexec/fxshmd\"|#define FXSHM_DAEMON \"$FXD_ROOT/usr/libexec/fxshmd\"|" sysdeps/unix/sysv/linux/fxshm-config.h
 grep -q "$FXD_ROOT/usr/libexec/fxshmd" sysdeps/unix/sysv/linux/fxshm-config.h || { echo "fxshm-config.h patch failed"; exit 1; }
+# fexdroid exec (patches/glibc/0004-*): the rootfs, its loader and FEX, for programs
+# made for an ordinary Linux (see NOTES.md N-050).
+sed -i "s|#define FXD_EXEC_ROOT \"/fxd-root\"|#define FXD_EXEC_ROOT \"$FXD_ROOT\"|; s|#define FXD_EXEC_LDSO \"/lib/ld-linux-aarch64.so.1\"|#define FXD_EXEC_LDSO \"$FXD_LDSO\"|; s|#define FXD_EXEC_FEX  \"/usr/bin/FEX\"|#define FXD_EXEC_FEX  \"$FXD_ROOT/usr/bin/FEX\"|" sysdeps/unix/sysv/linux/aarch64/fxd-exec-config.h
+grep -q "$FXD_ROOT/usr/bin/FEX" sysdeps/unix/sysv/linux/aarch64/fxd-exec-config.h || { echo "fxd-exec-config.h patch failed"; exit 1; }
 # nss_files and the resolver read /etc/{passwd,group,hosts,...}.
 grep -rlE "\"/etc/" nss/nss_files resolv/*.h resolv/res_init.c 2>/dev/null | xargs -r sed -i "s|\"/etc/|\"$FXD_ROOT/etc/|g"
 

@@ -29,6 +29,15 @@ RUNTIME_PKGS=(
   pulseaudio pulseaudio-utils                        # phase 4: audio server (pipe sink -> AAudio)
   mesa-vulkan-drivers                                # lavapipe: CPU Vulkan for GPUs without Turnip (Mali, ...)
   libgl1-mesa-dri                                    # swrast: Xvfb's GLX extension (Steam's vgui needs a GLX visual)
+  # Valve's native arm64 Steam client (NOTES N-049, N-050): what steam, steamui.so,
+  # steamclient.so and steamwebhelper (CEF) ask the system for.
+  bash ca-certificates fonts-dejavu-core libatomic1
+  libgtk2.0-0t64 libnss3 libasound2t64 libpulse0 libfontconfig1 libfreetype6 libdbus-1-3
+  libgl1 libegl1 libgbm1 libxkbcommon0 libudev1 libcups2t64 libcap2 libusb-1.0-0
+  libxtst6 libxrandr2 libxss1 libxcomposite1 libxdamage1 libxfixes3 libxi6 libxcursor1
+  libxinerama1 libsm6 libice6 libatk1.0-0t64 libatk-bridge2.0-0t64 libpango-1.0-0 libcairo2
+  libpipewire-0.3-0t64 libopenal1 libnm0 libibus-1.0-5 libva2 libva-drm2 libva-x11-2 libvdpau1
+  libsdl2-2.0-0                                      # gldriverquery of the client
 )
 # Extra packages only needed to cross-compile FEX/Mesa against this sysroot.
 DEV_PKGS=(

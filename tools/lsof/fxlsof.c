@@ -4,7 +4,8 @@
 // Steam checks the peer of its UI websocket with `lsof -P -F upnR -i TCP@127.0.0.1:<port>`
 // (logs/transport_client.txt: GetIPCConnectionDetails). Real lsof reads /proc/net/tcp,
 // which Android denies to apps, and NETLINK_SOCK_DIAG is denied too. FEX records every
-// guest TCP socket (patches/fex/src/AndroidTcpRegistry.h); this tool answers from those
+// guest TCP socket (patches/fex/src/AndroidTcpRegistry.h), and libfxpath does the same for
+// native arm64 programs such as Valve's arm64 client (tools/fxpath); this tool answers from those
 // records and reports a socket only while /proc/<pid>/fd of its process still holds it,
 // so the answer is as real as lsof's. Stale records are deleted.
 //

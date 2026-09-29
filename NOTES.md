@@ -1200,3 +1200,218 @@ bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauz
   generatorul de cod al lui FEX, care nu sunt de o seară.
 - Unelte: `scripts/perf-by-block.py` (profil pe blocuri și pe biblioteci din `FEX_BLOCKJITNAMING=1`); locale,
   în `build/measure/`: `cyc.sh`, `threads.sh`, `dis.sh`, `procmem.py`.
+
+## N-047 · Generatorul de cod al lui FEX: banc de test, indicatori, AVX în biblioteca C  🧪 (Realme GT, 2026-09-29)
+- **Banc de test cu rezultate care se repetă** (`scripts/fex-bench-phone.sh`, `tools/fextest/bench.cpp`): un
+  program x86-64 mic, cu apeluri virtuale, containere, șiruri, calcule în virgulă mobilă și `shared_ptr`, rulat
+  pe telefon sub FEX-ul din `build/fex/install` (pus în `files/fextest`, fără să atingă FEX-ul aplicației),
+  cu `simpleperf stat` pe tot procesul. Două rulări la fel: 3,768 și 3,769 miliarde de instrucțiuni. O rulare
+  e o secundă pe un nucleu, cu ecranul stins. Rezultatul programului e identic cu cel de pe PC.
+- FEX nu pornește sub `qemu-user` pe PC (N-011), deci bancul e pe telefon.
+- **Ce fel de instrucțiuni consumă timpul în joc** (eșantioanele firului principal, puse peste codul tradus al
+  celor 60 de fragmente cele mai fierbinți, 25% din timpul petrecut în cod tradus): încărcări din memorie 19%,
+  comparații 20% (`cmp`/`subs`, de obicei imediat după o încărcare), virgulă mobilă 11%, scrieri 7%, salturi 6%,
+  construit constante 4,7%, `mrs`/`msr` pentru indicatori 1%. Jocul e limitat de accesul la memorie, nu de
+  instrucțiuni în plus puse de traducere. Se potrivește cu 0,97 instrucțiuni pe ciclu măsurate în N-039.
+- 🧪 **Indicatorii declarați morți la apel și la întoarcere** (patch local `0005`, opțiunea `ABILocalFlags`,
+  doar în modulele din `ExtendedVolatileMetadata`): 3,740 față de 3,768 miliarde de instrucțiuni (-0,75%),
+  ciclurile la fel (1,664 față de 1,662). Rezultat corect. Prea puțin ca să merite riscul: patch-ul e compilat în
+  FEX, dar opțiunea e oprită și aplicația nu o pornește până nu arată ceva într-un joc.
+- 🧪 **Opțiunile FEX pe banc** (cicluri, mai puțin e mai bine): implicit (TSO peste tot) 1,691; TSO oprit în
+  codul programului 1,662; și în `libc`, `libstdc++`, `libm` 1,575; TSO oprit peste tot 1,580; fără
+  `Multiblock` 2,144; tabelele L1/L2 de blocuri fixe 1,680 (nimic).
+- ✅ **AVX în biblioteca C:** cu AVX ascuns (`FEX_HOSTFEATURES=disableavx`) 1,399 de cicluri față de 1,662
+  (-16%). Același câștig, 1,405, cu AVX lăsat programelor și doar biblioteca C oprită de la el:
+  `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX2_Usable,-AVX_Usable`. glibc își
+  alege la pornire variantele AVX2 pentru `memcpy`, `strlen`, `memcmp` și celelalte; FEX traduce fiecare
+  operație pe 256 de biți în două pe 128, fiindcă procesorul nu are SVE pe 256. Variantele SSE2 se traduc unu
+  la unu.
+- **Cât înseamnă în joc:** `libc` are 2,5% din firul principal și 2,9% din firele ajutătoare, deci câștigul
+  așteptat e de 1–2%. Programul de test folosește șiruri mult mai mult decât jocul. În Steam și la încărcarea
+  jocului (copieri multe) ar trebui să se vadă mai bine. 🟨 Nemăsurat în joc.
+- **De măsurat în joc când telefonul e pe încărcătorul de priză** (pe USB-ul PC-ului nu ține pasul sub joc): variabila
+  de mai sus, AVX ascuns (prima măsurătoare, în N-046, era în zgomot), patch-ul `0005`. Pentru diferențe de 1–3%
+  măsurătoarea din joc trebuie pornită de la un tick fix al replay-ului (`demo_gototick`), nu de la cursor.
+- **Armada OS** (găsit de Marius, `github.com/armada-os/armada`): aceeași bază FEX-2609, fără schimbări în
+  generatorul de cod; reglajele lui de kernel cer root. Folosește însă **clientul Steam nativ ARM64** al lui
+  Valve (`steam_client_steamdeck_publicbeta_linuxarm64` de pe `client-update.steamstatic.com`), pe care noi îl
+  rulăm tradus. De încercat: ar scurta pornirea lui Steam și i-ar reduce memoria și procesorul.
+
+## N-048 · Cadrele jocului direct la aplicație, fără serverul X (fxpresent)  ✅ vkcube / 🟨 joc (Realme GT, 2026-09-29)
+- **Ce era:** fiecare cadru pleca din Mesa cu `PutImage` prin socketul X (4,6 MB la 1600×720), Xvfb îl copia în
+  framebufferul lui, iar puntea aplicației îl copia de acolo pe ecran, după ce se uita de 60 de ori pe secundă
+  dacă s-a schimbat ceva. Patru copii pe cadru și un plafon de 60 de cadre la măsurătoare.
+- **Ce e acum** (patch Mesa `0007`, `display_bridge.c`, protocolul în `tools/fxpresent/fxpresent-proto.h`):
+  aplicația ascultă pe un socket (`FEXDROID_PRESENT`, în `tmp/` din rootfs). Swapchain-ul X11 cu prezentare
+  software se conectează, trimite un `memfd` cu loc pentru trei cadre, copiază fiecare cadru într-un loc din
+  care aplicația nu citește, îl publică și anunță aplicația, care îl copiază pe ecran când sosește. Două copii
+  în loc de patru, nimic prin serverul X, fără așteptare de 1/60 s.
+- **Doar când fereastra acoperă tot ecranul X.** Altfel cadrele merg prin serverul X ca înainte (fereastra
+  `vkcube` de 500×500 a rămas pe drumul vechi, corect). La fel dacă aplicația nu ascultă; Mesa mai încearcă
+  conectarea o dată la 120 de cadre.
+- **Cursorul:** Xvfb îl desena în framebufferul lui. Mesa îl cere cu `XFixesGetCursorImage` la fiecare cadru
+  (imagine, poziție, punct activ) și îl desenează în copia trimisă aplicației. Se vede în captură.
+- **Ce nu se vede:** o fereastră X deschisă peste joc cât timp jocul desenează. După o jumătate de secundă
+  fără cadre, puntea arată din nou ecranul X.
+- ✅ **Măsurat cu `vkcube` la 1280×720**, nativ arm64 și x86 prin FEX (thunk Vulkan): 120 de cadre/s ajunse la
+  aplicație (1195–1201 în 10 s), Xvfb a dispărut din lista proceselor ocupate. Pe drumul vechi, aceeași
+  fereastră: 59 de cadre/s arătate (plafonul punții) și Xvfb la 83% dintr-un nucleu.
+- 🟨 **Neverificat în Dota 2**: bateria era la 43% și pe USB-ul PC-ului telefonul primește doar 68 mA. Setarea
+  „Cadre direct de la joc” e **oprită implicit** până la testul din joc. Fără variabila de mediu, codul nou din
+  Mesa nu face nimic.
+- La instalarea unui APK cu alt payload aplicația despachetează din nou rootfs-ul (un minut de lucru pe disc).
+
+## N-049 · Clientul Steam nativ ARM64 al lui Valve: merge într-un Debian ARM64  🧪 (PC, emulat, 2026-09-29)
+De ce: azi clientul Steam și procesele lui web rulează traduse prin FEX (pornire 130 s, 2,1–2,9 GB, 16% + 6%
+dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru ARM64 (găsit prin Armada OS).
+- **De unde:** lista de pachete `steam_client_steamdeck_publicbeta_linuxarm64` de pe
+  `https://client-update.steamstatic.com` (35 de pachete, 1,0 GB; versiunea 1790545198 la 2026-09-29), plus
+  `steam-runtime-steamrt-arm64.tar.xz` (52 MB) de pe `repo.steampowered.com/steamrt3c/images/<versiune>/`.
+  Pachetul de început e `bins_linuxarm64_linuxarm64.zip.<hash>` (110 MB): conține `steamrtarm64/steam`, care
+  își descarcă singur restul. Canalul se alege cu fișierul `package/beta` = `steamdeck_publicbeta`.
+- **Capcane la despachetare:** arhiva are căi cu `\` (unzip face fișiere cu `\` în nume) și nu păstrează
+  dreptul de execuție.
+- 🧪 **Prima pornire, în `debian:trixie` arm64 sub qemu pe PC** (`build/steamarm/`, nu în git): clientul a
+  descărcat 666 MB de la Valve, a despachetat și a instalat („Update complete, launching...”). Arborele
+  rezultat are 3,3 GB și conține și `linux64`, `steamrt64`, `ubuntu12_64` (partea x86) și `androidarm64`.
+- **Biblioteci de sistem cerute în plus față de ce are o instalare minimă:** `libpipewire-0.3`, `libopenal1`,
+  `libnm0`, `libibus-1.0-5`, pe lângă GTK 2, NSS, X11, PulseAudio, ALSA.
+- 🧪 **Interfața:** cu bibliotecile puse, `steamui.so` se încarcă și clientul ajunge la interogarea plăcii
+  video, apoi procesul moare cu „Segmentation fault” sub qemu. Nu se poate spune dacă e clientul sau emularea
+  de pe PC: testul adevărat e pe telefon.
+- **Ce ar trebui făcut pe telefon** (nefăcut):
+  1. Binarele lui Valve au ca interpretor `/lib/ld-linux-aarch64.so.1`, care pe Android nu există. Fără să
+     le modificăm: la `execve`, în glibc-ul nostru sau în `libfxpath`, un ELF cu acest interpretor se pornește
+     prin `ld.so`-ul din rootfs.
+  2. Bibliotecile de mai sus în rootfs-ul arm64.
+  3. Jocurile x86 pornite de clientul ARM64: el folosește un „compat tool” FEX al lui Valve, cu un rootfs la
+     o cale fixă. Trebuie făcut să pornească FEX-ul nostru cu punctul nostru de intrare (ca la `sniper` acum).
+  4. Aceleași opțiuni CEF ca la clientul x86 (`-no-cef-sandbox`, fără GPU).
+- **Ce s-ar câștiga:** pornire mai scurtă a lui Steam, mai puțină memorie și mai puțin procesor pentru
+  interfață. Nu crește direct cadrele din joc. 🟨 Necuantificat până nu rulează pe telefon.
+
+## N-050 · Programe făcute pentru un Linux obișnuit pornesc în mediul nostru; clientul Steam ARM64 ca experiment  🧪 (PC emulat, 2026-09-29; telefon: netestat)
+- **Problema:** binarele ARM64 ale lui Valve cer interpretorul `/lib/ld-linux-aarch64.so.1` și scripturile lor
+  `#!/bin/bash`; pe Android nu există niciunul. Binarele din rootfs-ul nostru au interpretorul rescris la
+  construire, dar fișierele lui Valve nu le modificăm.
+- **Patch glibc `0004`** (`execve.c`, `fxd-exe.c`, `readlink.c`, `readlinkat.c` în
+  `sysdeps/unix/sysv/linux/aarch64/`): `execve` se uită la fișier înainte să ceară kernelului și pornește
+  - un program arm64 cu acel interpretor prin `ld.so`-ul din rootfs (`ld.so --argv0 nume program argumente`);
+  - un script `#!` cu interpretorul din rootfs;
+  - un program x86 prin FEX (ce face `binfmt_misc` pe un Linux cu FEX instalat);
+  - un program de sub `/bin`, `/sbin`, `/usr`, `/opt` din rootfs, dacă există acolo (`system()` pornește
+    `/bin/sh`, care pe Android e shell-ul Android).
+  Toate funcțiile din familia `exec` și `posix_spawn` ajung în `__execve`, deci sunt acoperite.
+- **`/proc/self/exe`:** pentru kernel un astfel de proces rulează `ld.so`. Chromium (deci `steamwebhelper`) își
+  pornește copiii prin această legătură și ar porni încărcătorul cu argumentele lui. `readlink` și `execve`
+  dau calea programului, citită din `/proc/self/cmdline` (încărcătorul dă programului principal un nume gol,
+  iar `argv[0]` poate fi altul). Semnul că procesul a fost pornit așa: `AT_BASE` e 0.
+- **`libfxpath`** acoperă acum și numele vechi (`__xstat`, `__lxstat`, `__fxstatat`, pe care le cer programele
+  construite cu glibc mai vechi de 2.33), `opendir`, `scandir`, `statfs`, `dlopen`, `posix_spawn` și altele.
+  Fără ele clientul nu își găsea certificatele și nu își putea folosi `/tmp/dumps`.
+- **Rootfs arm64:** +53 MB de biblioteci (GTK 2, NSS, PipeWire, OpenAL, libnm, IBus, certificate...);
+  arhiva din APK ajunge la 610 MB nedespachetată.
+- ✅ **Verificat pe PC**, în containerul gol, la căile de pe telefon (`build/fextest/native/selfexe.c`):
+  programul cu interpretor `/lib/...` pornește, își vede calea, se repornește prin `/proc/self/exe` cu `exec`
+  și cu `posix_spawn`; scriptul `#!/bin/bash` rulează cu bash-ul din rootfs; `system()` merge; `shmtest` trece.
+- 🧪 **Clientul Steam ARM64 în mediul nostru, sub qemu:** își descarcă lista de pachete (certificatele merg),
+  interogarea plăcii video reușește (lavapipe), `vgui` își găsește vizualul GLX, scriptul `steamwebhelper.sh`
+  pornește; apoi `steamwebhelper` și `steam` mor cu „Segmentation fault”. La fel se întâmplă într-un Debian
+  obișnuit sub qemu, deci e limita emulării de pe PC, nu se poate merge mai departe fără telefon.
+- **În aplicație:** Setări › Joc › „Clientul Steam nativ (experiment)”, sau
+  `am start ... --es action steam-arm64`. Scriptul `tools/steam/fexdroid-steam-arm64.sh` descarcă de la Valve
+  primul pachet (110 MB), îi verifică hash-ul din lista lui Valve, îl despachetează în `files/home-arm64` și
+  pornește clientul, care își descarcă singur restul (666 MB). Clientul x86 rămâne neatins, în `files/home`.
+- **Ce nu e făcut:** jocurile x86 pornite din clientul ARM64 (el folosește un „compat tool” al lui Valve pentru
+  FEX); biblioteca de jocuri comună cu clientul x86.
+- ⚠ **Netestat pe telefon.** Patch-ul glibc schimbă pornirea fiecărui program din sesiune, inclusiv a celor
+  de până acum; pe PC trec testele de mai sus, dar FEX nu poate fi rulat acolo.
+- ✅ **Clientul Steam obișnuit (x86, prin FEX) cu glibc-ul nou, pe un al doilea telefon** (raport de la Marius,
+  2026-09-29, versiunea 0.3.102): Xiaomi 23090RA98G (Redmi Note 13 Pro+, Dimensity 7200 / MT6886, Mali,
+  Android 16, 7 GB). Steam pornește și ajunge la interfață; auto-testele din raport trec toate (FEX x86_64 și
+  i386, semafoare SysV, `/tmp`, `vulkaninfo` pe lavapipe). Deci patch-ul glibc `0004` nu strică pornirea
+  programelor de până acum. Clientul ARM64 nu a fost încă pornit pe telefon: raportul e din sesiunea obișnuită.
+- ✅ **Clientul ARM64 rulează pe telefon** (același Xiaomi, 0.3.102): pachetul de început s-a descărcat și a
+  trecut verificarea, clientul a pornit prin `ld.so`-ul nostru, și-a descărcat și instalat actualizarea
+  („Update complete, launching...”) și s-a încheiat cu codul 42. Codul 42 înseamnă „pornește-mă din nou”;
+  `steam.sh` al lui Valve face asta într-o buclă, scriptul nostru pornea clientul o singură dată. Reparat: bucla
+  e acum și în `fexdroid-steam-arm64.sh`. Interfața: încă nevăzută.
+- 🧪 **A doua pornire pe telefon: „Segmentation fault” (cod 139)** imediat după pornirea lui `steamwebhelper`,
+  în același loc ca pe PC sub qemu. Cauza, văzută cu `QEMU_STRACE=1`: clientul cere `get_robust_list(0, ...)`
+  (își pune blocările din memoria comună `ValveIPCSharedObj` pe lista firului) și cade pe un pointer nul când
+  nu primește lista. Android oprește `set_robust_list`/`get_robust_list` prin seccomp, iar `syscall()` din
+  glibc-ul nostru răspundea cu `ENOSYS`. Acum răspunde cu lista pe care glibc o ține oricum în descriptorul
+  firului (`pd->robust_head`), și pentru alt fir al aceluiași proces. Ce se pierde rămâne ce se pierdea:
+  kernelul nu eliberează blocările unui fir care moare.
+- 🧪 **După reparație, pe PC:** `steam` rămâne pornit (355 MB), `steamwebhelper` pornește și scrie jurnalul
+  Chromium; apoi „GPU process launch failed: error_code=1002” de câteva ori și „GPU process isn't usable”,
+  iar Steam îl repornește în buclă. `-cef-in-process-gpu` nu a schimbat nimic. Nu știu încă dacă e de la
+  emularea de pe PC sau se va vedea și pe telefon.
+
+- 🧪 **A treia pornire pe telefon (0.3.105):** clientul rămâne pornit (160 MB, firele `CSteamController`,
+  `HTMLController`, `llvmpipe-*`), dar `steamwebhelper` e repornit în buclă („setting LIBGL_KOPPER_DISABLE” de
+  multe ori). Mai lipsesc `libSDL2-2.0.so.0` (pentru `gldriverquery`) și `steam-runtime-launcher-service`.
+- 🧪 **Aceeași buclă pe PC, cauza de acolo:** zygote-ul Chromium face `CHECK(IsSingleThreaded())`: se uită la
+  `/proc/self/task` și renunță (SIGTRAP) dacă procesul are mai mult de un fir. Sub `qemu-user` procesul are
+  mereu un fir al emulatorului. Fără zygote procesul principal nu își poate porni procesul GPU („GPU process
+  launch failed: error_code=1002”, apoi „GPU process isn't usable”). `-cef-single-process` și
+  `-cef-in-process-gpu` nu schimbă nimic. Cu o bibliotecă de test care răspunde „un fir” la acea întrebare
+  (`build/fextest/native/faketask.c`, doar pe PC), bucla dispare și clientul desenează prima fereastră:
+  „Unexpected Transport Error (0x3008)”.
+- **Ce poate da al doilea fir pe telefon:** driverul software al lui Mesa (llvmpipe) își pornește fire la
+  primul desen. `LP_NUM_THREADS=0` în mediul clientului le oprește. 🟨 Neconfirmat că asta e cauza pe telefon:
+  raportul aplicației include de acum `steamwebhelper.log` al clientului ARM64.
+- **`/dev/shm`:** clientul și procesul lui web își împart memoria prin fișiere din `/dev/shm`
+  (`u<uid>-ValveIPCSharedObj-Steam`), deschise cu numele întreg. Android nu are `/dev/shm`; `libfxpath` îl duce
+  acum în `rootfs/dev/shm`.
+- 🧪 **A patra pornire pe telefon (0.3.106), cu jurnalul procesului web în raport:** zygote-ul pornește (pe
+  telefon nu există firul în plus de sub qemu), Chromium 126 ajunge să ruleze, dar nu își poate face memoria
+  comună: „Creating shared memory in /dev/shm/.com.valvesoftware.Steam.XXXXXX failed: No such file or
+  directory”. Chromium o face cu `mkstemp`, iar `libfxpath` nu acoperea funcțiile cu nume-șablon (`mkstemp`,
+  `mkostemp`, `mkstemps`, `mkdtemp` și variantele `64`). Adăugate; șablonul se întoarce la apelant cu numele pe
+  care l-ar fi avut fără mutare. Verificat pe PC (`build/fextest/native/tmpname.c`).
+- Fără urmări: D-Bus lipsă, `NETLINK` refuzat (Chromium își află adresele de rețea altfel),
+  `/proc/sys/fs/inotify/max_user_watches` de necitit.
+- 🧪 **A cincea pornire pe telefon (0.3.107):** procesul web rulează fără erori și face o fereastră, dar clientul
+  scrie „Failed to connect to websocket” după ce cheamă `lsof` de vreo 20 de ori („lsof: not found”). E aceeași
+  verificare ca la clientul x86 (N-028): clientul întreabă cu `lsof -P -F upnR -i TCP@127.0.0.1:<port>` cine e la
+  celălalt capăt al websocket-ului interfeței și refuză conexiunea dacă nu află. La clientul x86 răspunde
+  `fxlsof` din registrul de socket-uri scris de FEX; procesele native nu trec prin FEX, deci nu le nota nimeni.
+- **Reparația:** `libfxpath` scrie același registru la `connect`, `bind`, `accept`, `accept4` (un fișier pe inode,
+  `"<pid> <adresă locală> <port> <adresă> <port>"`), iar `fxlsof` e construit și pentru arm64, în rootfs. Testat pe
+  PC cu un server și un client în două procese: `lsof` arată ambele capete, cu proces, părinte și utilizator.
+- ✅ **Pe PC, sub qemu:** `transport_client.txt` arată „Websocket connection from: https://steamloopback.host”,
+  fără eroare, și **clientul Steam nativ ARM64 desenează fereastra de autentificare** (cont + parolă și cod QR). Pe
+  PC e nevoie în plus de `build/fextest/native/faketask.c`, fiindcă qemu adaugă un fir procesului; pe telefon nu.
+- Rootfs arm64: `libsdl2-2.0-0` pentru `gldriverquery` al clientului.
+- ✅ **Pe telefon (0.3.108, Xiaomi 23090RA98G, Dimensity 7200, Mali, Android 16): clientul Steam nativ ARM64
+  pornește** (confirmat de Marius, 2026-09-29 ~04:45). Primul client Steam ARM64 al lui Valve care rulează pe un
+  telefon Android prin mediul nostru, fără root și fără să modificăm fișierele lui Valve. Nemăsurat încă:
+  memorie și procesor față de clientul tradus; ce merge după autentificare; jocurile (neconectate).
+- Corectură: bateria Realme-ului s-a încărcat de la 24% la 79% în 3½ ore pe USB-ul PC-ului, cu ecranul stins și
+  Wi-Fi oprit. Valoarea „Battery current” din `dumpsys battery` (−66…−68) nu e în mA, cum am scris în N-047;
+  portul dă până la ~0,9 A, destul cât telefonul stă, prea puțin sub joc.
+
+## N-051 · Runda de dimineață pe Realme: versiunea nouă, cadre directe în Dota, clientul ARM64 pe Adreno  ✅/🧪 (Realme GT, 2026-09-29)
+- ✅ **Nicio regresie din glibc `0004` și `libfxpath`:** cu 0.3.109 (tot ce e pe `steam-arm64`), Steam-ul obișnuit
+  pornește, iar replay-ul Dota merge la 26–29 de cadre/s cu telefonul rece, ca înainte. `GLIBC_TUNABLES` (fără
+  funcțiile AVX2 ale glibc) a fost activ în toate rulările, fără probleme. Efectul lui în joc nu l-am măsurat:
+  e sub zgomotul măsurătorii (±10%).
+- 🧪 **Cadre directe (fxpresent) în Dota:** imaginea e corectă (culori, interfață, cursor). O primă rulare a
+  arătat 37–41 de cadre/s, dar saltul în replay nu reușise și măsura începutul meciului (0–0), mult mai ușor.
+  `bench.sh` verifică acum saltul și îl repetă. Cu saltul verificat, aceeași scenă, aceleași limite de
+  frecvență (1555/1555/1804 MHz): **21,7 cadre/s direct, 24,1 prin serverul X**. Xvfb nu mai lucrează, dar
+  aplicația urcă de la 20% la 55% dintr-un nucleu: `direct_show` copiază cu verificări pe fiecare pixel.
+  Setarea rămâne oprită. De făcut: copierea pe rânduri, fără verificări pe pixel; cererea cursorului doar când
+  s-a mișcat.
+- `fps.sh` numără acum și rândurile „frames straight from the game” (înainte arăta 0 cu cadrele directe).
+- ✅ **Clientul Steam nativ ARM64 pe Realme GT** (Adreno 660, Android 14, Turnip): descărcat, instalat și pornit
+  în 70 s pe Wi-Fi, ajunge la fereastra de autentificare. Folosește Turnip pentru interogarea plăcii video. La
+  fereastra de autentificare: clientul 7%, procesul web 2% dintr-un nucleu. Al doilea telefon după Xiaomi.
+- **Xiaomi, după autentificare (raport de la Marius, 0.3.108):** fereastra „Steam” cu biblioteca, conexiunea
+  interfeței acceptată. Clientul a trecut singur de pe canalul beta `steamdeck_publicbeta` pe canalul stabil
+  `steam_client_linuxarm64` (1788652215, aceeași versiune ca clientul x86) și s-a descărcat din nou. Scriptul
+  folosește de acum direct canalul stabil. Consum cu biblioteca deschisă, care se redesenează de 60 de ori pe
+  secundă: procesul de randare 66% dintr-un nucleu (compozitorul software 31%), clientul 38%, procesul web 12%,
+  puntea aplicației 59%. Lipsește UDisks2 („Failed to initialize storage device manager”): de văzut la
+  instalarea jocurilor.

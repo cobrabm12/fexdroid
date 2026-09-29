@@ -100,6 +100,10 @@ WSI-ul X11 cade pe calea software (copiere prin `xcb_put_image`/MIT-SHM).
 | **B. server X11 propriu minimal** (ca Winlator, dar scris de noi) | Control total, poate prezenta direct în `AHardwareBuffer` | Foarte mult de implementat ca Steam/CEF să meargă; LGPL dacă ne inspirăm prea mult din codul Winlator |
 | **C. compositor Wayland minimal** (wlroots headless sau propriu) + XWayland | Protocol modern, buffere partajate mai ușor | XWayland tot e nevoie pentru Steam; mai multe piese; thunk-ul WaylandClient e mai puțin testat |
 
+Stare 2026-09-29: layerul direct există ca patch Mesa + punte (fxpresent, N-048): cadrele jocului ajung la
+aplicație printr-o memorie comună, fără serverul X; verificat cu `vkcube`, în joc urmează. Copia pe CPU spre
+`ANativeWindow` a rămas; varianta fără nicio copie (`AHardwareBuffer` importat în Turnip) nu e făcută.
+
 Recomandare: **A pentru Fazele 3–5** (cea mai simplă variantă care sigur funcționează), apoi în
 Faza 6 un **layer Vulkan propriu** care prezintă swapchain-ul jocului direct într-un
 `AHardwareBuffer` al SurfaceView-ului, ocolind copierea X11 doar pentru joc.

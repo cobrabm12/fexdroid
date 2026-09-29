@@ -143,6 +143,8 @@
     <string name="settings_cache_size">Cache: %1$s</string>
     <string name="settings_clear_cache">Șterge cache-ul</string>
     <string name="settings_controls">Joc prin atingere</string>
+    <string name="settings_direct_frames">Cadre direct de la joc (experimental)</string>
+    <string name="settings_direct_frames_about">Imaginea jocului ocolește serverul X în drum spre ecran: mai puțină muncă pentru procesor, mai puțină căldură. Ferestrele care se deschid peste joc nu se văd cât timp el desenează.</string>
     <string name="settings_disk_cache">Cache de cod pe disc</string>
     <string name="settings_disk_cache_about">Experimental. Codul x86 tradus o dată e păstrat și refolosit, deci pornirile următoare sunt mai rapide. Cu FEX-2609 unele programe crapă (de ex. instalarea Steam), așa că e oprit implicit.</string>
     <string name="settings_dota_profile">Profil de performanță pentru Dota 2</string>
@@ -181,6 +183,9 @@
     <string name="settings_screen">Ecran</string>
     <string name="settings_source2_tso">Memorie rapidă pentru Dota 2 și CS2 (experimental)</string>
     <string name="settings_source2_tso_about">Bibliotecile jocului rulează fără emularea ordinii memoriei x86, partea cea mai scumpă a traducerii. Mai multe cadre. Dacă jocul se blochează sau se închide, oprește opțiunea și trimite jurnalul.</string>
+    <string name="settings_steam_arm64">Clientul Steam nativ (experiment)</string>
+    <string name="settings_steam_arm64_about">Steam-ul făcut de Valve pentru procesoare ARM, netradus, spre deosebire de cel obișnuit. Se descarcă de la Valve (cam 1 GB), se instalează separat de Steam-ul obișnuit și cere autentificare din nou. Din el nu pornesc încă jocuri: nu le instala acolo. S-ar putea să nu pornească pe orice telefon.</string>
+    <string name="settings_steam_arm64_start">Pornește</string>
     <string name="settings_theme">Temă</string>
     <string name="settings_theme_dark">Întunecată</string>
     <string name="settings_theme_light">Luminoasă</string>

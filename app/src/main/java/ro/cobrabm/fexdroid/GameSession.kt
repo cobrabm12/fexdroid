@@ -14,7 +14,9 @@ import kotlin.concurrent.thread
 /** What the user can start from the home screen (scripts from tools/steam, installed into the rootfs). */
 enum class Game(val title: String, val tag: String, private val script: String) {
     STEAM("Steam", "steam", "fexdroid-steam.sh"),
-    DOTA("Dota 2", "dota", "fexdroid-dota.sh");
+    DOTA("Dota 2", "dota", "fexdroid-dota.sh"),
+    /** Experiment: Valve's native arm64 client, in a home of its own (NOTES N-049, N-050). */
+    STEAM_ARM64("Steam ARM64", "steam-arm64", "fexdroid-steam-arm64.sh");
 
     fun argv(env: LinuxEnv) = listOf("${env.root}/bin/sh", "${env.root}/usr/lib/fexdroid/steam/$script")
 }
@@ -118,13 +120,20 @@ object GameSession {
             .getOrElse { "---- performance ----\nfailed: $it\n" })
         appendLine("---- session log (last $REPORT_LOG_LINES lines) ----")
         appendLine(synchronized(logLines) { logLines.toList() }.takeLast(REPORT_LOG_LINES).joinToString("\n"))
-        // Steam's own logs: what its updater and client did (no passwords in them).
-        val steamLogs = File(env.home, ".local/share/Steam/logs")
-        for (name in listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
+        // Steam's own logs: what its updater and client did (no passwords in them). The
+        // experimental arm64 client keeps its own, and its web helper's log says why it ends.
+        val arm64 = (state as? SessionState.Running)?.game == Game.STEAM_ARM64 ||
+            (state as? SessionState.Exited)?.game == Game.STEAM_ARM64 || (state as? SessionState.Failed)?.game == Game.STEAM_ARM64
+        val steamLogs = if (arm64) File(env.files, "home-arm64/.local/share/Steam/logs") else File(env.home, ".local/share/Steam/logs")
+        val names = if (arm64) listOf("transport_client.txt", "steamwebhelper.log", "cef_log.txt", "steamui_system.txt",
+                "bootstrap_log.txt", "stderr.txt")
+            else listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")
+        for (name in names) {
             val f = File(steamLogs, name)
             if (!f.isFile) continue
-            appendLine("---- Steam logs/$name (last $STEAM_LOG_TAIL lines) ----")
-            appendLine(runCatching { f.readLines().takeLast(STEAM_LOG_TAIL).joinToString("\n") }
+            val tail = if (name == "steamwebhelper.log") 60 else STEAM_LOG_TAIL
+            appendLine("---- Steam${if (arm64) " ARM64" else ""} logs/$name (last $tail lines) ----")
+            appendLine(runCatching { f.readLines().takeLast(tail).joinToString("\n") { it.take(300) } }
                 .getOrElse { "cannot read: $it" })
         }
         append(selfTests(env))
@@ -271,7 +280,8 @@ object GameSession {
                         append("FEX: profile ${AppSettings.fexProfile.name}, code cache ${if (AppSettings.fexDiskCache) "on" else "off"}" +
                             ", Source 2 libraries without TSO ${if (AppSettings.source2WithoutTso) "on" else "off"}" +
                             ", thread placement ${if (AppSettings.threadPlacement) "on" else "off"}" +
-                            ", video memory ${if (AppSettings.limitVideoMemory) "${MemoryWatch.videoMemoryShare()} of the phone's" else "as Mesa chooses"}")
+                            ", video memory ${if (AppSettings.limitVideoMemory) "${MemoryWatch.videoMemoryShare()} of the phone's" else "as Mesa chooses"}" +
+                            ", frames straight from the game ${if (AppSettings.directFrames) "on" else "off"}")
                     }
                     .onFailure { append("FEX: cannot write Config.json: $it") }
                 if (!current()) return@thread xs.stopAll()
@@ -359,7 +369,7 @@ object GameSession {
         val xs = session ?: return
         val s = surface ?: return
         if (bridgeOn || xs.shmid < 0) return
-        append(DisplayBridge.start(s, xs.fxshmSocket, xs.shmid, AppSettings.fps))
+        append(DisplayBridge.start(s, xs.fxshmSocket, xs.shmid, AppSettings.fps, xs.presentSocket))
         bridgeOn = true
         if (!inputReady) {
             append(XInput.connect(0))

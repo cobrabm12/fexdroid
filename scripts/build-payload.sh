@@ -111,6 +111,7 @@ clang --target=aarch64-linux-gnu --sysroot=build/rootfs/sysroot-arm64 -fuse-ld=l
 install -D -m 0755 tools/steam/fexdroid-steam.sh "$A/usr/lib/fexdroid/steam/fexdroid-steam.sh"
 install -D -m 0755 tools/steam/_v2-entry-point "$A/usr/lib/fexdroid/steam/_v2-entry-point"
 install -D -m 0755 tools/steam/fexdroid-dota.sh "$A/usr/lib/fexdroid/steam/fexdroid-dota.sh"
+install -D -m 0755 tools/steam/fexdroid-steam-arm64.sh "$A/usr/lib/fexdroid/steam/fexdroid-steam-arm64.sh"
 
 # Test for the glibc seccomp workarounds (patches/glibc/0003).
 clang --target=aarch64-linux-gnu --sysroot=build/rootfs/sysroot-arm64 -fuse-ld=lld -O2 \
@@ -135,6 +136,9 @@ gcc -O2 -o "$X/opt/fexdroid-tests/tone" tests/common/tone.c -lm
 # lsof for Steam's websocket peer check, answered from FEX's TCP records (tools/lsof/fxlsof.c).
 # The app copies it into the Steam rootfs (LinuxEnv.writeIdentityFiles).
 gcc -O2 -Wall -o "$X/usr/bin/lsof" tools/lsof/fxlsof.c
+# The same for native arm64 programs (Valve's arm64 Steam client), whose sockets libfxpath records.
+clang --target=aarch64-linux-gnu --sysroot=build/rootfs/sysroot-arm64 -fuse-ld=lld \
+  -Wl,--dynamic-linker="$FXD_LDSO" -O2 -Wall -o "$A/usr/bin/lsof" tools/lsof/fxlsof.c
 # Dynamic: static x86 binaries crash under FEX on older kernels (NOTES N-021).
 gcc -O2 -o "$X/opt/fexdroid-tests/semtest" tests/sysvsem/semtest.c
 # i386 variant (direct semget/semctl/semtimedop_time64 syscalls, FEX's x32 handlers); needs a
