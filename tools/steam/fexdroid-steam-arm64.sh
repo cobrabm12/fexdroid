@@ -15,7 +15,10 @@ export HOME="$FXD_FILES/home-arm64"
 STEAMROOT="$HOME/.local/share/Steam"
 FEX="$FXD_ROOT/usr/bin/FEX"
 CDN=https://client-update.steamstatic.com
-LIST=steam_client_steamdeck_publicbeta_linuxarm64
+# Valve's stable arm64 channel, the same client version as the x86 one. (The Steam Deck beta
+# channel works too, but the client leaves it for this one at the first sign-in and downloads
+# itself again.)
+LIST=steam_client_linuxarm64
 log() { echo "[fexdroid-steam-arm64] $*"; }
 
 mkdir -p "$STEAMROOT/package" "$HOME/.steam"
@@ -49,7 +52,6 @@ if [ ! -x "$STEAMROOT/steamrtarm64/steam" ]; then
     cp -a "$tmp/out/." "$STEAMROOT/"
     rm -rf "$tmp"
     [ -x "$STEAMROOT/steamrtarm64/steam" ] || { log "the package has no steamrtarm64/steam"; exit 1; }
-    echo steamdeck_publicbeta > "$STEAMROOT/package/beta"
     log "first package unpacked; the client downloads the rest at its first start"
 fi
 ln -sfn "$STEAMROOT" "$HOME/.steam/root"

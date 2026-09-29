@@ -1391,3 +1391,27 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
 - Corectură: bateria Realme-ului s-a încărcat de la 24% la 79% în 3½ ore pe USB-ul PC-ului, cu ecranul stins și
   Wi-Fi oprit. Valoarea „Battery current” din `dumpsys battery` (−66…−68) nu e în mA, cum am scris în N-047;
   portul dă până la ~0,9 A, destul cât telefonul stă, prea puțin sub joc.
+
+## N-051 · Runda de dimineață pe Realme: versiunea nouă, cadre directe în Dota, clientul ARM64 pe Adreno  ✅/🧪 (Realme GT, 2026-09-29)
+- ✅ **Nicio regresie din glibc `0004` și `libfxpath`:** cu 0.3.109 (tot ce e pe `steam-arm64`), Steam-ul obișnuit
+  pornește, iar replay-ul Dota merge la 26–29 de cadre/s cu telefonul rece, ca înainte. `GLIBC_TUNABLES` (fără
+  funcțiile AVX2 ale glibc) a fost activ în toate rulările, fără probleme. Efectul lui în joc nu l-am măsurat:
+  e sub zgomotul măsurătorii (±10%).
+- 🧪 **Cadre directe (fxpresent) în Dota:** imaginea e corectă (culori, interfață, cursor). O primă rulare a
+  arătat 37–41 de cadre/s, dar saltul în replay nu reușise și măsura începutul meciului (0–0), mult mai ușor.
+  `bench.sh` verifică acum saltul și îl repetă. Cu saltul verificat, aceeași scenă, aceleași limite de
+  frecvență (1555/1555/1804 MHz): **21,7 cadre/s direct, 24,1 prin serverul X**. Xvfb nu mai lucrează, dar
+  aplicația urcă de la 20% la 55% dintr-un nucleu: `direct_show` copiază cu verificări pe fiecare pixel.
+  Setarea rămâne oprită. De făcut: copierea pe rânduri, fără verificări pe pixel; cererea cursorului doar când
+  s-a mișcat.
+- `fps.sh` numără acum și rândurile „frames straight from the game” (înainte arăta 0 cu cadrele directe).
+- ✅ **Clientul Steam nativ ARM64 pe Realme GT** (Adreno 660, Android 14, Turnip): descărcat, instalat și pornit
+  în 70 s pe Wi-Fi, ajunge la fereastra de autentificare. Folosește Turnip pentru interogarea plăcii video. La
+  fereastra de autentificare: clientul 7%, procesul web 2% dintr-un nucleu. Al doilea telefon după Xiaomi.
+- **Xiaomi, după autentificare (raport de la Marius, 0.3.108):** fereastra „Steam” cu biblioteca, conexiunea
+  interfeței acceptată. Clientul a trecut singur de pe canalul beta `steamdeck_publicbeta` pe canalul stabil
+  `steam_client_linuxarm64` (1788652215, aceeași versiune ca clientul x86) și s-a descărcat din nou. Scriptul
+  folosește de acum direct canalul stabil. Consum cu biblioteca deschisă, care se redesenează de 60 de ori pe
+  secundă: procesul de randare 66% dintr-un nucleu (compozitorul software 31%), clientul 38%, procesul web 12%,
+  puntea aplicației 59%. Lipsește UDisks2 („Failed to initialize storage device manager”): de văzut la
+  instalarea jocurilor.
