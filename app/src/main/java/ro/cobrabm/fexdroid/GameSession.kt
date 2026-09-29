@@ -120,13 +120,19 @@ object GameSession {
             .getOrElse { "---- performance ----\nfailed: $it\n" })
         appendLine("---- session log (last $REPORT_LOG_LINES lines) ----")
         appendLine(synchronized(logLines) { logLines.toList() }.takeLast(REPORT_LOG_LINES).joinToString("\n"))
-        // Steam's own logs: what its updater and client did (no passwords in them).
-        val steamLogs = File(env.home, ".local/share/Steam/logs")
-        for (name in listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")) {
+        // Steam's own logs: what its updater and client did (no passwords in them). The
+        // experimental arm64 client keeps its own, and its web helper's log says why it ends.
+        val arm64 = (state as? SessionState.Running)?.game == Game.STEAM_ARM64 ||
+            (state as? SessionState.Exited)?.game == Game.STEAM_ARM64 || (state as? SessionState.Failed)?.game == Game.STEAM_ARM64
+        val steamLogs = if (arm64) File(env.files, "home-arm64/.local/share/Steam/logs") else File(env.home, ".local/share/Steam/logs")
+        val names = if (arm64) listOf("steamwebhelper.log", "cef_log.txt", "steamui_system.txt", "bootstrap_log.txt", "stderr.txt")
+            else listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")
+        for (name in names) {
             val f = File(steamLogs, name)
             if (!f.isFile) continue
-            appendLine("---- Steam logs/$name (last $STEAM_LOG_TAIL lines) ----")
-            appendLine(runCatching { f.readLines().takeLast(STEAM_LOG_TAIL).joinToString("\n") }
+            val tail = if (name == "steamwebhelper.log") 60 else STEAM_LOG_TAIL
+            appendLine("---- Steam${if (arm64) " ARM64" else ""} logs/$name (last $tail lines) ----")
+            appendLine(runCatching { f.readLines().takeLast(tail).joinToString("\n") { it.take(300) } }
                 .getOrElse { "cannot read: $it" })
         }
         append(selfTests(env))

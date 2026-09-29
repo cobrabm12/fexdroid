@@ -1347,3 +1347,20 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   Chromium; apoi „GPU process launch failed: error_code=1002” de câteva ori și „GPU process isn't usable”,
   iar Steam îl repornește în buclă. `-cef-in-process-gpu` nu a schimbat nimic. Nu știu încă dacă e de la
   emularea de pe PC sau se va vedea și pe telefon.
+
+- 🧪 **A treia pornire pe telefon (0.3.105):** clientul rămâne pornit (160 MB, firele `CSteamController`,
+  `HTMLController`, `llvmpipe-*`), dar `steamwebhelper` e repornit în buclă („setting LIBGL_KOPPER_DISABLE” de
+  multe ori). Mai lipsesc `libSDL2-2.0.so.0` (pentru `gldriverquery`) și `steam-runtime-launcher-service`.
+- 🧪 **Aceeași buclă pe PC, cauza de acolo:** zygote-ul Chromium face `CHECK(IsSingleThreaded())`: se uită la
+  `/proc/self/task` și renunță (SIGTRAP) dacă procesul are mai mult de un fir. Sub `qemu-user` procesul are
+  mereu un fir al emulatorului. Fără zygote procesul principal nu își poate porni procesul GPU („GPU process
+  launch failed: error_code=1002”, apoi „GPU process isn't usable”). `-cef-single-process` și
+  `-cef-in-process-gpu` nu schimbă nimic. Cu o bibliotecă de test care răspunde „un fir” la acea întrebare
+  (`build/fextest/native/faketask.c`, doar pe PC), bucla dispare și clientul desenează prima fereastră:
+  „Unexpected Transport Error (0x3008)”.
+- **Ce poate da al doilea fir pe telefon:** driverul software al lui Mesa (llvmpipe) își pornește fire la
+  primul desen. `LP_NUM_THREADS=0` în mediul clientului le oprește. 🟨 Neconfirmat că asta e cauza pe telefon:
+  raportul aplicației include de acum `steamwebhelper.log` al clientului ARM64.
+- **`/dev/shm`:** clientul și procesul lui web își împart memoria prin fișiere din `/dev/shm`
+  (`u<uid>-ValveIPCSharedObj-Steam`), deschise cu numele întreg. Android nu are `/dev/shm`; `libfxpath` îl duce
+  acum în `rootfs/dev/shm`.

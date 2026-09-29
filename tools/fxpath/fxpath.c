@@ -30,8 +30,10 @@
 #include <unistd.h>
 #include <utime.h>
 
+// "/dev/shm": Android has none; programs that share memory through files there (Valve's
+// Steam client and its web helper) name it outright. The rest of /dev is the phone's.
 static const char *const kPrefixes[] = { "/tmp", "/usr", "/etc", "/var", "/bin", "/sbin",
-                                         "/lib", "/opt", "/run", "/root", "/home", "/srv" };
+                                         "/lib", "/opt", "/run", "/root", "/home", "/srv", "/dev/shm" };
 static char g_root[PATH_MAX];
 static size_t g_root_len;
 static int g_debug;  // FXPATH_DEBUG=1: log every mapping to stderr

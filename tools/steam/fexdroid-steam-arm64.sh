@@ -70,7 +70,12 @@ export XDG_DATA_DIRS="$FXD_ROOT/usr/local/share:$FXD_ROOT/usr/share"
 # driver; ld.so opens the driver from Mesa's built-in /usr path, which it cannot find here.
 export LIBGL_DRIVERS_PATH="$FXD_ROOT/usr/lib/aarch64-linux-gnu/dri"
 export LIBGL_ALWAYS_SOFTWARE=1
-mkdir -p "$FXD_ROOT/tmp/dumps"
+# Mesa's software driver starts threads of its own when a program first draws. Chromium's
+# zygote refuses to go on if it finds a second thread in its process.
+export LP_NUM_THREADS=0
+mkdir -p "$FXD_ROOT/tmp/dumps" "$FXD_ROOT/dev/shm"
+# Left behind by a client that did not end by itself.
+rm -f "$FXD_ROOT"/dev/shm/u*-ValveIPCSharedObj-* "$FXD_ROOT"/dev/shm/u*-Shm_* 2>/dev/null || true
 [ -x "$FXD_ROOT/usr/bin/fxwmfit" ] && "$FXD_ROOT/usr/bin/fxwmfit" 2>/dev/null &
 
 log "starting the arm64 Steam client from $STEAMROOT"
