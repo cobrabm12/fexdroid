@@ -37,6 +37,7 @@ RUNTIME_PKGS=(
   libxtst6 libxrandr2 libxss1 libxcomposite1 libxdamage1 libxfixes3 libxi6 libxcursor1
   libxinerama1 libsm6 libice6 libatk1.0-0t64 libatk-bridge2.0-0t64 libpango-1.0-0 libcairo2
   libpipewire-0.3-0t64 libopenal1 libnm0 libibus-1.0-5 libva2 libva-drm2 libva-x11-2 libvdpau1
+  libsdl2-2.0-0                                      # gldriverquery of the client
 )
 # Extra packages only needed to cross-compile FEX/Mesa against this sysroot.
 DEV_PKGS=(

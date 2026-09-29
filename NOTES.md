@@ -1364,3 +1364,11 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
 - **`/dev/shm`:** clientul și procesul lui web își împart memoria prin fișiere din `/dev/shm`
   (`u<uid>-ValveIPCSharedObj-Steam`), deschise cu numele întreg. Android nu are `/dev/shm`; `libfxpath` îl duce
   acum în `rootfs/dev/shm`.
+- 🧪 **A patra pornire pe telefon (0.3.106), cu jurnalul procesului web în raport:** zygote-ul pornește (pe
+  telefon nu există firul în plus de sub qemu), Chromium 126 ajunge să ruleze, dar nu își poate face memoria
+  comună: „Creating shared memory in /dev/shm/.com.valvesoftware.Steam.XXXXXX failed: No such file or
+  directory”. Chromium o face cu `mkstemp`, iar `libfxpath` nu acoperea funcțiile cu nume-șablon (`mkstemp`,
+  `mkostemp`, `mkstemps`, `mkdtemp` și variantele `64`). Adăugate; șablonul se întoarce la apelant cu numele pe
+  care l-ar fi avut fără mutare. Verificat pe PC (`build/fextest/native/tmpname.c`).
+- Fără urmări: D-Bus lipsă, `NETLINK` refuzat (Chromium își află adresele de rețea altfel),
+  `/proc/sys/fs/inotify/max_user_watches` de necitit.

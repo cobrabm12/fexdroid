@@ -231,6 +231,62 @@ int posix_spawn(pid_t *pid, const char *p, const posix_spawn_file_actions_t *fa,
     return real_posix_spawn(pid, map(p, b), fa, at, argv, envp);
 }
 
+// ---- temporary files: the name is a pattern the function fills in -----------------------
+// Chromium makes its shared memory with mkstemp("/dev/shm/.com.valvesoftware.Steam.XXXXXX").
+// The caller gets the name it would have had without the mapping: it ends the same way.
+static void name_back(char *pattern, const char *mapped) {
+    size_t n = strlen(pattern), m = strlen(mapped);
+    if (m >= n) memcpy(pattern, mapped + (m - n), n);
+}
+int mkstemp(char *t) {
+    REAL(int, mkstemp, char *);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkstemp(t);
+    int r = real_mkstemp(b);
+    name_back(t, b);
+    return r;
+}
+int mkstemp64(char *t) {
+    REAL(int, mkstemp64, char *);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkstemp64(t);
+    int r = real_mkstemp64(b);
+    name_back(t, b);
+    return r;
+}
+int mkostemp(char *t, int flags) {
+    REAL(int, mkostemp, char *, int);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkostemp(t, flags);
+    int r = real_mkostemp(b, flags);
+    name_back(t, b);
+    return r;
+}
+int mkostemp64(char *t, int flags) {
+    REAL(int, mkostemp64, char *, int);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkostemp64(t, flags);
+    int r = real_mkostemp64(b, flags);
+    name_back(t, b);
+    return r;
+}
+int mkstemps(char *t, int suffix) {
+    REAL(int, mkstemps, char *, int);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkstemps(t, suffix);
+    int r = real_mkstemps(b, suffix);
+    name_back(t, b);
+    return r;
+}
+char *mkdtemp(char *t) {
+    REAL(char *, mkdtemp, char *);
+    char b[PATH_MAX];
+    if (map(t, b) == t) return real_mkdtemp(t);
+    char *r = real_mkdtemp(b);
+    name_back(t, b);
+    return r ? t : NULL;
+}
+
 // ---- *at variants -------------------------------------------------------------------
 int faccessat(int d, const char *p, int m, int f) {
     REAL(int, faccessat, int, const char *, int, int);
