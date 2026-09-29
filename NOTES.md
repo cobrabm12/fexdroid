@@ -1229,7 +1229,7 @@ bateria a scăzut de la 100% la 43% în două ore și jumătate de teste cu pauz
 - **Cât înseamnă în joc:** `libc` are 2,5% din firul principal și 2,9% din firele ajutătoare, deci câștigul
   așteptat e de 1–2%. Programul de test folosește șiruri mult mai mult decât jocul. În Steam și la încărcarea
   jocului (copieri multe) ar trebui să se vadă mai bine. 🟨 Nemăsurat în joc.
-- **De măsurat în joc când telefonul e pe încărcătorul de priză** (pe USB-ul PC-ului primește 68 mA): variabila
+- **De măsurat în joc când telefonul e pe încărcătorul de priză** (pe USB-ul PC-ului nu ține pasul sub joc): variabila
   de mai sus, AVX ascuns (prima măsurătoare, în N-046, era în zgomot), patch-ul `0005`. Pentru diferențe de 1–3%
   măsurătoarea din joc trebuie pornită de la un tick fix al replay-ului (`demo_gototick`), nu de la cursor.
 - **Armada OS** (găsit de Marius, `github.com/armada-os/armada`): aceeași bază FEX-2609, fără schimbări în
@@ -1384,3 +1384,10 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   fără eroare, și **clientul Steam nativ ARM64 desenează fereastra de autentificare** (cont + parolă și cod QR). Pe
   PC e nevoie în plus de `build/fextest/native/faketask.c`, fiindcă qemu adaugă un fir procesului; pe telefon nu.
 - Rootfs arm64: `libsdl2-2.0-0` pentru `gldriverquery` al clientului.
+- ✅ **Pe telefon (0.3.108, Xiaomi 23090RA98G, Dimensity 7200, Mali, Android 16): clientul Steam nativ ARM64
+  pornește** (confirmat de Marius, 2026-09-29 ~04:45). Primul client Steam ARM64 al lui Valve care rulează pe un
+  telefon Android prin mediul nostru, fără root și fără să modificăm fișierele lui Valve. Nemăsurat încă:
+  memorie și procesor față de clientul tradus; ce merge după autentificare; jocurile (neconectate).
+- Corectură: bateria Realme-ului s-a încărcat de la 24% la 79% în 3½ ore pe USB-ul PC-ului, cu ecranul stins și
+  Wi-Fi oprit. Valoarea „Battery current” din `dumpsys battery` (−66…−68) nu e în mA, cum am scris în N-047;
+  portul dă până la ~0,9 A, destul cât telefonul stă, prea puțin sub joc.
