@@ -11,6 +11,9 @@ starts itself again through that link as before (Chromium does).
 
 Needed for Valve's native arm64 Steam client, whose files are not changed.
 See NOTES.md N-050.
+
+get_robust_list answers with glibc's own list of the thread (set_robust_list is
+trapped by Android's filter, so the kernel has none): Valve's client asks for it.
 diff --color -urN a/sysdeps/unix/sysv/linux/aarch64/execve.c b/sysdeps/unix/sysv/linux/aarch64/execve.c
 --- a/sysdeps/unix/sysv/linux/aarch64/execve.c
 +++ b/sysdeps/unix/sysv/linux/aarch64/execve.c
@@ -354,6 +357,64 @@ diff --color -urN a/sysdeps/unix/sysv/linux/aarch64/fxd-exe.h b/sysdeps/unix/sys
 +extern int __fxd_is_self_exe (const char *path) attribute_hidden;
 +
 +#endif /* fxd-exe.h */
+diff --color -urN a/sysdeps/unix/sysv/linux/aarch64/fxd-syscall.c b/sysdeps/unix/sysv/linux/aarch64/fxd-syscall.c
+--- a/sysdeps/unix/sysv/linux/aarch64/fxd-syscall.c
++++ b/sysdeps/unix/sysv/linux/aarch64/fxd-syscall.c
+@@ -7,6 +7,10 @@
+ #include <sys/socket.h>
+ #include <sysdep.h>
+ #include <fxshm.h>
++#include <ldsodefs.h>
++#include <list.h>
++#include <lowlevellock.h>
++#include <pthreadP.h>
+ #include "fxd-android-seccomp.h"
+ 
+ extern long int __fxd_raw_syscall (long int number, ...);
+@@ -50,6 +54,43 @@
+ 			    (unsigned long int) a3);
+       case __NR_accept:
+ 	return accept4 ((int) a0, (struct sockaddr *) a1, (socklen_t *) a2, 0);
++      case __NR_get_robust_list:
++	{
++	  /* The list set_robust_list would have given the kernel is glibc's
++	     own, in the thread's descriptor.  Valve's Steam client asks for
++	     it to put its locks in shared memory on it, and falls over a
++	     NULL when there is none.  */
++	  struct pthread *self = THREAD_SELF;
++	  struct pthread *pd = NULL;
++	  if (a0 == 0 || a0 == THREAD_GETMEM (self, tid))
++	    pd = self;
++	  else
++	    {
++	      lll_lock (GL (dl_stack_cache_lock), LLL_PRIVATE);
++	      list_t *runp;
++	      list_for_each (runp, &GL (dl_stack_used))
++		{
++		  struct pthread *t = list_entry (runp, struct pthread, list);
++		  if (t->tid == a0)
++		    pd = t;
++		}
++	      list_for_each (runp, &GL (dl_stack_user))
++		{
++		  struct pthread *t = list_entry (runp, struct pthread, list);
++		  if (t->tid == a0)
++		    pd = t;
++		}
++	      lll_unlock (GL (dl_stack_cache_lock), LLL_PRIVATE);
++	    }
++	  if (pd == NULL || a1 == 0 || a2 == 0)
++	    {
++	      __set_errno (pd == NULL ? ESRCH : EFAULT);
++	      return -1;
++	    }
++	  *(void **) a1 = &pd->robust_head;
++	  *(size_t *) a2 = sizeof (struct robust_list_head);
++	  return 0;
++	}
+       case __NR_set_robust_list:
+ 	/* Accept the registration; only the kernel's cleanup of robust
+ 	   mutexes held by a dying thread is lost (see patch 0001).  */
 diff --color -urN a/sysdeps/unix/sysv/linux/aarch64/Makefile b/sysdeps/unix/sysv/linux/aarch64/Makefile
 --- a/sysdeps/unix/sysv/linux/aarch64/Makefile
 +++ b/sysdeps/unix/sysv/linux/aarch64/Makefile

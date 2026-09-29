@@ -1336,3 +1336,14 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   („Update complete, launching...”) și s-a încheiat cu codul 42. Codul 42 înseamnă „pornește-mă din nou”;
   `steam.sh` al lui Valve face asta într-o buclă, scriptul nostru pornea clientul o singură dată. Reparat: bucla
   e acum și în `fexdroid-steam-arm64.sh`. Interfața: încă nevăzută.
+- 🧪 **A doua pornire pe telefon: „Segmentation fault” (cod 139)** imediat după pornirea lui `steamwebhelper`,
+  în același loc ca pe PC sub qemu. Cauza, văzută cu `QEMU_STRACE=1`: clientul cere `get_robust_list(0, ...)`
+  (își pune blocările din memoria comună `ValveIPCSharedObj` pe lista firului) și cade pe un pointer nul când
+  nu primește lista. Android oprește `set_robust_list`/`get_robust_list` prin seccomp, iar `syscall()` din
+  glibc-ul nostru răspundea cu `ENOSYS`. Acum răspunde cu lista pe care glibc o ține oricum în descriptorul
+  firului (`pd->robust_head`), și pentru alt fir al aceluiași proces. Ce se pierde rămâne ce se pierdea:
+  kernelul nu eliberează blocările unui fir care moare.
+- 🧪 **După reparație, pe PC:** `steam` rămâne pornit (355 MB), `steamwebhelper` pornește și scrie jurnalul
+  Chromium; apoi „GPU process launch failed: error_code=1002” de câteva ori și „GPU process isn't usable”,
+  iar Steam îl repornește în buclă. `-cef-in-process-gpu` nu a schimbat nimic. Nu știu încă dacă e de la
+  emularea de pe PC sau se va vedea și pe telefon.
