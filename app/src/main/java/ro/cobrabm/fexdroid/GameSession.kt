@@ -125,7 +125,8 @@ object GameSession {
         val arm64 = (state as? SessionState.Running)?.game == Game.STEAM_ARM64 ||
             (state as? SessionState.Exited)?.game == Game.STEAM_ARM64 || (state as? SessionState.Failed)?.game == Game.STEAM_ARM64
         val steamLogs = if (arm64) File(env.files, "home-arm64/.local/share/Steam/logs") else File(env.home, ".local/share/Steam/logs")
-        val names = if (arm64) listOf("steamwebhelper.log", "cef_log.txt", "steamui_system.txt", "bootstrap_log.txt", "stderr.txt")
+        val names = if (arm64) listOf("transport_client.txt", "steamwebhelper.log", "cef_log.txt", "steamui_system.txt",
+                "bootstrap_log.txt", "stderr.txt")
             else listOf("content_log.txt", "bootstrap_log.txt", "console-linux.txt", "stderr.txt")
         for (name in names) {
             val f = File(steamLogs, name)

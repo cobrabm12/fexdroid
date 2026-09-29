@@ -21,6 +21,8 @@
 #include <spawn.h>
 #include <stdint.h>
 #include <sys/inotify.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -400,6 +402,82 @@ int execl(const char *p, const char *arg, ...) {
     return execv(p, argv);
 }
 
+// ---- TCP sockets: which process owns which, for lsof (tools/lsof/fxlsof.c) -----------
+// Steam's client checks the peer of its UI websocket with lsof, and Android lets an app read
+// neither /proc/net/tcp nor NETLINK_SOCK_DIAG. FEX writes a record per socket for x86 guests
+// (patches/fex/src/AndroidTcpRegistry.h); this writes the same records for native programs:
+// one file per socket inode, "<pid> <local addr> <port> <remote addr> <port>\n".
+static void tcp_format(const struct sockaddr_storage *ss, char *out, size_t len) {
+    char ip[INET6_ADDRSTRLEN] = "?";
+    unsigned port = 0;
+    if (ss->ss_family == AF_INET) {
+        const struct sockaddr_in *a = (const struct sockaddr_in *)ss;
+        inet_ntop(AF_INET, &a->sin_addr, ip, sizeof ip);
+        port = ntohs(a->sin_port);
+    } else if (ss->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *a = (const struct sockaddr_in6 *)ss;
+        inet_ntop(AF_INET6, &a->sin6_addr, ip, sizeof ip);
+        port = ntohs(a->sin6_port);
+    } else {
+        snprintf(out, len, "- 0");
+        return;
+    }
+    snprintf(out, len, "%s %u", ip, port);
+}
+
+// `remote`: the connect() address, while a non-blocking connect is still in progress.
+static void record_tcp(int fd, const struct sockaddr *remote, socklen_t rlen) {
+    if (!g_root_len) return;
+    int saved = errno;
+    struct sockaddr_storage local = {0}, peer = {0};
+    socklen_t llen = sizeof local, plen = sizeof peer;
+    int type = 0;
+    socklen_t tlen = sizeof type;
+    struct stat st;
+    if (getsockname(fd, (struct sockaddr *)&local, &llen) != 0 ||
+        (local.ss_family != AF_INET && local.ss_family != AF_INET6) ||
+        getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &tlen) != 0 || type != SOCK_STREAM || fstat(fd, &st) != 0) {
+        errno = saved;
+        return;
+    }
+    if (getpeername(fd, (struct sockaddr *)&peer, &plen) != 0) {
+        memset(&peer, 0, sizeof peer);
+        if (remote && rlen <= sizeof peer) memcpy(&peer, remote, rlen);
+    }
+    char dir[PATH_MAX], path[PATH_MAX + 32], tmp[PATH_MAX + 64], l[INET6_ADDRSTRLEN + 8], r[INET6_ADDRSTRLEN + 8], line[128];
+    snprintf(dir, sizeof dir, "%s/usr/share/fex-emu/fexdroid-tcp", g_root);
+    mkdir(dir, 0700);
+    tcp_format(&local, l, sizeof l);
+    tcp_format(&peer, r, sizeof r);
+    int n = snprintf(line, sizeof line, "%d %s %s\n", getpid(), l, r);
+    snprintf(path, sizeof path, "%s/%lu", dir, (unsigned long)st.st_ino);
+    snprintf(tmp, sizeof tmp, "%s.%d", path, gettid());
+    int out = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (out >= 0) {
+        int ok = n > 0 && write(out, line, (size_t)n) == n;
+        close(out);
+        if (!ok || rename(tmp, path) != 0) unlink(tmp);
+    }
+    errno = saved;
+}
+
+static int is_inet(const struct sockaddr *sa) {
+    return sa && (sa->sa_family == AF_INET || sa->sa_family == AF_INET6);
+}
+
+int accept(int fd, struct sockaddr *sa, socklen_t *len) {
+    REAL(int, accept, int, struct sockaddr *, socklen_t *);
+    int r = real_accept(fd, sa, len);
+    if (r >= 0) record_tcp(r, NULL, 0);
+    return r;
+}
+int accept4(int fd, struct sockaddr *sa, socklen_t *len, int flags) {
+    REAL(int, accept4, int, struct sockaddr *, socklen_t *, int);
+    int r = real_accept4(fd, sa, len, flags);
+    if (r >= 0) record_tcp(r, NULL, 0);
+    return r;
+}
+
 // ---- AF_UNIX filesystem sockets (abstract names start with '\0' and pass) ----------
 static const struct sockaddr *map_sun(const struct sockaddr *sa, socklen_t *len, struct sockaddr_un *tmp) {
     if (!sa || sa->sa_family != AF_UNIX || *len <= offsetof(struct sockaddr_un, sun_path)) return sa;
@@ -418,11 +496,15 @@ int bind(int fd, const struct sockaddr *sa, socklen_t len) {
     REAL(int, bind, int, const struct sockaddr *, socklen_t);
     struct sockaddr_un t;
     const struct sockaddr *m = map_sun(sa, &len, &t);
-    return real_bind(fd, m, len);
+    int r = real_bind(fd, m, len);
+    if (r == 0 && is_inet(sa)) record_tcp(fd, NULL, 0);
+    return r;
 }
 int connect(int fd, const struct sockaddr *sa, socklen_t len) {
     REAL(int, connect, int, const struct sockaddr *, socklen_t);
     struct sockaddr_un t;
     const struct sockaddr *m = map_sun(sa, &len, &t);
-    return real_connect(fd, m, len);
+    int r = real_connect(fd, m, len);
+    if (is_inet(sa) && (r == 0 || errno == EINPROGRESS)) record_tcp(fd, sa, len);
+    return r;
 }

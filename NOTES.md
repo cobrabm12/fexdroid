@@ -1372,3 +1372,15 @@ dintr-un nucleu în timpul jocului). Valve publică un client compilat pentru AR
   care l-ar fi avut fără mutare. Verificat pe PC (`build/fextest/native/tmpname.c`).
 - Fără urmări: D-Bus lipsă, `NETLINK` refuzat (Chromium își află adresele de rețea altfel),
   `/proc/sys/fs/inotify/max_user_watches` de necitit.
+- 🧪 **A cincea pornire pe telefon (0.3.107):** procesul web rulează fără erori și face o fereastră, dar clientul
+  scrie „Failed to connect to websocket” după ce cheamă `lsof` de vreo 20 de ori („lsof: not found”). E aceeași
+  verificare ca la clientul x86 (N-028): clientul întreabă cu `lsof -P -F upnR -i TCP@127.0.0.1:<port>` cine e la
+  celălalt capăt al websocket-ului interfeței și refuză conexiunea dacă nu află. La clientul x86 răspunde
+  `fxlsof` din registrul de socket-uri scris de FEX; procesele native nu trec prin FEX, deci nu le nota nimeni.
+- **Reparația:** `libfxpath` scrie același registru la `connect`, `bind`, `accept`, `accept4` (un fișier pe inode,
+  `"<pid> <adresă locală> <port> <adresă> <port>"`), iar `fxlsof` e construit și pentru arm64, în rootfs. Testat pe
+  PC cu un server și un client în două procese: `lsof` arată ambele capete, cu proces, părinte și utilizator.
+- ✅ **Pe PC, sub qemu:** `transport_client.txt` arată „Websocket connection from: https://steamloopback.host”,
+  fără eroare, și **clientul Steam nativ ARM64 desenează fereastra de autentificare** (cont + parolă și cod QR). Pe
+  PC e nevoie în plus de `build/fextest/native/faketask.c`, fiindcă qemu adaugă un fir procesului; pe telefon nu.
+- Rootfs arm64: `libsdl2-2.0-0` pentru `gldriverquery` al clientului.
