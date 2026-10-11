@@ -140,10 +140,14 @@ def validate(sc):
             errors.append(f"variants[{i}]: name {v['name']!r} used twice")
         names.add(v["name"])
         for k in v:
-            if k not in ("name", "session_env", "launch_options", "files", "game", "note"):
+            if k not in ("name", "session_env", "launch_options", "files", "root_files", "game", "note"):
                 errors.append(f"variants[{i}]: unknown key {k!r}")
         if not all(isinstance(x, str) and "=" in x for x in v.get("session_env", [])):
             errors.append(f"variants[{i}].session_env: KEY=VALUE strings")
+        rf = v.get("root_files", {})
+        if not isinstance(rf, dict) or not all(isinstance(t, str) and re.fullmatch(r"/(sys|proc)/[A-Za-z0-9_./-]+", f)
+                                                for f, t in rf.items()):
+            errors.append(f"variants[{i}].root_files: {{\"/sys/... or /proc/...\": \"value\"}}")
         if v.get("game", "steam") not in ("steam", "dota", "steam-arm64"):
             errors.append(f"variants[{i}].game: steam, dota or steam-arm64 (the session start_session starts)")
         files = v.get("files", {})
@@ -184,6 +188,7 @@ class Runner:
         self.samples = []      # dicts: variant, round, label, fps, ...
         self.failures = []
         self._restore = {}     # app files we overwrote -> previous text (None: did not exist)
+        self._root_restore = {}  # kernel settings (root) we changed -> previous value
 
     # Guards -----------------------------------------------------------------------------
     def guard_power(self):
@@ -313,6 +318,12 @@ class Runner:
         self.dev.write_app_file(rel, text)
 
     def restore_files(self):
+        for path, value in self._root_restore.items():
+            try:
+                self.dev.write_root_file(path, value)
+            except DeviceError as e:
+                self.out(f"warning: could not put back {path}: {e}")
+        self._root_restore.clear()
         for rel, text in self._restore.items():
             try:
                 if text is None:
@@ -345,6 +356,15 @@ class Runner:
             opts.update(self.variant.get("launch_options", {}))
             for appid, line in opts.items():
                 self.write(f"launch-options-{appid}.txt", line + "\n")
+            # Kernel settings (root): the variant's value, or the one found before the run.
+            mine_root = self.variant.get("root_files", {})
+            for path in sorted({f for v in self.sc["variants"] for f in v.get("root_files", {})}):
+                if path not in self._root_restore:
+                    current = self.dev.read_root_file(path)
+                    # /sys/kernel/mm/transparent_hugepage/enabled shows "always madvise [never]"
+                    chosen = re.search(r"\[(\w+)\]", current)
+                    self._root_restore[path] = chosen.group(1) if chosen else current
+                self.dev.write_root_file(path, mine_root.get(path, self._root_restore[path]))
             # A file one variant writes is put back as it was for the variants that do not.
             mine = self.variant.get("files", {})
             for rel in sorted({f for v in self.sc["variants"] for f in v.get("files", {})}):

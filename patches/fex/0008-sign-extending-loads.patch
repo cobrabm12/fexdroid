@@ -1,0 +1,150 @@
+From: fexdroid
+Subject: [PATCH] JIT: sign-extending loads for movsx/movsxd from memory
+
+FEX-2609 has no sign-extending load: `movsx r32, word [mem]` becomes ldrh + sxth,
+`movsxd r64, dword [mem]` ldr + sxtw. A new IR op, LoadMemSExt, is lowered to
+ldrsb/ldrsh/ldrsw and used by MOVSX/MOVSXD when the source is in memory and the
+load does not have to be ordered (TSO off, as in the modules of patch 0004; the
+ordered loads, ldapr*, have no sign-extending forms before RCPC2).
+
+The disk cache format version gets a value of our own: the local codegen patches
+change the generated code without changing a config value, and code cached before
+them would otherwise be reused.
+
+---
+--- a/FEXCore/Source/Interface/IR/IR.json
++++ b/FEXCore/Source/Interface/IR/IR.json
+@@ -533,6 +533,14 @@
+         "DestSize": "Size"
+       },
+ 
++      "GPR = LoadMemSExt OpSize:#Size, OpSize:$SrcSize, GPR:$Addr, GPR:$Offset, MemOffsetType:$OffsetType, u8:$OffsetScale": {
++        "Desc": ["Loads SrcSize bytes from memory and sign extends them to Size (ldrsb/ldrsh/ldrsw).",
++                 "Plain (non-TSO) loads only. A 32-bit Size zeroes the upper 32 bits."
++                ],
++        "Inline": ["", "Mem"],
++        "DestSize": "Size"
++      },
++
+       "SSA:$Value1, SSA:$Value2 = LoadMemPair RegisterClass:$Class, OpSize:#Size, GPR:$Addr, u32:$Offset": {
+         "Desc": ["Load a pair of values from memory."],
+         "DestSize": "Size",
+--- a/FEXCore/Source/Interface/Core/JIT/MemoryOps.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/MemoryOps.cpp
+@@ -738,6 +738,35 @@
+   }
+ }
+ 
++DEF_OP(LoadMemSExt) {
++  const auto Op = IROp->C<IR::IROp_LoadMemSExt>();
++  const auto MemSrc = GenerateMemOperand(Op->SrcSize, GetReg(Op->Addr), Op->Offset, Op->OffsetType, Op->OffsetScale);
++  const auto Dst = GetReg(Node);
++  const bool Wide = IROp->Size == IR::OpSize::i64Bit;
++
++  switch (Op->SrcSize) {
++  case IR::OpSize::i8Bit:
++    if (Wide) {
++      ldrsb(Dst.X(), MemSrc);
++    } else {
++      ldrsb(Dst.W(), MemSrc);
++    }
++    break;
++  case IR::OpSize::i16Bit:
++    if (Wide) {
++      ldrsh(Dst.X(), MemSrc);
++    } else {
++      ldrsh(Dst.W(), MemSrc);
++    }
++    break;
++  case IR::OpSize::i32Bit:
++    LOGMAN_THROW_A_FMT(Wide, "LoadMemSExt: a 32-bit source needs a 64-bit result");
++    ldrsw(Dst.X(), MemSrc);
++    break;
++  default: LOGMAN_MSG_A_FMT("Unhandled LoadMemSExt size: {}", Op->SrcSize); break;
++  }
++}
++
+ DEF_OP(LoadMemPair) {
+   const auto Op = IROp->C<IR::IROp_LoadMemPair>();
+   const auto Addr = GetReg(Op->Addr);
+--- a/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp
++++ b/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp
+@@ -1039,6 +1039,13 @@
+   auto Size = std::min<IR::OpSize>(OpSize::i32Bit, OpSizeFromSrc(Op));
+   bool Sext = (Size != OpSize::i16Bit) && Op->Flags & FEXCore::X86Tables::DecodeFlags::FLAG_REX_WIDENING;
+ 
++  if (Sext) {
++    if (Ref Loaded = LoadSourceGPRSExt(Op, Op->Src[0], Size, OpSize::i64Bit)) {
++      StoreResultGPR(Op, Loaded);
++      return;
++    }
++  }
++
+   Ref Src = LoadSourceGPR_WithOpSize(Op, Op->Src[0], Size, Op->Flags, {.AllowUpperGarbage = Sext});
+   if (Size == OpSize::i16Bit) {
+     // This'll make sure to insert in to the lower 16bits without modifying upper bits
+@@ -1053,15 +1060,38 @@
+   }
+ }
+ 
++Ref OpDispatchBuilder::LoadSourceGPRSExt(const X86Tables::DecodedOp& Op, const X86Tables::DecodedOperand& Operand, IR::OpSize SrcSize,
++                                          IR::OpSize DstSize) {
++  // fexdroid: a load from memory sign extends itself (ldrsb/ldrsh/ldrsw) instead of
++  // ldrb/ldrh/ldr + sxtb/sxth/sxtw. Only plain loads: the TSO ones (ldapr*) have no
++  // sign-extending forms before RCPC2.
++  if (!IsOperandMem(Operand, true)) {
++    return nullptr;
++  }
++  AddressMode A = DecodeAddress(Op, Operand, MemoryAccessType::DEFAULT, true /* IsLoad */);
++  if (IsTSOEnabled(RegClass::GPR) && !A.NonTSO) {
++    return nullptr;
++  }
++  const auto B = SelectAddressMode(this, A, GetGPROpSize(), CTX->HostFeatures.SupportsTSOImm9, false, false, SrcSize);
++  return _LoadMemSExt(DstSize, SrcSize, B.Base, B.Index, B.IndexType, B.IndexScale);
++}
++
+ void OpDispatchBuilder::MOVSXOp(OpcodeArgs) {
+   // Load garbage in upper bits, since we're sign extending anyway
+   const auto Size = OpSizeFromSrc(Op);
++  const auto DstSize = OpSizeFromDst(Op);
++  const auto ExtSize = DstSize == OpSize::i64Bit ? OpSize::i64Bit : OpSize::i32Bit;
++
++  if (Ref Loaded = LoadSourceGPRSExt(Op, Op->Src[0], Size, ExtSize)) {
++    StoreResultGPR(Op, Op->Dest, Loaded);
++    return;
++  }
++
+   Ref Src = LoadSourceGPR(Op, Op->Src[0], Op->Flags, {.AllowUpperGarbage = true});
+ 
+   // Sign-extend to DstSize and zero-extend to the register size, using a fast
+   // path for 32-bit dests where the native 32-bit Sbfe zero extends the top.
+-  const auto DstSize = OpSizeFromDst(Op);
+-  Src = _Sbfe(DstSize == OpSize::i64Bit ? OpSize::i64Bit : OpSize::i32Bit, IR::OpSizeAsBits(Size), 0, Src);
++  Src = _Sbfe(ExtSize, IR::OpSizeAsBits(Size), 0, Src);
+   StoreResultGPR(Op, Op->Dest, Src);
+ }
+ 
+--- a/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
++++ b/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
+@@ -1566,6 +1566,8 @@
+ 
+   Ref LoadSource_WithOpSize(RegClass Class, const X86Tables::DecodedOp& Op, const X86Tables::DecodedOperand& Operand, IR::OpSize OpSize,
+                             uint32_t Flags, const LoadSourceOptions& Options = {});
++  // A memory source loaded with sign extension in one instruction, or nullptr (register, TSO).
++  Ref LoadSourceGPRSExt(const X86Tables::DecodedOp& Op, const X86Tables::DecodedOperand& Operand, IR::OpSize SrcSize, IR::OpSize DstSize);
+   Ref LoadSourceGPR_WithOpSize(const X86Tables::DecodedOp& Op, const X86Tables::DecodedOperand& Operand, IR::OpSize OpSize, uint32_t Flags,
+                                const LoadSourceOptions& Options = {}) {
+     return LoadSource_WithOpSize(RegClass::GPR, Op, Operand, OpSize, Flags, Options);
+--- a/FEXCore/include/FEXCore/Core/DiskCache.h
++++ b/FEXCore/include/FEXCore/Core/DiskCache.h
+@@ -223,7 +223,9 @@
+ 
+   // TODO: This header is in global installed header path, but uses internal headers.
+   // Migrate this once that is fixed.
+-  static constexpr uint16_t FormatVersion = 19;
++  // fexdroid: local codegen patches (0004, 0008...) change the code without a config value,
++  // so cached code from before them must not be reused.
++  static constexpr uint16_t FormatVersion = 0xF008;
+   FEX_DEFAULT_VISIBILITY uint16_t GetFormatVersion();
+ 
+ } // namespace DiskCache

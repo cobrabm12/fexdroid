@@ -143,6 +143,17 @@ class Device:
         else:
             self.control("steam-url", url)
 
+    def read_root_file(self, path):
+        """A kernel setting (/sys, /proc) read as root; the phone must be rooted."""
+        if not re.fullmatch(r"/(sys|proc)/[A-Za-z0-9_./-]+", path) or ".." in path:
+            raise DeviceError(f"not a /sys or /proc path: {path}")
+        return self.shell(f"su -c {shlex.quote('cat ' + path)}").strip()
+
+    def write_root_file(self, path, value):
+        if not re.fullmatch(r"/(sys|proc)/[A-Za-z0-9_./-]+", path) or ".." in path:
+            raise DeviceError(f"not a /sys or /proc path: {path}")
+        self.shell(f"su -c {shlex.quote('echo ' + shlex.quote(value) + ' > ' + path)}")
+
     def write_app_file(self, rel_path, text):
         """files/<rel_path> in the app's data, through /data/local/tmp (run-as reads it there)."""
         if rel_path.startswith("/") or ".." in rel_path.split("/"):

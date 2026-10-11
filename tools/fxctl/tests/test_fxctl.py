@@ -147,6 +147,7 @@ class FakePhone:
         self.charging, self.locked = charging, locked
         self.fps_by_env = fps_by_env or {}
         self.files = {"session-env.txt": "MY_EXPERIMENT=1\n"}
+        self.root = {"/sys/kernel/mm/transparent_hugepage/enabled": "always madvise [never]"}
         self.t_ms = 0
         self.frames = 0
         self.state = "Idle"
@@ -224,6 +225,12 @@ class FakePhone:
 
     def kill_matching(self, pattern):
         return []
+
+    def read_root_file(self, path):
+        return self.root.get(path, "")
+
+    def write_root_file(self, path, value):
+        self.root[path] = value
 
     def process_memory(self, pattern):
         return {"rss_mb": 2400, "swap_mb": 3500, "available_mb": 1300, "swap_free_mb": 1100}
@@ -309,6 +316,22 @@ class Running(unittest.TestCase):
             r.step({"do": "apply_variant"}, 0)
             self.assertEqual(phone.files["tuner.txt"], "pin\n")
             self.assertNotIn("new.txt", phone.files)
+
+    def test_root_files(self):
+        phone = FakePhone()
+        thp = "/sys/kernel/mm/transparent_hugepage/enabled"
+        sc = scenario.validate({"name": "x", "run": [{"do": "apply_variant"}], "variants": [
+            {"name": "thp", "root_files": {thp: "madvise"}}, {"name": "base"}]})
+        seen = []
+        with tempfile.TemporaryDirectory() as d:
+            r, _ = fast_runner(phone, sc, d)
+            real = phone.write_root_file
+            phone.write_root_file = lambda p, v: (seen.append(v), real(p, v))
+            r.run()
+        self.assertEqual(seen[:2], ["madvise", "never"])   # thp round, base round
+        self.assertEqual(phone.root[thp], "never")           # put back at the end
+        with self.assertRaises(scenario.ScenarioError):
+            scenario.validate({"name": "x", "run": [], "variants": [{"name": "a", "root_files": {"/data/x": "1"}}]})
 
     def test_variant_game(self):
         phone = FakePhone()
