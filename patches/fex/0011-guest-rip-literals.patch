@@ -1,0 +1,233 @@
+From: fexdroid
+Subject: [PATCH] JIT: load call return addresses from a literal pool
+
+A call pushes its return address to the guest stack and to the call-ret
+stack. The address is a guest RIP, built with movz+movk+movk for a 64-bit
+guest above 4GB (Dota 2 code sits at 0x73xxxxxxxx), and with four
+instructions whenever relocatable constants are on (DiskCache writing, code
+cache validation), because relocated moves are padded.
+
+The return address is only stored, so a load is as good as a move chain
+there. It now comes from a new IR op, EntrypointOffsetLiteral, which the
+backend emits as one `ldr xN, <literal>` (`ldr wN` for a 32-bit guest,
+which loads the low half). The literals are placed in a pool after the jump
+thunks of the multiblock, out of the straight-line code, 8-byte aligned.
+Each slot carries a RELOC_GUEST_RIP_LITERAL relocation, the type the jump
+thunks and the block tail already use for their GuestRIP fields, so
+DiskCache stores it relative to the block entry and fixes it up when cached
+code is loaded at another guest base. The load is PC-relative and moves
+with the code when the temporary buffer is copied, so it needs no fixup.
+
+Moves stay where they are as short: a guest RIP below 4GB without
+relocation padding (at most two moves). They also stay when the multiblock
+was restarted with far jumps; a load out of the +-1MB range restarts the
+compilation that way, through the existing bind-or-restart path.
+
+Every other EntrypointOffset (RIP-relative data bases, compares, atomics)
+keeps the move chain: there the value feeds an address or a compare, and a
+load from a code line, likely missing in L1D, would be on the critical path.
+
+Local patch, not upstream.
+---
+diff --git a/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp b/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
+index 3691bca..3535597 100644
+--- a/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
+@@ -64,6 +64,19 @@ DEF_OP(EntrypointOffset) {
+   InsertGuestRIPMove(GetReg(Node), Constant & Mask);
+ }
+ 
++DEF_OP(EntrypointOffsetLiteral) {
++  auto Op = IROp->C<IR::IROp_EntrypointOffsetLiteral>();
++
++  auto Constant = Entry + Op->Offset;
++  uint64_t Mask = ~0ULL;
++  const auto OpSize = IROp->Size;
++  if (OpSize == IR::OpSize::i32Bit) {
++    Mask = 0xFFFF'FFFFULL;
++  }
++
++  InsertGuestRIPLiteralLoad(GetReg(Node), Constant & Mask, OpSize);
++}
++
+ DEF_OP(PatchableGuestData) {
+   auto Op = IROp->C<IR::IROp_PatchableGuestData>();
+   InsertGuestPatchableDataMove(GetReg(Node), Op->Value, Op->SiteAddress, (uint8_t)Op->SiteSize);
+diff --git a/FEXCore/Source/Interface/Core/JIT/Arm64Relocations.cpp b/FEXCore/Source/Interface/Core/JIT/Arm64Relocations.cpp
+index 5877844..b55811f 100644
+--- a/FEXCore/Source/Interface/Core/JIT/Arm64Relocations.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/Arm64Relocations.cpp
+@@ -103,6 +103,47 @@ void Arm64JITCore::InsertGuestRIPMove(ARMEmitter::Register Reg, uint64_t Constan
+   Relocations.emplace_back(MoveABI);
+ }
+ 
++void Arm64JITCore::InsertGuestRIPLiteralLoad(ARMEmitter::Register Reg, uint64_t Constant, IR::OpSize Size) {
++  const bool Is32Bit = Size == IR::OpSize::i32Bit;
++
++  // Without relocation padding, a guest RIP below 4GB takes at most two moves. One load isn't worth its
++  // latency and the data cache line it touches there. Higher addresses take three moves, and with
++  // relocation padding every guest RIP takes four.
++  const bool ShortMove = !SupportCodeRelocations && (Is32Bit || (Constant >> 32) == 0);
++
++  // The literal pool sits after the jump thunks, out of reach of a literal load (+-1MB) only in a
++  // multiblock large enough to need far branches. Use moves there.
++  if (ShortMove || RequiresFarARM64Jumps) {
++    InsertGuestRIPMove(Reg, Constant);
++    return;
++  }
++
++  auto& Lit = PendingGuestRIPLiterals.emplace_back(PendingGuestRIPLiteral {.GuestRIP = Constant, .Label = {}});
++  if (Is32Bit) {
++    // Loads the lower half of the 64-bit literal, which is also correct after relocation.
++    ldr(Reg.W(), &Lit.Label);
++  } else {
++    ldr(Reg.X(), &Lit.Label);
++  }
++}
++
++void Arm64JITCore::PlaceGuestRIPLiterals() {
++  if (PendingGuestRIPLiterals.empty()) {
++    return;
++  }
++
++  // Natural alignment for the 64-bit loads. The code is copied to a 16B aligned location, and DiskCache loads it to one.
++  Align(8);
++  for (auto& Pending : PendingGuestRIPLiterals) {
++    auto Lit = InsertGuestRIPLiteral(Pending.GuestRIP);
++    Lit.Loc = std::move(Pending.Label);
++    // Binds the label, emits the literal and records a RELOC_GUEST_RIP_LITERAL at its offset.
++    // Restarts the compilation with far jumps when a load is out of range.
++    PlaceNamedSymbolLiteral(std::move(Lit));
++  }
++  PendingGuestRIPLiterals.clear();
++}
++
+ auto Arm64JITCore::InsertGuestPatchableRIPLiteral(uint64_t GuestRIP, uint64_t SiteAddress, uint8_t ValueSize) -> NamedSymbolLiteralPair {
+   return {
+     .Lit = GuestRIP,
+diff --git a/FEXCore/Source/Interface/Core/JIT/JIT.cpp b/FEXCore/Source/Interface/Core/JIT/JIT.cpp
+index c23f01a..6262aac 100644
+--- a/FEXCore/Source/Interface/Core/JIT/JIT.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/JIT.cpp
+@@ -871,6 +871,7 @@ CPUBackend::CompiledCode Arm64JITCore::CompileCode(uint64_t Entry, uint64_t Size
+   JumpTargets.clear();
+   CallReturnTargets.clear();
+   PendingJumpThunks.clear();
++  PendingGuestRIPLiterals.clear();
+   JumpTargets.resize(IR->GetHeader()->BlockCount, {});
+   Relocations.resize(PrevNumAllocations, FEXCore::CPU::Relocation::Default()); // Discard any relocations generated from a previous attempt
+ 
+@@ -1033,6 +1034,9 @@ CPUBackend::CompiledCode Arm64JITCore::CompileCode(uint64_t Entry, uint64_t Size
+   BindOrRestart(&l_ExitLink);
+   PlaceNamedSymbolLiteral(InsertNamedSymbolLiteral(RelocNamedSymbolLiteral::NamedSymbol::SYMBOL_LITERAL_EXITFUNCTION_LINKER));
+ 
++  // Literal pool of the guest RIPs loaded by InsertGuestRIPLiteralLoad, out of the straight-line code.
++  PlaceGuestRIPLiterals();
++
+   // CodeSize not including the header or tail data.
+   const uint64_t CodeOnlySize = GetCursorAddress<uint8_t*>() - CodeBegin;
+ 
+diff --git a/FEXCore/Source/Interface/Core/JIT/JITClass.h b/FEXCore/Source/Interface/Core/JIT/JITClass.h
+index 8758f9a..ee6ee92 100644
+--- a/FEXCore/Source/Interface/Core/JIT/JITClass.h
++++ b/FEXCore/Source/Interface/Core/JIT/JITClass.h
+@@ -110,6 +110,14 @@ private:
+   };
+   fextl::vector<PendingJumpThunk> PendingJumpThunks;
+ 
++  // Guest RIP values loaded with `ldr <literal>`, placed in a pool after the jump thunks of the multiblock.
++  // Each pool slot carries a RELOC_GUEST_RIP_LITERAL relocation, like the GuestRIP field of the jump thunks.
++  struct PendingGuestRIPLiteral {
++    uint64_t GuestRIP;
++    ARMEmitter::ForwardLabel Label;
++  };
++  fextl::vector<PendingGuestRIPLiteral> PendingGuestRIPLiterals;
++
+   Utils::PoolBufferWithTimedRetirement<uint8_t*, 5000, 500> TempCodeBufferAllocator;
+ 
+   static uint64_t ExitFunctionLink(FEXCore::Core::CpuStateFrame* Frame, FEXCore::Context::ExitFunctionLinkData* Record);
+@@ -564,6 +572,23 @@ private:
+    */
+   void InsertGuestRIPMove(ARMEmitter::Register Reg, uint64_t Constant);
+ 
++  /**
++   * @brief Loads a guest RIP with a PC-relative literal load from the multiblock's literal pool
++   *
++   * Falls back to InsertGuestRIPMove when a move is as short, or when the multiblock may be too large for
++   * the +-1MB range of the literal load.
++   *
++   * @param Reg - The GPR to load the guest RIP in to
++   * @param Constant - The guest RIP that will be relocated
++   * @param Size - 32-bit loads the lower half of the literal, zero extended
++   */
++  void InsertGuestRIPLiteralLoad(ARMEmitter::Register Reg, uint64_t Constant, IR::OpSize Size);
++
++  /**
++   * @brief Places the literals queued by InsertGuestRIPLiteralLoad
++   */
++  void PlaceGuestRIPLiterals();
++
+   void InsertGuestPatchableDataMove(ARMEmitter::Register Reg, uint64_t Value, uint64_t SiteAddress, uint8_t ValueSize);
+   void InsertGuestPatchableRIPMove(ARMEmitter::Register Reg, uint64_t Value, uint64_t SiteAddress, uint8_t ValueSize);
+ 
+diff --git a/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp b/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp
+index a3e299e..a4deee0 100644
+--- a/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp
++++ b/FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp
+@@ -475,7 +475,7 @@ void OpDispatchBuilder::CALLOp(OpcodeArgs) {
+   // Call instruction only uses up to 32-bit signed displacement
+   const int64_t TargetOffset = Op->Src[0].Literal();
+ 
+-  const auto ConstantPC = GetRelocatedPC(Op);
++  const auto ConstantPC = GetCallReturnAddress(Op);
+ 
+   // Push the return address.
+   Push(GPRSize, ConstantPC);
+@@ -503,7 +503,7 @@ void OpDispatchBuilder::CALLAbsoluteOp(OpcodeArgs) {
+   Ref JMPPCOffset = LoadSourceGPR(Op, Op->Src[0], Op->Flags);
+ 
+   // Push the return address.
+-  auto ConstantPC = GetRelocatedPC(Op);
++  auto ConstantPC = GetCallReturnAddress(Op);
+   Push(Size, ConstantPC);
+ 
+   // Store the RIP
+diff --git a/FEXCore/Source/Interface/Core/OpcodeDispatcher.h b/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
+index 3b97045..5e6e955 100644
+--- a/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
++++ b/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
+@@ -1525,6 +1525,12 @@ private:
+     return _GetRelocatedPC(Op, Offset, false);
+   }
+ 
++  // The return address of a call. It is only stored, to the guest stack and to the call-ret stack,
++  // so the backend may load it from a literal instead of building it with a chain of moves.
++  Ref GetCallReturnAddress(const FEXCore::X86Tables::DecodedOp& Op) {
++    return _EntrypointOffsetLiteral(GetGPROpSize(), Op->PC + Op->InstSize - Entry);
++  }
++
+   void ExitRelocatedPC(const FEXCore::X86Tables::DecodedOp& Op, int64_t Offset, BranchHint Hint, Ref CallReturnAddress, Ref CallReturnBlock) {
+     uint64_t PatchOffset = 0;
+     uint64_t PatchSize = 0;
+diff --git a/FEXCore/Source/Interface/IR/IR.json b/FEXCore/Source/Interface/IR/IR.json
+index fc5d0aa..cb00474 100644
+--- a/FEXCore/Source/Interface/IR/IR.json
++++ b/FEXCore/Source/Interface/IR/IR.json
+@@ -949,6 +949,17 @@
+         ]
+       },
+ 
++      "GPR = EntrypointOffsetLiteral OpSize:#Size, i64:$Offset": {
++        "Desc": ["Returns the <entrypoint> + Offset address, like EntrypointOffset",
++                 "The backend may load it from a PC-relative literal pool instead of materializing it with moves.",
++                 "Only use it where the extra load latency doesn't matter, e.g. when the value is only stored."
++                ],
++        "DestSize": "Size",
++        "EmitValidation": [
++          "Size == FEXCore::IR::OpSize::i32Bit || Size == FEXCore::IR::OpSize::i64Bit"
++        ]
++      },
++
+       "InlineEntrypointOffset OpSize:#Size, i64:$Offset": {
+         "Desc": ["Returns the <entrypoint> + Offset address",
+                  "When the size is 4 bytes then 32-bit overflow and underflow needs to work"

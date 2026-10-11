@@ -1,0 +1,79 @@
+From: fexdroid
+Subject: [PATCH] JIT: carry invert without FlagM goes through the CarryInvert op
+
+FEX keeps the x86 carry inverted in host NZCV.C and puts it back in the
+canonical polarity before a carry read and at block exits. With FlagM that is
+the CarryInvert IR op (cfinv). Without FlagM (Snapdragon 888 / Cortex-X1,
+ARMv8.2) RectifyCarryInvert emitted LoadNZCV + Xor(1 << 29) + StoreNZCV
+instead. The dead flag pass cannot remove that StoreNZCV when N or Z are still
+live (test + je), so mrs/eor/msr stayed after test/and/or with an immediate or
+an 8-bit test r,r even when nothing reads C afterwards.
+
+RectifyCarryInvert now emits CarryInvert whenever NZCV is not dirty in a GPR,
+on every host. The dead flag pass already treats it as reads C / writes C /
+eliminable, so it disappears when C is dead. When C is live it is lowered to
+mrs/eor/msr through TMP1 on hosts without FlagM (cfinv with FlagM, as
+before). When NZCV is already loaded or dirty in a GPR the old GPR path is
+kept, since inverting that copy is cheaper.
+
+InstCountCI with FlagM disabled: test eax,0x10 / test rax,imm / and / test
+al,al followed by je/jne whose successors overwrite the flags go from 7 to 4
+host instructions; cases where adc/jb/setc read C keep the invert.
+
+Local patch, not upstream.
+---
+diff --git a/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp b/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
+index 3691bca..9a00c29 100644
+--- a/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/ALUOps.cpp
+@@ -285,8 +285,15 @@ DEF_OP(CmpPairZ) {
+ }
+ 
+ DEF_OP(CarryInvert) {
+-  LOGMAN_THROW_A_FMT(CTX->HostFeatures.SupportsFlagM, "Unsupported flagm op");
+-  cfinv();
++  if (CTX->HostFeatures.SupportsFlagM) {
++    cfinv();
++  } else {
++    // No FlagM: flip C (NZCV bit 29) through the scratch register. TMP1 is
++    // never allocated and this op has no register sources.
++    mrs(TMP1, ARMEmitter::SystemRegister::NZCV);
++    eor(ARMEmitter::Size::i32Bit, TMP1, TMP1, 1u << 29);
++    msr(ARMEmitter::SystemRegister::NZCV, TMP1);
++  }
+ }
+ 
+ DEF_OP(RmifNZCV) {
+diff --git a/FEXCore/Source/Interface/Core/OpcodeDispatcher.h b/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
+index 3b97045..9bfca9b 100644
+--- a/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
++++ b/FEXCore/Source/Interface/Core/OpcodeDispatcher.h
+@@ -1778,8 +1778,13 @@ private:
+   // operation reading carry or at the end of a block.
+   void RectifyCarryInvert(bool RequiredInvert) {
+     if (CFInverted != RequiredInvert) {
+-      if (CTX->HostFeatures.SupportsFlagM && !NZCVDirty) {
+-        // Invert as NZCV.
++      if (!NZCVDirty && (CTX->HostFeatures.SupportsFlagM || !CachedNZCV)) {
++        // Invert as NZCV. This is a single cfinv with FlagM, and mrs/eor/msr
++        // through a scratch register without it. Either way it stays a
++        // CarryInvert op in the IR, which the dead flag pass removes when the
++        // carry is not read afterwards (e.g. test + je, or a block exit with
++        // the flags dead). Without FlagM, if NZCV is already loaded into a
++        // GPR, inverting that copy saves the mrs, so keep doing that.
+         _CarryInvert();
+         CachedNZCV = nullptr;
+       } else {
+diff --git a/FEXCore/Source/Interface/IR/IR.json b/FEXCore/Source/Interface/IR/IR.json
+index fc5d0aa..1712704 100644
+--- a/FEXCore/Source/Interface/IR/IR.json
++++ b/FEXCore/Source/Interface/IR/IR.json
+@@ -1149,7 +1149,7 @@
+         ]
+       },
+       "CarryInvert": {
+-        "Desc": ["Invert carry flag in NZCV"],
++        "Desc": ["Invert carry flag in NZCV", "cfinv with FlagM, else mrs/eor/msr through a scratch register"],
+         "HasSideEffects": true
+       },
+       "AXFlag GPR:$V_inv": {

@@ -1,0 +1,221 @@
+From: fexdroid
+Subject: [PATCH] DFE: read the raw fcmp flags instead of emulating AXFLAG
+
+comiss/ucomiss/comisd/ucomisd (and fcomi/fucomi) end in FCmp + AXFlag. Without
+FlagM2 (Cortex-X1) AXFlag is emulated with cset vc + csetm eq + ccmn after
+every compare, which then mostly feeds a single ja/jbe/jae/jb, setcc or cmovcc.
+Those read the converted flags with hi/ls/hs/lo, and each of the four selects
+the same comparison outcomes as one condition on the raw fcmp flags, unordered
+included:
+
+  hi {gt} = gt,  ls {lt,eq,un} = le,  hs {gt,eq} = ge,  lo {lt,un} = lt
+
+After the liveness fixpoint, an AXFlag is removed and its readers retargeted
+when: every NZCV reader up to a full NZCV overwrite (or the block end) is an
+NZCVSelect/NZCVSelectV/NZCVSelectIncrement/CondJump using one of those four
+conditions; nothing between the AXFlag and a reader can fault; and if NZCV is
+not overwritten in the block, the block ends in Jump/CondJump with NZCV dead on
+entry to every successor. The V_inv select goes too when PF does not use it.
+Everything else (eq/ne, SF/OF conditions, PF reads, readers in successor
+blocks, partial writes, other exits) keeps the AXFlag.
+
+Local patch, not upstream.
+---
+diff --git a/FEXCore/Source/Interface/IR/Passes/RedundantFlagCalculationElimination.cpp b/FEXCore/Source/Interface/IR/Passes/RedundantFlagCalculationElimination.cpp
+index dc44f16..78e0a53 100644
+--- a/FEXCore/Source/Interface/IR/Passes/RedundantFlagCalculationElimination.cpp
++++ b/FEXCore/Source/Interface/IR/Passes/RedundantFlagCalculationElimination.cpp
+@@ -158,6 +158,7 @@ private:
+   bool EliminateDeadCode(IREmitter* IREmit, Ref CodeNode, IROp_Header* IROp);
+   void FoldBranch(IREmitter* IREmit, IRListView& CurrentIR, IROp_CondJump* Op, Ref CodeNode);
+   CondClass X86ToArmFloatCond(CondClass X86);
++  bool FoldAXFlag(IREmitter* IREmit, IRListView& CurrentIR, ControlFlowGraph& CFG, Ref Block, Ref CodeNode);
+   bool ProcessBlock(IREmitter* IREmit, IRListView& CurrentIR, Ref Block, ControlFlowGraph& CFG);
+   void OptimizeParity(IREmitter* IREmit, IRListView& CurrentIR, ControlFlowGraph& CFG);
+ };
+@@ -518,6 +519,167 @@ void DeadFlagCalculationEliminination::FoldBranch(IREmitter* IREmit, IRListView&
+   IREmit->Remove(CurrentIR.GetNode(PrevWrap));
+ }
+ 
++// fexdroid: after an FCmp, AXFlag turns the Arm NZCV (gt: nzCv, lt: Nzcv,
++// eq: nZCv, unordered: nzCV) into the x86 one with an inverted CF (gt: nzCv,
++// lt: nzcv, eq: nZCv, unordered: nZcv). The dispatcher reads that with
++// UGT/ULE/UGE/ULT (hi/ls/hs/lo) for ja/jbe/jae/jb, seta/..., cmova/....
++// Each of those four selects exactly the same comparison outcomes as one
++// condition on the raw FCmp flags, unordered included:
++//
++//   hi (C && !Z)  {gt}          = gt (!Z && N == V)  FGT
++//   ls (!C || Z)  {lt, eq, un}  = le (Z || N != V)   FLEU
++//   hs (C)        {gt, eq}      = ge (N == V)        FGE
++//   lo (!C)       {lt, un}      = lt (N != V)        FLU
++//
++// No other condition has one (Z is set for unordered after AXFlag but not
++// after FCmp, and N/V are constant after AXFlag but not after FCmp).
++static CondClass AXFlagToRawFCmpCond(CondClass Cond) {
++  switch (Cond) {
++  case CondClass::UGT: return CondClass::FGT;
++  case CondClass::ULE: return CondClass::FLEU;
++  case CondClass::UGE: return CondClass::FGE;
++  case CondClass::ULT: return CondClass::FLU;
++  default: return CondClass::AL;
++  }
++}
++
++// fexdroid: the condition of an NZCV reader that can be retargeted, or null.
++static CondClass* NZCVReaderCond(IROp_Header* IROp) {
++  switch (IROp->Op) {
++  case OP_NZCVSELECT: return &IROp->CW<IROp_NZCVSelect>()->Cond;
++  case OP_NZCVSELECTV: return &IROp->CW<IROp_NZCVSelectV>()->Cond;
++  case OP_NZCVSELECTINCREMENT: return &IROp->CW<IROp_NZCVSelectIncrement>()->Cond;
++  case OP_CONDJUMP: {
++    auto Op = IROp->CW<IROp_CondJump>();
++    return Op->FromNZCV ? &Op->Cond : nullptr;
++  }
++  default: return nullptr;
++  }
++}
++
++// fexdroid: ops that cannot fault and do not touch NZCV implicitly, so a
++// signal can not observe the flags while they sit before one of them. Kept
++// short on purpose: anything else between the AXFlag and its last reader
++// (a memory access in particular) stops the fold.
++static bool AllowedBeforeAXFlagReader(IROps Op) {
++  switch (Op) {
++  case OP_INLINECONSTANT:
++  case OP_CONSTANT:
++  case OP_GUESTOPCODE:
++  case OP_LOADREGISTER:
++  case OP_STOREREGISTER:
++  case OP_LOADCONTEXT:
++  case OP_STORECONTEXT:
++  case OP_STOREPF:
++  case OP_STOREAF:
++  case OP_NZCVSELECT:
++  case OP_NZCVSELECTV:
++  case OP_NZCVSELECTINCREMENT:
++  case OP_BFI:
++  case OP_BFE:
++  case OP_SBFE:
++  case OP_AND:
++  case OP_OR:
++  case OP_XOR:
++  case OP_ADD:
++  case OP_SUB:
++  case OP_LSHL:
++  case OP_LSHR:
++  case OP_ASHR: return true;
++  default: return false;
++  }
++}
++
++// fexdroid: removes the AXFlag at CodeNode when everything that reads its
++// NZCV is in Block, uses one of the four conditions above, and the flags are
++// dead afterwards (fully overwritten later in Block, or dead on entry to every
++// successor of its Jump/CondJump per the liveness fixpoint). The readers are
++// retargeted to the raw FCmp flags. Returns whether it folded.
++//
++// Flags are only allowed to differ from x86 where they are dead, as for every
++// other elimination in this pass: no op that can fault may sit between the
++// AXFlag and a reader, and any other exit (ExitFunction, Break, ...) keeps it.
++bool DeadFlagCalculationEliminination::FoldAXFlag(IREmitter* IREmit, IRListView& CurrentIR, ControlFlowGraph& CFG, Ref Block, Ref CodeNode) {
++  constexpr size_t MaxReaders = 8;
++  std::array<CondClass*, MaxReaders> Readers;
++  size_t NumReaders = 0;
++
++  auto BlockIROp = CurrentIR.GetOp<IR::IROp_CodeBlock>(Block);
++  const auto End = CurrentIR.at(BlockIROp->Last);
++
++  bool MayFault = false;
++  bool Overwritten = false;
++  IROp_Header* ExitOp = nullptr;
++
++  auto It = CurrentIR.at(CodeNode);
++  for (++It; It != End; ++It) {
++    auto [Node, IROp] = It();
++    ExitOp = IROp;
++
++    const FlagInfo Info = Classify(IROp);
++    if (Info.Read() & FLAG_NZCV) {
++      CondClass* Cond = NZCVReaderCond(IROp);
++      if (!Cond || AXFlagToRawFCmpCond(*Cond) == CondClass::AL || MayFault || NumReaders == MaxReaders) {
++        return false;
++      }
++
++      Readers[NumReaders++] = Cond;
++    }
++
++    if (Info.Write() & FLAG_NZCV) {
++      // A partial write would leave a mix of FCmp and new flags behind.
++      if ((Info.Write() & FLAG_NZCV) != FLAG_NZCV) {
++        return false;
++      }
++
++      Overwritten = true;
++      break;
++    }
++
++    if (!AllowedBeforeAXFlagReader(IROp->Op)) {
++      MayFault = true;
++    }
++  }
++
++  if (NumReaders == 0) {
++    // Dead AXFlags are already removed by ProcessBlock.
++    return false;
++  }
++
++  if (!Overwritten) {
++    uint32_t FlagsOut;
++    if (ExitOp->Op == OP_CONDJUMP) {
++      auto Op = ExitOp->C<IR::IROp_CondJump>();
++      FlagsOut = CFG.Get(Op->TrueBlock)->Flags | CFG.Get(Op->FalseBlock)->Flags;
++    } else if (ExitOp->Op == OP_JUMP) {
++      FlagsOut = CFG.Get(ExitOp->Args[0])->Flags;
++    } else {
++      return false;
++    }
++
++    if (FlagsOut & FLAG_NZCV) {
++      return false;
++    }
++  }
++
++  for (size_t i = 0; i < NumReaders; ++i) {
++    *Readers[i] = AXFlagToRawFCmpCond(*Readers[i]);
++  }
++
++  // The V_inv select only fed the emulated AXFlag unless PF is still stored.
++  const auto V_inv = CurrentIR.GetOp<IR::IROp_AXFlag>(CodeNode)->V_inv;
++  IREmit->Remove(CodeNode);
++
++  if (!V_inv.IsInvalid()) {
++    Ref V_invNode = CurrentIR.GetNode(V_inv);
++    if (V_invNode->GetUses() == 0 && !IR::HasSideEffects(CurrentIR.GetOp<IR::IROp_Header>(V_invNode)->Op)) {
++      IREmit->Remove(V_invNode);
++    }
++  }
++
++  return true;
++}
++
+ /**
+  * @brief This pass removes dead code locally.
+  */
+@@ -723,6 +885,17 @@ void DeadFlagCalculationEliminination::Run(IREmitter* IREmit) {
+     }
+   }
+ 
++  // fexdroid: retarget the readers of FCmp+AXFlag to the raw FCmp flags where
++  // nothing else can see them, and drop the AXFlag. Before FoldBranch, which
++  // would otherwise try its own (narrower) AXFlag fold.
++  for (auto [Block, _] : CurrentIR.GetBlocks()) {
++    for (auto [CodeNode, IROp] : CurrentIR.GetCode(Block)) {
++      if (IROp->Op == OP_AXFLAG) {
++        FoldAXFlag(IREmit, CurrentIR, CFG, Block, CodeNode);
++      }
++    }
++  }
++
+   // Fold compares into branches now that we're otherwise optimized. This needs
+   // to run after eliminating carries etc and it needs the global flag metadata.
+   // But it only needs to run once, we don't do it in the loop.

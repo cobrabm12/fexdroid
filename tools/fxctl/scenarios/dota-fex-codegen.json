@@ -1,0 +1,155 @@
+{
+  "name": "dota-fex-codegen",
+  "description": "FEX-2609 with the local patches up to 0007 against the same plus 0008 (sign-extending loads), 0009 (raw fcmp flags instead of the AXFLAG emulation), 0010 (carry flip left to the dead-flag pass) and 0011 (call return addresses from a literal). Both builds are files of the app: rootfs/usr/bin/FEX.pre0008 and fextest/new/FEX.",
+  "note": "Uses the arm64 Steam client (the x86 one waited on a Steam Cloud dialog). Screen coordinates are the Realme GT's.",
+  "repeat": 2,
+  "order": "abba",
+  "noise_pct": 10,
+  "requires_charging": true,
+  "min_battery": 40,
+  "session_env": [
+    "FEX_PROFILESTATS=1"
+  ],
+  "launch_options": {
+    "570": "-condebug +fps_max 120 +playdemo replays/9020144444.dem"
+  },
+  "variants": [
+    {
+      "name": "fex-0007",
+      "game": "steam-arm64",
+      "copy_files": {
+        "rootfs/usr/bin/FEX": "rootfs/usr/bin/FEX.pre0008",
+        "rootfs/usr/bin/FEXServer": "rootfs/usr/bin/FEXServer.pre0008"
+      }
+    },
+    {
+      "name": "fex-0011",
+      "game": "steam-arm64",
+      "copy_files": {
+        "rootfs/usr/bin/FEX": "fextest/new/FEX",
+        "rootfs/usr/bin/FEXServer": "fextest/new/FEXServer"
+      }
+    }
+  ],
+  "run": [
+    {
+      "do": "stop_session",
+      "settle": 8
+    },
+    {
+      "do": "apply_variant"
+    },
+    {
+      "do": "remove_file",
+      "path": "steamlib/steamapps/common/dota 2 beta/game/dota/console.log"
+    },
+    {
+      "do": "start_session",
+      "game": "steam"
+    },
+    {
+      "do": "wait",
+      "until": {
+        "state": "Running"
+      },
+      "timeout": 120,
+      "interval": 5
+    },
+    {
+      "do": "wait",
+      "until": {
+        "any": [
+          {
+            "process": "steamwebhelper"
+          },
+          {
+            "log": "Desktop state changed"
+          }
+        ]
+      },
+      "timeout": 300,
+      "interval": 10,
+      "note": "Steam's web UI is up (the main window's X title is empty on the phone)"
+    },
+    {
+      "do": "sleep",
+      "seconds": 40,
+      "note": "Steam finishes logging in"
+    },
+    {
+      "do": "steam_url",
+      "url": "steam://rungameid/570",
+      "until": {
+        "process": "^dota$"
+      },
+      "timeout": 300,
+      "resend_every": 60
+    },
+    {
+      "do": "wait",
+      "until": {
+        "guest_grep": {
+          "file": "steamlib/steamapps/common/dota 2 beta/game/dota/console.log",
+          "pattern": "LoadingDisplay changed from LOADING to NONE"
+        }
+      },
+      "timeout": 400,
+      "interval": 5,
+      "note": "the replay has loaded"
+    },
+    {
+      "do": "sleep",
+      "seconds": 15
+    },
+    {
+      "do": "drag_handle",
+      "row_y": 239,
+      "x_range": [
+        2085,
+        2300
+      ],
+      "to_x": 2262,
+      "accept_min_x": 2230,
+      "source": "mouse",
+      "retries": 3,
+      "settle": 8,
+      "expect": {
+        "process": "^dota$"
+      },
+      "note": "seek to the same late moment of the match"
+    },
+    {
+      "do": "sleep",
+      "seconds": 22
+    },
+    {
+      "do": "screenshot",
+      "save": "start"
+    },
+    {
+      "do": "memory",
+      "match": "linuxsteamrt64/dota2",
+      "label": "before"
+    },
+    {
+      "do": "measure_fps",
+      "seconds": 150,
+      "label": "replay"
+    },
+    {
+      "do": "memory",
+      "match": "linuxsteamrt64/dota2",
+      "label": "after"
+    },
+    {
+      "do": "kill_process",
+      "match": "linuxsteamrt64/dota2"
+    }
+  ],
+  "teardown": [
+    {
+      "do": "kill_process",
+      "match": "linuxsteamrt64/dota2"
+    }
+  ]
+}

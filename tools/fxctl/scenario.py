@@ -140,10 +140,14 @@ def validate(sc):
             errors.append(f"variants[{i}]: name {v['name']!r} used twice")
         names.add(v["name"])
         for k in v:
-            if k not in ("name", "session_env", "launch_options", "files", "root_files", "game", "note"):
+            if k not in ("name", "session_env", "launch_options", "files", "root_files", "copy_files", "game", "note"):
                 errors.append(f"variants[{i}]: unknown key {k!r}")
         if not all(isinstance(x, str) and "=" in x for x in v.get("session_env", [])):
             errors.append(f"variants[{i}].session_env: KEY=VALUE strings")
+        cf = v.get("copy_files", {})
+        if not isinstance(cf, dict) or any(not isinstance(t, str) or f.startswith("/") or t.startswith("/") or ".." in f + t
+                                           for f, t in cf.items()):
+            errors.append(f"variants[{i}].copy_files: {{\"path under files/\": \"path under files/ to copy from\"}}")
         rf = v.get("root_files", {})
         if not isinstance(rf, dict) or not all(isinstance(t, str) and re.fullmatch(r"/(sys|proc)/[A-Za-z0-9_./-]+", f)
                                                 for f, t in rf.items()):
@@ -188,6 +192,7 @@ class Runner:
         self.samples = []      # dicts: variant, round, label, fps, ...
         self.failures = []
         self._restore = {}     # app files we overwrote -> previous text (None: did not exist)
+        self._copied = set()     # app files replaced by copy_files (originals in <name>.fxctl-orig)
         self._root_restore = {}  # kernel settings (root) we changed -> previous value
 
     # Guards -----------------------------------------------------------------------------
@@ -318,6 +323,12 @@ class Runner:
         self.dev.write_app_file(rel, text)
 
     def restore_files(self):
+        for rel in sorted(self._copied):
+            try:
+                self.dev.run_as(f"mv files/{shlex.quote(rel)}.fxctl-orig files/{shlex.quote(rel)}")
+            except DeviceError as e:
+                self.out(f"warning: could not put back files/{rel}: {e}")
+        self._copied.clear()
         for path, value in self._root_restore.items():
             try:
                 self.dev.write_root_file(path, value)
@@ -356,6 +367,16 @@ class Runner:
             opts.update(self.variant.get("launch_options", {}))
             for appid, line in opts.items():
                 self.write(f"launch-options-{appid}.txt", line + "\n")
+            # Files of the app replaced by others of the app (a FEX build against another): the
+            # original is kept aside once and put back for the variants that do not name it.
+            mine_copy = self.variant.get("copy_files", {})
+            for rel in sorted({f for v in self.sc["variants"] for f in v.get("copy_files", {})}):
+                if rel not in self._copied:
+                    self.dev.run_as(f"cp -p files/{shlex.quote(rel)} files/{shlex.quote(rel)}.fxctl-orig")
+                    self._copied.add(rel)
+                src = mine_copy.get(rel, rel + ".fxctl-orig")
+                self.dev.run_as(f"cp files/{shlex.quote(src)} files/{shlex.quote(rel)}.fxctl-new && "
+                                f"mv files/{shlex.quote(rel)}.fxctl-new files/{shlex.quote(rel)}")
             # Kernel settings (root): the variant's value, or the one found before the run.
             mine_root = self.variant.get("root_files", {})
             for path in sorted({f for v in self.sc["variants"] for f in v.get("root_files", {})}):

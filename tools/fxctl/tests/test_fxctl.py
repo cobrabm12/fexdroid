@@ -317,6 +317,24 @@ class Running(unittest.TestCase):
             self.assertEqual(phone.files["tuner.txt"], "pin\n")
             self.assertNotIn("new.txt", phone.files)
 
+    def test_copy_files(self):
+        phone = FakePhone()
+        cmds = []
+        real = phone.run_as
+        phone.run_as = lambda c, timeout=120: (cmds.append(c), real(c, timeout))[1]
+        sc = scenario.validate({"name": "x", "run": [{"do": "apply_variant"}], "variants": [
+            {"name": "old", "copy_files": {"rootfs/usr/bin/FEX": "fextest/old/FEX"}}, {"name": "new"}]})
+        with tempfile.TemporaryDirectory() as d:
+            r, _ = fast_runner(phone, sc, d)
+            r.run()
+        joined = "\n".join(cmds)
+        self.assertIn("cp -p files/rootfs/usr/bin/FEX files/rootfs/usr/bin/FEX.fxctl-orig", joined)
+        self.assertIn("cp files/fextest/old/FEX files/rootfs/usr/bin/FEX.fxctl-new", joined)
+        self.assertIn("cp files/rootfs/usr/bin/FEX.fxctl-orig files/rootfs/usr/bin/FEX.fxctl-new", joined)
+        self.assertTrue(cmds[-1].startswith("mv files/rootfs/usr/bin/FEX.fxctl-orig files/rootfs/usr/bin/FEX"))
+        with self.assertRaises(scenario.ScenarioError):
+            scenario.validate({"name": "x", "run": [], "variants": [{"name": "a", "copy_files": {"a": "../b"}}]})
+
     def test_root_files(self):
         phone = FakePhone()
         thp = "/sys/kernel/mm/transparent_hugepage/enabled"

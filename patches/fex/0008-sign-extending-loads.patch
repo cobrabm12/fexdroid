@@ -14,16 +14,17 @@ them would otherwise be reused.
 ---
 --- a/FEXCore/Source/Interface/IR/IR.json
 +++ b/FEXCore/Source/Interface/IR/IR.json
-@@ -533,6 +533,14 @@
+@@ -533,6 +533,15 @@
          "DestSize": "Size"
        },
  
-+      "GPR = LoadMemSExt OpSize:#Size, OpSize:$SrcSize, GPR:$Addr, GPR:$Offset, MemOffsetType:$OffsetType, u8:$OffsetScale": {
-+        "Desc": ["Loads SrcSize bytes from memory and sign extends them to Size (ldrsb/ldrsh/ldrsw).",
-+                 "Plain (non-TSO) loads only. A 32-bit Size zeroes the upper 32 bits."
++      "GPR = LoadMemSExt OpSize:#DstSize, OpSize:$Size, GPR:$Addr, GPR:$Offset, MemOffsetType:$OffsetType, u8:$OffsetScale": {
++        "Desc": ["Loads Size bytes from memory and sign extends them to DstSize (ldrsb/ldrsh/ldrsw).",
++                 "Plain (non-TSO) loads only. A 32-bit DstSize zeroes the upper 32 bits.",
++                 "The access size is the argument named Size: an inlined offset is checked against it."
 +                ],
 +        "Inline": ["", "Mem"],
-+        "DestSize": "Size"
++        "DestSize": "DstSize"
 +      },
 +
        "SSA:$Value1, SSA:$Value2 = LoadMemPair RegisterClass:$Class, OpSize:#Size, GPR:$Addr, u32:$Offset": {
@@ -37,11 +38,11 @@ them would otherwise be reused.
  
 +DEF_OP(LoadMemSExt) {
 +  const auto Op = IROp->C<IR::IROp_LoadMemSExt>();
-+  const auto MemSrc = GenerateMemOperand(Op->SrcSize, GetReg(Op->Addr), Op->Offset, Op->OffsetType, Op->OffsetScale);
++  const auto MemSrc = GenerateMemOperand(Op->Size, GetReg(Op->Addr), Op->Offset, Op->OffsetType, Op->OffsetScale);
 +  const auto Dst = GetReg(Node);
 +  const bool Wide = IROp->Size == IR::OpSize::i64Bit;
 +
-+  switch (Op->SrcSize) {
++  switch (Op->Size) {
 +  case IR::OpSize::i8Bit:
 +    if (Wide) {
 +      ldrsb(Dst.X(), MemSrc);
@@ -60,7 +61,7 @@ them would otherwise be reused.
 +    LOGMAN_THROW_A_FMT(Wide, "LoadMemSExt: a 32-bit source needs a 64-bit result");
 +    ldrsw(Dst.X(), MemSrc);
 +    break;
-+  default: LOGMAN_MSG_A_FMT("Unhandled LoadMemSExt size: {}", Op->SrcSize); break;
++  default: LOGMAN_MSG_A_FMT("Unhandled LoadMemSExt size: {}", Op->Size); break;
 +  }
 +}
 +
